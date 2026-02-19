@@ -19,16 +19,13 @@ export function Hero({ appName }: HeroProps) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] py-16 px-4">
+    <div className="flex flex-col items-center justify-center min-h-[50vh] py-12 px-4">
       <div className="text-center mb-8 max-w-3xl">
-        <p className="text-sm font-medium text-primary mb-3 tracking-wide uppercase">
-          Knowledge Base
-        </p>
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
           {name}
         </h1>
-        <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-          Get instant answers about admissions, programs, tuition, campus life, and more.
+        <p className="text-muted-foreground max-w-xl mx-auto">
+          Ask questions about admissions, programs, tuition, campus life, and more.
         </p>
       </div>
 

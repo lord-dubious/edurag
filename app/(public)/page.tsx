@@ -2,7 +2,6 @@ import { Hero } from '@/components/landing/Hero';
 import { FaqSection } from '@/components/landing/FaqSection';
 import { SuggestionChipsWrapper } from '@/components/landing/SuggestionChips';
 import { ThemeToggle } from '@/components/providers/theme-toggle';
-import { Button } from '@/components/ui/button';
 import { MessageSquareIcon } from 'lucide-react';
 import Link from 'next/link';
 
@@ -17,17 +16,9 @@ export default async function HomePage() {
         <div className="container flex h-14 items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <MessageSquareIcon className="size-5 text-primary" />
-            <span className="font-semibold text-lg">{appName}</span>
+            <span className="font-semibold">{appName}</span>
           </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Link href="/chat">
-              <Button size="sm" className="gap-2">
-                <MessageSquareIcon className="size-4" />
-                Start Chatting
-              </Button>
-            </Link>
-          </div>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -39,9 +30,9 @@ export default async function HomePage() {
         <FaqSection />
       </main>
 
-      <footer className="border-t py-6 md:py-0">
-        <div className="container flex h-14 items-center justify-center text-sm text-muted-foreground">
-          Powered by EduRAG
+      <footer className="border-t py-4">
+        <div className="container flex items-center justify-center text-xs text-muted-foreground">
+          {appName} · Powered by EduRAG
         </div>
       </footer>
     </div>
