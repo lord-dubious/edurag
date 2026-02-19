@@ -1,34 +1,54 @@
-import { env } from '@/lib/env';
+'use client';
 
-export function Hero() {
+import { useRouter } from 'next/navigation';
+import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputFooter, PromptInputSubmit } from '@/components/ai-elements/prompt-input';
+import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
+import type { ChatStatus } from 'ai';
+
+interface HeroProps {
+  appName?: string;
+}
+
+export function Hero({ appName }: HeroProps) {
+  const router = useRouter();
+  const name = appName ?? process.env.NEXT_PUBLIC_APP_NAME ?? 'University Knowledge Base';
+
+  const handleSubmit = (message: PromptInputMessage) => {
+    const encodedQuery = encodeURIComponent(message.text);
+    router.push(`/chat?q=${encodedQuery}`);
+  };
+
   return (
-    <div className="bg-gradient-to-b from-primary/10 to-background py-20">
-      <div className="container mx-auto px-4 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">
-          {env.NEXT_PUBLIC_APP_NAME}
+    <div className="flex flex-col items-center justify-center min-h-[60vh] py-16 px-4">
+      <div className="text-center mb-8 max-w-3xl">
+        <p className="text-sm font-medium text-primary mb-3 tracking-wide uppercase">
+          Knowledge Base
+        </p>
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+          {name}
         </h1>
-        <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+        <p className="text-lg text-muted-foreground max-w-xl mx-auto">
           Get instant answers about admissions, programs, tuition, campus life, and more.
         </p>
-        <a
-          href="/chat"
-          className="inline-flex items-center px-6 py-3 bg-primary text-primary-foreground rounded-lg text-lg font-medium hover:opacity-90 transition-opacity"
-        >
-          Start Chatting
-          <svg
-            className="ml-2 w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13 7l5 5m0 0l-5 5m5-5H6"
+      </div>
+
+      <div className="w-full max-w-2xl">
+        <PromptInput onSubmit={handleSubmit} className="shadow-lg">
+          <PromptInputBody>
+            <PromptInputTextarea 
+              placeholder="Ask anything about the university..."
+              className="min-h-[56px] text-base"
             />
-          </svg>
-        </a>
+          </PromptInputBody>
+          <PromptInputFooter>
+            <div className="flex-1" />
+            <PromptInputSubmit status={'ready' as ChatStatus} />
+          </PromptInputFooter>
+        </PromptInput>
+
+        <p className="text-xs text-muted-foreground text-center mt-3">
+          Press Enter to send, Shift+Enter for new line
+        </p>
       </div>
     </div>
   );

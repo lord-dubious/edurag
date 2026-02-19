@@ -8,6 +8,12 @@ interface Session {
   preview?: string;
 }
 
+interface StoredSession {
+  id: string;
+  createdAt: string;
+  preview?: string;
+}
+
 interface Props {
   currentThreadId: string;
   onNewChat: () => void;
@@ -21,8 +27,8 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession }: 
     const stored = localStorage.getItem('edurag-sessions');
     if (stored) {
       try {
-        const parsed = JSON.parse(stored);
-        setSessions(parsed.map((s: any) => ({
+        const parsed: StoredSession[] = JSON.parse(stored);
+        setSessions(parsed.map((s) => ({
           ...s,
           createdAt: new Date(s.createdAt),
         })));

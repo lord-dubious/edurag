@@ -294,23 +294,25 @@ Question: {QUESTION}`;
 
 Each tool is a self-contained export. **To add a new tool**: add an export here, register it in `lib/agent/index.ts`. No other files need to change.
 
+> **IMPORTANT**: AI SDK 6 uses `inputSchema` (not `parameters`) for Zod schema definition.
+
 ```typescript
 import { tool } from 'ai';
 import { z } from 'zod';
-import { getVectorStore } from '../vectorstore';
+import { similaritySearchWithScore } from '../vectorstore';
 
 // ─── Tool: Vector Search ─────────────────────────────────────────────────────
 export const createVectorSearchTool = (threadId: string) =>
   tool({
     description:
       'Search the university knowledge base for information about programs, admissions, fees, campus life, deadlines, and any other university-related topics.',
-    inputSchema: z.object({
+    inputSchema: z.object({  // Use inputSchema, NOT parameters
       query: z.string().describe('A specific search query. Be precise for better results.'),
       topK: z.number().optional().default(5),
     }),
     execute: async ({ query, topK = 5 }) => {
-      const vectorStore = await getVectorStore(threadId);
-      const results = await vectorStore.similaritySearchWithScore(query, topK);
+      // Post-filtering: search all, then filter in code
+      const results = await similaritySearchWithScore(query, topK, threadId);
 
       if (results.length === 0) return { found: false, results: [] };
 
@@ -329,7 +331,7 @@ export const createVectorSearchTool = (threadId: string) =>
 // ─── Tool: Get Popular FAQs ───────────────────────────────────────────────────
 export const getPopularFaqsTool = tool({
   description: 'Retrieve the most frequently asked questions to suggest related topics.',
-  inputSchema: z.object({ limit: z.number().optional().default(3) }),
+  inputSchema: z.object({ limit: z.number().optional().default(3) }),  // Use inputSchema
   execute: async ({ limit }) => {
     const { getPublicFaqs } = await import('../faq-manager');
     const faqs = await getPublicFaqs(limit);
@@ -595,6 +597,8 @@ export async function POST(req: Request) {
 
 ### 5.9 `lib/crawl.ts`
 
+> **IMPORTANT**: Tavily JS SDK uses camelCase (not snake_case like Python SDK).
+
 ```typescript
 import { tavily } from '@tavily/core';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
@@ -627,15 +631,16 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
   const excludePaths = opts.excludePaths
     ?? env.CRAWL_EXCLUDE_PATHS?.split(',').map(p => p.trim()).filter(Boolean);
 
+  // Tavily JS SDK uses camelCase, NOT snake_case
   const crawlResponse = await client.crawl(opts.url, {
-    maxDepth: opts.maxDepth ?? env.CRAWL_MAX_DEPTH,
-    maxBreadth: opts.maxBreadth ?? env.CRAWL_MAX_BREADTH,
+    maxDepth: opts.maxDepth ?? env.CRAWL_MAX_DEPTH,        // NOT max_depth
+    maxBreadth: opts.maxBreadth ?? env.CRAWL_MAX_BREADTH,  // NOT max_breadth
     limit: opts.limit ?? env.CRAWL_LIMIT,
-    extractDepth: opts.extractDepth ?? env.CRAWL_EXTRACT_DEPTH,
+    extractDepth: opts.extractDepth ?? env.CRAWL_EXTRACT_DEPTH,  // NOT extract_depth
     instructions: opts.instructions ?? env.CRAWL_INSTRUCTIONS,
-    selectPaths: selectPaths?.length ? selectPaths : undefined,
-    excludePaths: excludePaths?.length ? excludePaths : undefined,
-    allowExternal: opts.allowExternal ?? env.CRAWL_ALLOW_EXTERNAL,
+    selectPaths: selectPaths?.length ? selectPaths : undefined,   // NOT select_paths
+    excludePaths: excludePaths?.length ? excludePaths : undefined, // NOT exclude_paths
+    allowExternal: opts.allowExternal ?? env.CRAWL_ALLOW_EXTERNAL, // NOT allow_external
     format: opts.format ?? env.CRAWL_FORMAT,
   });
 
@@ -651,11 +656,12 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
     const result = crawlResponse.results[i];
     opts.onProgress?.(i + 1, total);
 
+    // JS SDK uses rawContent (camelCase), NOT raw_content
     const chunks = await splitter.createDocuments([result.rawContent], [{
       url: result.url,
       title: result.title,
-      thread_id: opts.threadId,
-      base_url: opts.url,
+      threadId: opts.threadId,  // Stored at root level (LangChain spreads metadata)
+      baseUrl: opts.url,
       timestamp: new Date().toISOString(),
     }]);
     documents.push(...chunks);
@@ -674,7 +680,8 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
 
 export async function deleteCrawlData(threadId: string): Promise<number> {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
-  const result = await collection.deleteMany({ 'metadata.thread_id': threadId });
+  // Metadata is stored at ROOT level by LangChain, not in a subdocument
+  const result = await collection.deleteMany({ threadId });
   return result.deletedCount;
 }
 ```
@@ -752,6 +759,55 @@ npx ai-elements@latest add attachments
 After installing `message`, add to `app/globals.css`:
 ```css
 @source "../node_modules/streamdown/dist/*.js";
+```
+
+### AI SDK 6 `useChat` Hook
+
+> **IMPORTANT**: AI SDK 6 has a different API than v4.
+
+```typescript
+import { useChat } from '@ai-sdk/react';
+
+const { 
+  messages,      // UIMessage[] - has .parts[] array
+  sendMessage,   // (message: PromptInputMessage) => void
+  status,        // 'submitted' | 'streaming' | 'ready' | 'error'
+  regenerate,    // () => void - regenerate last response
+  error,         // Error | null
+} = useChat({
+  api: '/api/chat',
+  body: { threadId },
+});
+```
+
+### UIMessage Types (AI SDK 6)
+
+```typescript
+import type { UIMessage, TextUIPart, ToolResultUIPart } from 'ai';
+
+// UIMessage.parts is an array of:
+type UIMessagePart = TextUIPart | ToolResultUIPart | ...;
+
+// TextUIPart
+interface TextUIPart {
+  type: 'text';
+  text: string;
+  state?: 'streaming' | 'done';
+}
+
+// ToolResultUIPart - output from tool calls
+interface ToolResultUIPart {
+  type: `tool-${string}`;  // e.g., 'tool-vector_search'
+  toolCallId: string;
+  toolName: string;
+  state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
+  output?: unknown;  // Only available when state is 'output-available'
+}
+
+// Type guard for extracting tool output
+function isToolResultPart(part: { type: string }): part is ToolResultUIPart {
+  return part.type.startsWith('tool-');
+}
 ```
 
 ### Component Usage Map
@@ -1069,17 +1125,30 @@ Mobile: sidebar → drawer, sources panel → bottom sheet via "Sources (N)" bad
 
 ### Vector Index (create in Atlas UI on `crawled_index`)
 
+> **IMPORTANT**: We use **post-filtering** (filter in code after search), matching the original crawl2rag approach. No filter fields needed in index.
+
 ```json
 {
   "fields": [
-    { "type": "vector", "path": "embedding", "numDimensions": 2048, "similarity": "cosine" },
-    { "type": "filter", "path": "metadata.thread_id" },
-    { "type": "filter", "path": "metadata.base_url" }
+    { "type": "vector", "path": "embedding", "numDimensions": 2048, "similarity": "cosine" }
   ]
 }
 ```
 
 > `numDimensions` must match `EMBEDDING_DIMENSIONS`. Voyage `voyage-4-large` = `2048`, OpenAI `text-embedding-3-large` = `3072`.
+
+### Why No Filter Fields?
+
+LangChain's `MongoDBAtlasVectorSearch.fromDocuments()` stores metadata at the **root level** of MongoDB documents (not in a `metadata` subdocument). Instead of pre-filtering via Atlas Vector Search (which requires filter fields in index), we use **post-filtering**:
+
+1. Search all documents with similarity search
+2. Filter results in code by `threadId`
+3. Return filtered results
+
+This approach:
+- Matches the original Python crawl2rag implementation
+- Requires no special index configuration
+- Is simpler and more flexible
 
 ### Collections
 
@@ -1205,6 +1274,15 @@ npx ai-elements@latest add message conversation prompt-input inline-citation con
 
 | Area | Change |
 |---|---|
+| **AI SDK Version** | Upgraded to AI SDK 6.x |
+| **tool() syntax** | Uses `inputSchema` (not `parameters`) for Zod schema definition |
+| **useChat API** | Changed: `sendMessage` instead of `handleSubmit`, no `input/setInput` |
+| **Tavily JS SDK** | Uses camelCase (`maxDepth`, `rawContent`) not snake_case |
+| **MongoDB Index** | Simplified - no filter fields needed (uses post-filtering) |
+| **Metadata storage** | LangChain stores at root level, not `metadata` subdocument |
+| **Post-filtering** | Filter in code after search (matches original crawl2rag) |
+| **Type safety** | No `any` types - strict TypeScript throughout |
+| **UI Components** | Full Admin UI + Student UI with AI Elements + shadcn/ui |
 | **Docker** | Removed — replaced with Vercel, Render, Netlify guides |
 | **Agent module** | Refactored into `lib/agent/` (prompts.ts, tools.ts, index.ts) for extensibility |
 | **System prompt** | Full prompt added to `lib/agent/prompts.ts` — mirrors `backend/prompts.py` |

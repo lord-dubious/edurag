@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, type Document as MongoDocument, type WithId, type OptionalId } from 'mongodb';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { env } from './env';
 import { embeddings } from './providers';
@@ -13,10 +13,14 @@ export async function getMongoClient(): Promise<MongoClient> {
   return client;
 }
 
-export async function getMongoCollection(collectionName: string) {
+export async function getMongoCollection<TSchema extends MongoDocument = MongoDocument>(
+  collectionName: string
+) {
   const client = await getMongoClient();
-  return client.db(env.DB_NAME).collection(collectionName);
+  return client.db(env.DB_NAME).collection<TSchema>(collectionName);
 }
+
+export type { MongoDocument, WithId, OptionalId };
 
 export async function getVectorStore(threadId?: string) {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);

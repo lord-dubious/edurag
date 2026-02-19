@@ -1,15 +1,42 @@
 import { Hero } from '@/components/landing/Hero';
 import { FaqSection } from '@/components/landing/FaqSection';
+import { SuggestionChips } from '@/components/landing/SuggestionChips';
+import { Button } from '@/components/ui/button';
+import { MessageSquareIcon } from 'lucide-react';
+import Link from 'next/link';
 
 export const revalidate = 3600;
 
 export default async function HomePage() {
   return (
-    <div className="min-h-screen">
-      <Hero />
-      <div className="container mx-auto px-4 py-16">
+    <div className="min-h-screen flex flex-col">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-14 items-center justify-between">
+          <Link href="/" className="font-semibold text-lg">
+            {process.env.NEXT_PUBLIC_APP_NAME ?? 'Knowledge Base'}
+          </Link>
+          <Link href="/chat">
+            <Button variant="ghost" size="sm" className="gap-2">
+              <MessageSquareIcon className="size-4" />
+              Chat
+            </Button>
+          </Link>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        <Hero />
+        <div className="container mx-auto px-4">
+          <SuggestionChips />
+        </div>
         <FaqSection />
-      </div>
+      </main>
+
+      <footer className="border-t py-6 md:py-0">
+        <div className="container flex h-14 items-center justify-center text-sm text-muted-foreground">
+          Powered by EduRAG
+        </div>
+      </footer>
     </div>
   );
 }

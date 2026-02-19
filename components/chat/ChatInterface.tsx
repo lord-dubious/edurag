@@ -8,10 +8,40 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { SessionSidebar } from './SessionSidebar';
 import { CitationPanel } from './CitationPanel';
+
 interface Source {
   url: string;
   title?: string;
   content: string;
+}
+
+interface VectorSearchResult {
+  url: string;
+  title?: string;
+  content: string;
+  score: number;
+}
+
+interface VectorSearchToolPart {
+  type: 'tool-vector_search';
+  toolCallId: string;
+  state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
+  input: { query: string; topK?: number };
+  output?: { found: boolean; results: VectorSearchResult[] };
+}
+
+interface VectorSearchToolPartWithOutput {
+  type: 'tool-vector_search';
+  toolCallId: string;
+  state: 'output-available';
+  input: { query: string; topK?: number };
+  output: { found: boolean; results: VectorSearchResult[] };
+}
+
+type MessagePart = { type: string; state?: string; output?: unknown };
+
+function isVectorSearchToolPart(part: MessagePart): part is VectorSearchToolPartWithOutput {
+  return part.type === 'tool-vector_search' && part.state === 'output-available' && 'output' in part;
 }
 
 export function ChatInterface() {
@@ -26,12 +56,12 @@ export function ChatInterface() {
     }),
     onFinish: ({ message }) => {
       if (message.parts) {
-        const toolParts = message.parts.filter(p => p.type === 'tool-result');
+        const toolParts = message.parts.filter(isVectorSearchToolPart);
         if (toolParts.length > 0) {
           const newSources: Source[] = [];
-          toolParts.forEach((part: any) => {
-            if (part.result?.results) {
-              part.result.results.forEach((r: any) => {
+          toolParts.forEach((part) => {
+            if (part.output?.results) {
+              part.output.results.forEach((r: VectorSearchResult) => {
                 newSources.push({
                   url: r.url,
                   title: r.title,

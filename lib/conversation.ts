@@ -1,11 +1,19 @@
-import { getMongoCollection, getMongoClient } from './vectorstore';
+import { getMongoCollection } from './vectorstore';
 import { env } from './env';
-import { ObjectId } from 'mongodb';
+import { ObjectId, type Collection, type WithId, type Document } from 'mongodb';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+}
+
+export interface ConversationDocument {
+  _id?: ObjectId;
+  threadId: string;
+  messages: Message[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Conversation {
@@ -16,14 +24,18 @@ export interface Conversation {
   updatedAt: Date;
 }
 
+export async function getConversationsCollection(): Promise<Collection<ConversationDocument>> {
+  return getMongoCollection<ConversationDocument>(env.CONVERSATIONS_COLLECTION);
+}
+
 export async function getHistory(threadId: string): Promise<Message[]> {
-  const collection = await getMongoCollection(env.CONVERSATIONS_COLLECTION);
+  const collection = await getConversationsCollection();
   const conversation = await collection.findOne({ threadId });
   return conversation?.messages ?? [];
 }
 
 export async function appendMessage(threadId: string, message: Message): Promise<void> {
-  const collection = await getMongoCollection(env.CONVERSATIONS_COLLECTION);
+  const collection = await getConversationsCollection();
   const existing = await collection.findOne({ threadId });
   
   if (existing) {
@@ -45,15 +57,16 @@ export async function appendMessage(threadId: string, message: Message): Promise
 }
 
 export async function clearHistory(threadId: string): Promise<void> {
-  const collection = await getMongoCollection(env.CONVERSATIONS_COLLECTION);
+  const collection = await getConversationsCollection();
   await collection.deleteOne({ threadId });
 }
 
 export async function listConversations(limit = 20): Promise<Conversation[]> {
-  const collection = await getMongoCollection(env.CONVERSATIONS_COLLECTION);
-  return collection
+  const collection = await getConversationsCollection();
+  const docs = await collection
     .find({})
     .sort({ updatedAt: -1 })
     .limit(limit)
-    .toArray() as Promise<Conversation[]>;
+    .toArray();
+  return docs as Conversation[];
 }

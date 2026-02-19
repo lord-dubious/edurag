@@ -1,6 +1,6 @@
 'use client';
 
-import { type UIMessage, type ChatStatus } from 'ai';
+import { type UIMessage, type ChatStatus, type TextUIPart } from 'ai';
 import {
   Message,
   MessageContent,
@@ -58,7 +58,7 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
                 {message.parts.map((part, i) =>
                   part.type === 'text' ? (
                     <MessageResponse key={`${message.id}-${i}`}>
-                      {(part as any).text}
+                      {(part as TextUIPart).text}
                     </MessageResponse>
                   ) : null
                 )}
@@ -71,8 +71,8 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
                   label="Copy"
                   onClick={() => {
                     const text = message.parts
-                      .filter(p => p.type === 'text')
-                      .map(p => (p as any).text)
+                      .filter((p): p is TextUIPart => p.type === 'text')
+                      .map(p => p.text)
                       .join('');
                     navigator.clipboard.writeText(text);
                   }}
