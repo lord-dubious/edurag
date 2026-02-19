@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
@@ -46,7 +46,11 @@ function isVectorSearchToolPart(part: MessagePart): part is VectorSearchToolPart
   return part.type === 'tool-vector_search' && part.state === 'output-available' && 'output' in part;
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  initialQuery?: string;
+}
+
+export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   const [threadId, setThreadId] = useState(() => nanoid());
   const [sources, setSources] = useState<Record<string, Source[]>>({});
   const [showSources, setShowSources] = useState(true);
@@ -84,6 +88,12 @@ export function ChatInterface() {
       }
     },
   });
+
+  useEffect(() => {
+    if (initialQuery && messages.length === 0 && status === 'ready') {
+      sendMessage({ text: initialQuery });
+    }
+  }, [initialQuery, messages.length, status, sendMessage]);
 
   const handleSubmit = useCallback(
     (message: { text: string }) => {

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { GraduationCapIcon, DollarSignIcon, ClipboardListIcon, HomeIcon, BookOpenIcon, UsersIcon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -53,4 +54,15 @@ export function SuggestionChips({ onSuggestionClick }: SuggestionChipsProps) {
       </div>
     </div>
   );
+}
+
+export function SuggestionChipsWrapper() {
+  const router = useRouter();
+
+  const handleSuggestionClick = (query: string) => {
+    const encodedQuery = encodeURIComponent(query);
+    router.push(`/chat?q=${encodedQuery}`);
+  };
+
+  return <SuggestionChips onSuggestionClick={handleSuggestionClick} />;
 }
