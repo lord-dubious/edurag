@@ -15,10 +15,25 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
-const navItems = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/domains', label: 'Domains', icon: Globe },
-  { href: '/admin/faqs', label: 'FAQs', icon: HelpCircle },
+const navSections = [
+  {
+    title: 'Overview',
+    items: [
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: 'Knowledge Base',
+    items: [
+      { href: '/admin/domains', label: 'Domains', icon: Globe },
+    ],
+  },
+  {
+    title: 'Content',
+    items: [
+      { href: '/admin/faqs', label: 'FAQs', icon: HelpCircle },
+    ],
+  },
 ];
 
 export function AdminSidebar() {
@@ -64,26 +79,35 @@ export function AdminSidebar() {
       </header>
 
       <aside className="fixed left-0 top-14 bottom-0 w-56 border-r bg-muted/30 flex flex-col">
-        <nav className="flex-1 p-3 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            
-            return (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    'w-full justify-start gap-2',
-                    isActive && 'bg-primary/10 text-primary hover:bg-primary/15'
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Button>
-              </Link>
-            );
-          })}
+        <nav className="flex-1 p-3">
+          {navSections.map((section) => (
+            <div key={section.title} className="mb-4">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 py-1.5">
+                {section.title}
+              </div>
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+
+                  return (
+                    <Link key={item.href} href={item.href}>
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          'w-full justify-start gap-2',
+                          isActive && 'bg-primary/10 text-primary hover:bg-primary/15'
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {item.label}
+                      </Button>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
       </aside>
     </>
