@@ -23,7 +23,7 @@ export async function runAgent({
     system,
     messages: await convertToModelMessages(messages),
     tools: {
-      vector_search: createVectorSearchTool(threadId),
+      vector_search: createVectorSearchTool(),
       get_popular_faqs: getPopularFaqsTool,
       ...extraTools,
     },

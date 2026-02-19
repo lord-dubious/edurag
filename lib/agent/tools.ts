@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { similaritySearchWithScore } from '../vectorstore';
 import type { VectorSearchResult, ToolResult } from './types';
 
-export const createVectorSearchTool = (threadId: string) =>
+export const createVectorSearchTool = () =>
   tool({
     description:
       'Search the university knowledge base for information about programs, admissions, fees, campus life, deadlines, and any other university-related topics.',
@@ -12,7 +12,7 @@ export const createVectorSearchTool = (threadId: string) =>
       topK: z.number().optional().default(5),
     }),
     execute: async ({ query, topK = 5 }): Promise<ToolResult> => {
-      const results = await similaritySearchWithScore(query, threadId, topK);
+      const results = await similaritySearchWithScore(query, undefined, topK);
 
       if (results.length === 0) return { found: false, results: [] };
 

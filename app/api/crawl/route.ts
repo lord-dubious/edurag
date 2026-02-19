@@ -3,13 +3,15 @@ import { crawlAndVectorize } from '@/lib/crawl';
 import { verifyAdmin } from '@/lib/auth';
 import { errorResponse } from '@/lib/errors';
 import { NextRequest } from 'next/server';
+import { getMongoCollection } from '@/lib/vectorstore';
+import { env } from '@/lib/env';
 
 const bodySchema = z.object({
   url: z.string().url(),
   threadId: z.string().min(1),
   maxDepth: z.coerce.number().min(1).max(5).optional(),
-  maxBreadth: z.coerce.number().min(1).max(100).optional(),
-  limit: z.coerce.number().min(1).max(500).optional(),
+  maxBreadth: z.coerce.number().min(1).optional(),
+  limit: z.coerce.number().min(1).optional(),
   extractDepth: z.enum(['basic', 'advanced']).optional(),
   instructions: z.string().optional(),
   selectPaths: z.array(z.string()).optional(),
@@ -40,6 +42,20 @@ export async function POST(req: NextRequest) {
           ...body,
           onProgress: (page, total) => send({ type: 'progress', page, total }),
         });
+        
+        // Update domain with document count
+        const domainsCollection = await getMongoCollection(env.DOMAINS_COLLECTION);
+        await domainsCollection.updateOne(
+          { threadId: body.threadId },
+          { 
+            $set: { 
+              documentCount: count,
+              lastCrawled: new Date(),
+              status: 'indexed'
+            } 
+          }
+        );
+        
         send({ type: 'complete', documentsIndexed: count });
       } catch (err) {
         send({ type: 'error', message: err instanceof Error ? err.message : 'Crawl failed' });

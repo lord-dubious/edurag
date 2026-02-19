@@ -37,7 +37,7 @@ export async function getVectorStore(threadId?: string) {
 
 export async function similaritySearchWithScore(
   query: string,
-  threadId: string,
+  threadId?: string,
   k: number = 5
 ) {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
@@ -51,22 +51,12 @@ export async function similaritySearchWithScore(
   
   const queryEmbedding = await embeddings.embedQuery(query);
   
-  // Fetch more results to allow post-filtering
-  // This ensures we don't miss relevant documents from other threads
-  const fetchCount = Math.max(k * 3, 20);
-  
   const allResults = await vectorStore.similaritySearchVectorWithScore(
     queryEmbedding,
-    fetchCount
+    k
   );
   
-  // Post-filter by threadId (filter in code, not in MongoDB)
-  // This is more accurate as it searches ALL data first
-  const filteredResults = allResults
-    .filter(([doc]) => doc.metadata.threadId === threadId)
-    .slice(0, k);
-  
-  return filteredResults;
+  return allResults;
 }
 
 export async function closeMongoClient() {
