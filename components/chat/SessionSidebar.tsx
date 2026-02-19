@@ -5,79 +5,58 @@ import { PlusIcon, Trash2Icon, MessageSquareIcon } from 'lucide-react';
 
 interface Session {
   id: string;
-  createdAt: Date;
-  preview?: string;
-}
-
-interface StoredSession {
-  id: string;
-  createdAt: string;
-  preview?: string;
+  title: string;
+  createdAt: number;
 }
 
 interface Props {
   currentThreadId: string;
   onNewChat: () => void;
   onSelectSession: (id: string) => void;
+  onDeleteSession: (id: string) => void;
   collapsed?: boolean;
 }
 
-function getDateGroup(date: Date): string {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 7);
+const STORAGE_KEY = 'edurag_sessions';
 
-  const sessionDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+function getDateGroup(timestamp: number): string {
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const today = Math.floor(now / dayMs);
+  const sessionDay = Math.floor(timestamp / dayMs);
+  const diff = today - sessionDay;
 
-  if (sessionDate >= today) return 'Today';
-  if (sessionDate >= yesterday) return 'Yesterday';
-  if (sessionDate >= weekAgo) return 'This Week';
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  if (diff <= 7) return 'This Week';
   return 'Older';
 }
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, collapsed }: Props) {
+export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, onDeleteSession, collapsed }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
 
   useEffect(() => {
-    const stored = localStorage.getItem('edurag-sessions');
-    if (stored) {
-      try {
-        const parsed: StoredSession[] = JSON.parse(stored);
-        setSessions(parsed.map((s) => ({
-          ...s,
-          createdAt: new Date(s.createdAt),
-        })));
-      } catch (e) {
-        console.error('Failed to parse sessions:', e);
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed: Session[] = JSON.parse(stored);
+        setSessions(parsed);
       }
+    } catch (e) {
+      console.error('Failed to load sessions:', e);
     }
   }, []);
 
-  useEffect(() => {
-    const existing = sessions.find(s => s.id === currentThreadId);
-    if (!existing) {
-      const newSession: Session = {
-        id: currentThreadId,
-        createdAt: new Date(),
-      };
-      const updated = [newSession, ...sessions].slice(0, 50);
-      setSessions(updated);
-      localStorage.setItem('edurag-sessions', JSON.stringify(updated));
-    }
-  }, [currentThreadId, sessions]);
-
-  const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
+  const handleDelete = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
     const updated = sessions.filter(s => s.id !== sessionId);
     setSessions(updated);
-    localStorage.setItem('edurag-sessions', JSON.stringify(updated));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    onDeleteSession(sessionId);
   };
 
   const groupedSessions = useMemo(() => {
@@ -147,14 +126,14 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, co
                       <div className={`text-sm truncate ${
                         session.id === currentThreadId ? 'text-primary font-medium' : ''
                       }`}>
-                        {session.preview ?? `Chat ${session.id.slice(0, 8)}`}
+                        {session.title}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
                         {formatTime(session.createdAt)}
                       </div>
                     </div>
                     <button
-                      onClick={(e) => handleDeleteSession(e, session.id)}
+                      onClick={(e) => handleDelete(e, session.id)}
                       className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
                       title="Delete"
                     >
@@ -166,6 +145,12 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, co
             </div>
           );
         })}
+        
+        {sessions.length === 0 && (
+          <div className="text-center text-muted-foreground text-sm py-8">
+            No conversations yet
+          </div>
+        )}
       </div>
     </aside>
   );

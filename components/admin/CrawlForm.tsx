@@ -36,6 +36,8 @@ interface CrawlFormProps {
 }
 
 export function CrawlForm({ onSubmit, isLoading }: CrawlFormProps) {
+  const DEFAULT_INSTRUCTIONS = 'Focus on academic programs, admissions, tuition, campus life, and student services. Skip news articles, events, and administrative pages that students don\'t need.';
+
   const [formData, setFormData] = useState<CrawlFormData>({
     url: '',
     maxDepth: 2,
@@ -44,8 +46,8 @@ export function CrawlForm({ onSubmit, isLoading }: CrawlFormProps) {
     extractDepth: 'advanced',
     format: 'markdown',
     selectPaths: '',
-    excludePaths: '/admin/*,/login/*',
-    instructions: '',
+    excludePaths: '/admin/*,/login/*,/news/*,/events/*',
+    instructions: DEFAULT_INSTRUCTIONS,
   });
   const [optionsOpen, setOptionsOpen] = useState(false);
 
@@ -177,14 +179,16 @@ export function CrawlForm({ onSubmit, isLoading }: CrawlFormProps) {
             </div>
 
             <div className="col-span-full space-y-2">
-              <label className="text-sm font-medium">Instructions</label>
+              <label className="text-sm font-medium">Crawl Instructions</label>
               <Textarea
                 value={formData.instructions}
                 onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
-                placeholder="Focus on academic program pages, skip news and events..."
+                placeholder={DEFAULT_INSTRUCTIONS}
                 rows={2}
               />
-              <p className="text-xs text-muted-foreground">Natural language guidance for the crawler</p>
+              <p className="text-xs text-muted-foreground">
+                Natural language guidance for what content to prioritize or skip. Leave as-is for university content.
+              </p>
             </div>
           </div>
         </CollapsibleContent>

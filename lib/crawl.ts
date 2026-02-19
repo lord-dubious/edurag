@@ -5,6 +5,7 @@ import { Document } from '@langchain/core/documents';
 import { env } from './env';
 import { embeddings } from './providers';
 import { getMongoCollection } from './vectorstore';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from './agent/prompts';
 
 interface CrawlOptions {
   url: string;
@@ -34,7 +35,7 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
     maxBreadth: opts.maxBreadth ?? env.CRAWL_MAX_BREADTH,
     limit: opts.limit ?? env.CRAWL_LIMIT,
     extractDepth: opts.extractDepth ?? env.CRAWL_EXTRACT_DEPTH,
-    instructions: opts.instructions ?? env.CRAWL_INSTRUCTIONS,
+    instructions: opts.instructions ?? env.CRAWL_INSTRUCTIONS ?? DEFAULT_CRAWL_INSTRUCTIONS,
     selectPaths: selectPaths?.length ? selectPaths : undefined,
     excludePaths: excludePaths?.length ? excludePaths : undefined,
     allowExternal: opts.allowExternal ?? env.CRAWL_ALLOW_EXTERNAL,
@@ -46,11 +47,17 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
     chunkOverlap: 200,
   });
 
+  const seenUrls = new Set<string>();
   const documents: Document[] = [];
-  const total = crawlResponse.results.length;
+  const uniqueResults = crawlResponse.results.filter(r => {
+    if (seenUrls.has(r.url)) return false;
+    seenUrls.add(r.url);
+    return true;
+  });
+  const total = uniqueResults.length;
 
   for (let i = 0; i < total; i++) {
-    const result = crawlResponse.results[i];
+    const result = uniqueResults[i];
     opts.onProgress?.(i + 1, total);
 
     const urlObj = new URL(result.url);
@@ -60,7 +67,6 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
       title,
       threadId: opts.threadId,
       baseUrl: opts.url,
-      timestamp: new Date().toISOString(),
     }]);
     documents.push(...chunks);
   }

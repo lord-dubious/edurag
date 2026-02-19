@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, type UIMessage } from 'ai';
 import { PanelLeftIcon, MoonIcon, SunIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { ChatMessages } from './ChatMessages';
@@ -46,35 +46,77 @@ function isVectorSearchToolPart(part: MessagePart): part is VectorSearchToolPart
   return part.type === 'tool-vector_search' && part.state === 'output-available' && 'output' in part;
 }
 
+interface StoredSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  messages: UIMessage[];
+  sources: Record<string, Source[]>;
+}
+
+const STORAGE_KEY = 'edurag_sessions';
+
+function loadSessions(): StoredSession[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSessions(sessions: StoredSession[]): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+}
+
 interface ChatInterfaceProps {
   initialQuery?: string;
 }
 
 export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
-  const [threadId, setThreadId] = useState(() => nanoid());
-  const [sources, setSources] = useState<Record<string, Source[]>>({});
+  const [threadId, setThreadId] = useState(() => {
+    const sessions = loadSessions();
+    return sessions.length > 0 ? sessions[0].id : nanoid();
+  });
+  const [sources, setSources] = useState<Record<string, Source[]>>(() => {
+    const sessions = loadSessions();
+    const session = sessions.find(s => s.id === threadId);
+    return session?.sources ?? {};
+  });
   const [showSources, setShowSources] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { theme, setTheme } = useTheme();
 
   const { messages, status, error, sendMessage, regenerate, setMessages } = useChat({
+    id: threadId,
     transport: new DefaultChatTransport({
       api: '/api/chat',
       body: { threadId },
     }),
+    messages: (() => {
+      const sessions = loadSessions();
+      const session = sessions.find(s => s.id === threadId);
+      return session?.messages ?? [];
+    })(),
     onFinish: ({ message }) => {
       if (message.parts) {
         const toolParts = message.parts.filter(isVectorSearchToolPart);
         if (toolParts.length > 0) {
+          const seenUrls = new Set<string>();
           const newSources: Source[] = [];
           toolParts.forEach((part) => {
             if (part.output?.results) {
               part.output.results.forEach((r: VectorSearchResult) => {
-                newSources.push({
-                  url: r.url,
-                  title: r.title,
-                  content: r.content,
-                });
+                if (!seenUrls.has(r.url)) {
+                  seenUrls.add(r.url);
+                  newSources.push({
+                    url: r.url,
+                    title: r.title,
+                    content: r.content,
+                  });
+                }
               });
             }
           });
@@ -90,10 +132,41 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   });
 
   useEffect(() => {
-    if (initialQuery && messages.length === 0 && status === 'ready') {
+    const sessions = loadSessions();
+    const session = sessions.find(s => s.id === threadId);
+    
+    if (initialQuery && (!session || session.messages.length === 0) && status === 'ready') {
       sendMessage({ text: initialQuery });
     }
-  }, [initialQuery, messages.length, status, sendMessage]);
+  }, [initialQuery, threadId, status, sendMessage]);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    
+    const sessions = loadSessions();
+    const existingIndex = sessions.findIndex(s => s.id === threadId);
+    
+    const title = messages[0]?.parts
+      ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+      .map(p => p.text)
+      .join('')?.slice(0, 50) ?? 'New Chat';
+    
+    const updatedSession: StoredSession = {
+      id: threadId,
+      title,
+      createdAt: existingIndex >= 0 ? sessions[existingIndex].createdAt : Date.now(),
+      messages,
+      sources,
+    };
+    
+    if (existingIndex >= 0) {
+      sessions[existingIndex] = updatedSession;
+    } else {
+      sessions.unshift(updatedSession);
+    }
+    
+    saveSessions(sessions);
+  }, [messages, sources, threadId]);
 
   const handleSubmit = useCallback(
     (message: { text: string }) => {
@@ -103,16 +176,29 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   );
 
   const handleNewChat = useCallback(() => {
-    setThreadId(nanoid());
+    const newId = nanoid();
+    setThreadId(newId);
     setMessages([]);
     setSources({});
   }, [setMessages]);
 
   const handleSelectSession = useCallback((id: string) => {
-    setThreadId(id);
-    setMessages([]);
-    setSources({});
+    const sessions = loadSessions();
+    const session = sessions.find(s => s.id === id);
+    if (session) {
+      setThreadId(id);
+      setMessages(session.messages);
+      setSources(session.sources);
+    }
   }, [setMessages]);
+
+  const handleDeleteSession = useCallback((id: string) => {
+    const sessions = loadSessions().filter(s => s.id !== id);
+    saveSessions(sessions);
+    if (id === threadId) {
+      handleNewChat();
+    }
+  }, [threadId, handleNewChat]);
 
   const lastMessage = messages.at(-1);
   const lastSources = lastMessage ? sources[lastMessage.id] ?? [] : [];
@@ -123,6 +209,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
         currentThreadId={threadId}
         onNewChat={handleNewChat}
         onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
         collapsed={sidebarCollapsed}
       />
 
@@ -142,7 +229,11 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
             {lastSources.length > 0 && (
               <button
                 onClick={() => setShowSources(!showSources)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border hover:border-primary hover:text-primary transition-colors"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                  showSources 
+                    ? 'border-primary text-primary bg-primary/10' 
+                    : 'border-border hover:border-primary hover:text-primary'
+                }`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                 Sources {lastSources.length}
