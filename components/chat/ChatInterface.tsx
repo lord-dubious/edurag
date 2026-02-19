@@ -4,6 +4,8 @@ import { useState, useCallback } from 'react';
 import { nanoid } from 'nanoid';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
+import { PanelLeftIcon, MoonIcon, SunIcon } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { SessionSidebar } from './SessionSidebar';
@@ -48,6 +50,8 @@ export function ChatInterface() {
   const [threadId, setThreadId] = useState(() => nanoid());
   const [sources, setSources] = useState<Record<string, Source[]>>({});
   const [showSources, setShowSources] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const { messages, status, error, sendMessage, regenerate, setMessages } = useChat({
     transport: new DefaultChatTransport({
@@ -109,23 +113,41 @@ export function ChatInterface() {
         currentThreadId={threadId}
         onNewChat={handleNewChat}
         onSelectSession={handleSelectSession}
+        collapsed={sidebarCollapsed}
       />
 
-      <div className="flex-1 flex flex-col">
-        <header className="flex items-center justify-between px-6 py-4 border-b bg-background">
-          <h1 className="text-lg font-semibold">{process.env.NEXT_PUBLIC_APP_NAME}</h1>
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="flex items-center gap-3 px-4 h-14 border-b bg-background shrink-0">
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
+            title="Toggle sidebar"
+          >
+            <PanelLeftIcon className="w-4 h-4" />
+          </button>
+          <h1 className="flex-1 text-sm font-medium text-muted-foreground truncate">
+            {process.env.NEXT_PUBLIC_APP_NAME}
+          </h1>
           <div className="flex items-center gap-2">
+            {lastSources.length > 0 && (
+              <button
+                onClick={() => setShowSources(!showSources)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border border-border hover:border-primary hover:text-primary transition-colors"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Sources {lastSources.length}
+              </button>
+            )}
             <button
-              onClick={() => setShowSources(!showSources)}
-              className="text-sm text-muted-foreground hover:text-foreground"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
+              title="Toggle theme"
             >
-              {showSources ? 'Hide' : 'Show'} Sources
-            </button>
-            <button
-              onClick={handleNewChat}
-              className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90"
-            >
-              New Chat
+              {theme === 'dark' ? (
+                <SunIcon className="w-4 h-4" />
+              ) : (
+                <MoonIcon className="w-4 h-4" />
+              )}
             </button>
           </div>
         </header>

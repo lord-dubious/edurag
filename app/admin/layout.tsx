@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { ThemeProvider } from 'next-themes';
 
 export default async function AdminLayout({
   children,
@@ -15,13 +15,18 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex">
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <div className="min-h-screen bg-background">
         <AdminSidebar />
-        <main className="flex-1 min-h-screen">
+        <main className="ml-56 pt-14 min-h-screen">
           <div className="p-6">{children}</div>
         </main>
       </div>
-    </div>
+    </ThemeProvider>
   );
 }

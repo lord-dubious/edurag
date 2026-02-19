@@ -9,8 +9,11 @@ import {
   Globe, 
   HelpCircle, 
   LogOut,
-  Database
+  Database,
+  Moon,
+  Sun
 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -20,6 +23,7 @@ const navItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
 
   const handleLogout = () => {
     document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
@@ -27,47 +31,61 @@ export function AdminSidebar() {
   };
 
   return (
-    <aside className="w-56 min-h-screen border-r bg-card flex flex-col">
-      <div className="p-4 border-b">
+    <>
+      <header className="fixed top-0 left-0 right-0 h-14 bg-background border-b z-50 flex items-center px-4">
         <div className="flex items-center gap-2">
-          <Database className="h-6 w-6 text-primary" />
-          <span className="font-semibold text-lg">EduRAG</span>
+          <Database className="h-5 w-5 text-primary" />
+          <span className="font-semibold">EduRAG</span>
+          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+            Admin
+          </span>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">Knowledge Base Admin</p>
-      </div>
-      
-      <nav className="flex-1 p-3 space-y-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href;
-          
-          return (
-            <Link key={item.href} href={item.href}>
-              <Button
-                variant={isActive ? 'secondary' : 'ghost'}
-                className={cn(
-                  'w-full justify-start gap-2',
-                  isActive && 'bg-secondary'
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Button>
-            </Link>
-          );
-        })}
-      </nav>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-muted-foreground hover:text-foreground"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </Button>
+        </div>
+      </header>
 
-      <div className="p-3 border-t">
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
-          onClick={handleLogout}
-        >
-          <LogOut className="h-4 w-4" />
-          Logout
-        </Button>
-      </div>
-    </aside>
+      <aside className="fixed left-0 top-14 bottom-0 w-56 border-r bg-muted/30 flex flex-col">
+        <nav className="flex-1 p-3 space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            
+            return (
+              <Link key={item.href} href={item.href}>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    'w-full justify-start gap-2',
+                    isActive && 'bg-primary/10 text-primary hover:bg-primary/15'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </Button>
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+    </>
   );
 }
