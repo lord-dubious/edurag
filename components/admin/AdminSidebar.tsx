@@ -1,0 +1,115 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  LayoutDashboard,
+  Globe,
+  HelpCircle,
+  LogOut,
+  Database,
+  Moon,
+  Sun
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
+
+const navSections = [
+  {
+    title: 'Overview',
+    items: [
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: 'Knowledge Base',
+    items: [
+      { href: '/admin/domains', label: 'Domains', icon: Globe },
+    ],
+  },
+  {
+    title: 'Content',
+    items: [
+      { href: '/admin/faqs', label: 'FAQs', icon: HelpCircle },
+    ],
+  },
+];
+
+export function AdminSidebar() {
+  const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
+
+  const handleLogout = () => {
+    document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    window.location.href = '/admin/login';
+  };
+
+  return (
+    <>
+      <header className="fixed top-0 left-0 right-0 h-14 bg-background border-b z-50 flex items-center px-4">
+        <div className="flex items-center gap-2">
+          <Database className="h-5 w-5 text-primary" />
+          <span className="font-semibold">EduRAG</span>
+          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+            Admin
+          </span>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-muted-foreground hover:text-foreground"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </Button>
+        </div>
+      </header>
+
+      <aside className="fixed left-0 top-14 bottom-0 w-56 border-r bg-muted/30 flex flex-col">
+        <nav className="flex-1 p-3">
+          {navSections.map((section) => (
+            <div key={section.title} className="mb-4">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 py-1.5">
+                {section.title}
+              </div>
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+
+                  return (
+                    <Link key={item.href} href={item.href}>
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          'w-full justify-start gap-2',
+                          isActive && 'bg-primary/10 text-primary hover:bg-primary/15'
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {item.label}
+                      </Button>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+      </aside>
+    </>
+  );
+}

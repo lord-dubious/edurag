@@ -1,0 +1,1803 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduRAG — University Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&family=Cabinet+Grotesk:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Default EduRAG palette — will be overridden dynamically after brand extraction */
+  --brand-primary:   #1e4d2b;
+  --brand-secondary: #2e7042;
+  --brand-accent:    #4aaa68;
+  --brand-bg:        #f4f1eb;
+  --brand-surface:   #fdfcf9;
+  --brand-text:      #18140e;
+
+  /* Static UI chrome (never changes) */
+  --bg:        #f4f1eb;
+  --bg2:       #ece8e0;
+  --bg3:       #ddd8ce;
+  --surface:   #fdfcf9;
+  --surface2:  #f8f5ef;
+  --border:    #d6d0c4;
+  --border-hi: #b8b09e;
+  --text:      #18140e;
+  --text2:     #5c5344;
+  --text3:     #9a8e7e;
+
+  --accent:       var(--brand-primary);
+  --accent-light: #e6efe9;
+  --accent-glow:  rgba(30,77,43,0.10);
+
+  --ok:     #1e7d4a;
+  --ok-bg:  #e8f5ed;
+  --warn:   #b83232;
+  --warn-bg:#fdf0f0;
+  --info:   #1a5c9e;
+  --info-bg:#e8f0fc;
+  --gold:   #c08b30;
+  --gold-bg:#fdf6e8;
+
+  --radius:    14px;
+  --radius-sm: 9px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
+
+  --shadow-sm: 0 1px 4px rgba(24,20,14,0.06);
+  --shadow:    0 4px 20px rgba(24,20,14,0.10);
+  --shadow-lg: 0 12px 56px rgba(24,20,14,0.14);
+
+  --font-disp: 'Fraunces', Georgia, serif;
+  --font-body: 'Cabinet Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --t: 0.18s;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Step 3 extended ────────────────────────── */
+.scope-section-head {
+  display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px;
+}
+.scope-section-num {
+  width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0;
+  background: var(--accent); color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; margin-top: 1px;
+}
+.scope-divider { height: 1px; background: var(--border); margin: 22px 0; }
+
+.ext-url-row { display: flex; gap: 8px; align-items: center; }
+.ext-rm-btn {
+  width: 28px; height: 28px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: var(--text3); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; transition: all var(--t);
+}
+.ext-rm-btn:hover { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); }
+.add-ext-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--radius-sm);
+  border: 1.5px dashed var(--border); background: transparent;
+  font-size: 12px; font-weight: 500; color: var(--text3);
+  cursor: pointer; font-family: var(--font-body); transition: all var(--t);
+}
+.add-ext-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+
+.tags-wrap-ob {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); padding: 7px 10px;
+  min-height: 42px; align-items: center; cursor: text;
+  transition: border-color var(--t);
+}
+.tags-wrap-ob:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+.ob-tag {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 5px; padding: 2px 7px;
+  font-size: 12px; font-family: var(--font-mono); color: var(--text2);
+}
+.ob-rm { cursor: pointer; color: var(--text3); font-size: 11px; line-height: 1; }
+.ob-rm:hover { color: var(--warn); }
+.tag-in {
+  border: none; outline: none; background: transparent;
+  font-family: var(--font-mono); font-size: 12px; color: var(--text);
+  flex: 1; min-width: 160px; padding: 2px 0;
+}
+.tag-in::placeholder { color: var(--text3); }
+
+.filetype-grid {
+  display: flex; flex-direction: column;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  overflow: hidden; background: var(--surface);
+}
+.filetype-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px; border-bottom: 1px solid var(--border); gap: 12px;
+}
+.filetype-row:last-child { border-bottom: none; }
+.filetype-name { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+.filetype-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.filetype-opts { display: flex; gap: 16px; }
+.fto { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text2); cursor: pointer; }
+.fto input[type=radio] { accent-color: var(--accent); }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Layout ─────────────────────────────────── */
+.shell {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  min-height: 100dvh;
+}
+
+/* ─── Left panel ─────────────────────────────── */
+.left-panel {
+  background: var(--accent);
+  display: flex;
+  flex-direction: column;
+  padding: 40px 36px;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow: hidden;
+}
+.lp-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 48px;
+}
+.lp-mark {
+  width: 36px; height: 36px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.lp-wordmark {
+  font-family: var(--font-disp);
+  font-size: 20px;
+  font-weight: 400;
+  color: white;
+  letter-spacing: -0.01em;
+}
+
+.lp-headline {
+  font-family: var(--font-disp);
+  font-size: 34px;
+  font-weight: 300;
+  line-height: 1.15;
+  color: white;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+.lp-headline em { font-style: italic; opacity: 0.75; }
+.lp-sub {
+  font-size: 14px;
+  color: rgba(255,255,255,0.65);
+  line-height: 1.7;
+  font-weight: 300;
+  margin-bottom: 48px;
+}
+
+/* Step tracker */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  transition: background var(--t);
+  cursor: default;
+}
+.step.done { opacity: 0.5; }
+.step.active { background: rgba(255,255,255,0.12); opacity: 1; }
+.step-circle {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  border: 1.5px solid rgba(255,255,255,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  color: rgba(255,255,255,0.6);
+  flex-shrink: 0;
+  transition: all var(--t);
+}
+.step.active .step-circle {
+  background: white;
+  border-color: white;
+  color: var(--accent);
+}
+.step.done .step-circle {
+  background: rgba(255,255,255,0.3);
+  border-color: rgba(255,255,255,0.5);
+  color: white;
+}
+.step-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.5);
+  transition: color var(--t);
+}
+.step.active .step-label { color: white; }
+.step.done .step-label { color: rgba(255,255,255,0.5); }
+.step-connector {
+  width: 1px; height: 16px;
+  background: rgba(255,255,255,0.12);
+  margin: 0 0 0 26px;
+}
+
+.lp-footer {
+  padding-top: 32px;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Preview badge on left panel */
+.lp-preview {
+  position: absolute;
+  bottom: 100px; right: -1px;
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-right: none;
+  border-radius: 12px 0 0 12px;
+  padding: 12px 16px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  display: none;
+}
+
+/* ─── Right panel ────────────────────────────── */
+.right-panel {
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 60px 48px;
+  overflow-y: auto;
+  min-height: 100dvh;
+}
+
+/* ─── Step pages ─────────────────────────────── */
+.step-page {
+  display: none;
+  width: 100%;
+  max-width: 560px;
+  animation: pageIn 0.3s var(--ease);
+}
+.step-page.active { display: block; }
+@keyframes pageIn {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.step-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.step-tag::before {
+  content: '';
+  width: 20px; height: 1.5px;
+  background: var(--accent);
+}
+.step-title {
+  font-family: var(--font-disp);
+  font-size: 32px;
+  font-weight: 300;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-bottom: 8px;
+}
+.step-title em { font-style: italic; color: var(--accent); }
+.step-desc {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.7;
+  font-weight: 300;
+  margin-bottom: 36px;
+}
+
+/* ─── Form elements ──────────────────────────── */
+.form-group { margin-bottom: 20px; }
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text2);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.form-input, .form-select {
+  width: 100%;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.form-input:focus, .form-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.form-input::placeholder { color: var(--text3); }
+.form-hint {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* URL input with action button */
+.url-field {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.url-field .form-input { flex: 1; }
+.detect-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 18px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  transition: opacity var(--t), transform var(--t);
+  flex-shrink: 0;
+}
+.detect-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.detect-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* ─── Brand extraction card ──────────────────── */
+.extraction-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-sm);
+}
+.extraction-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.extraction-favicon {
+  width: 36px; height: 36px;
+  border-radius: 9px;
+  background: var(--bg2);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.extraction-favicon img { width: 100%; height: 100%; object-fit: contain; }
+.extraction-name {
+  flex: 1;
+}
+.extraction-name h3 { font-size: 15px; font-weight: 600; }
+.extraction-name p { font-size: 12px; color: var(--text3); font-family: var(--font-mono); }
+.extraction-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 100px;
+  display: flex; align-items: center; gap: 5px;
+}
+.extraction-status.scanning { background: var(--gold-bg); color: var(--gold); }
+.extraction-status.done { background: var(--ok-bg); color: var(--ok); }
+.extraction-status.scanning::before {
+  content: '';
+  width: 6px; height: 6px;
+  background: var(--gold);
+  border-radius: 50%;
+  animation: pulse 1s ease infinite;
+}
+.extraction-status.done::before {
+  content: '✓';
+  font-size: 10px;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.extraction-body { padding: 18px; }
+
+/* Color swatches */
+.swatch-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.swatch-dot {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.08);
+  position: relative;
+  cursor: pointer;
+  transition: transform var(--t);
+}
+.swatch-dot:hover { transform: scale(1.1); }
+.swatch-dot.selected::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.swatch-label { font-size: 9px; color: var(--text3); font-family: var(--font-mono); }
+
+/* Brand preview */
+.brand-preview {
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.preview-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.preview-logo-mark {
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.preview-wordmark {
+  font-family: var(--font-disp);
+  font-size: 13px;
+  font-weight: 400;
+}
+.preview-chat-bubble {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border-bottom-left-radius: 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 75%;
+}
+.preview-cta {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── Info callout ───────────────────────────── */
+.callout {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.callout.info { background: var(--info-bg); color: var(--info); border: 1px solid rgba(26,92,158,0.15); }
+.callout.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid rgba(184,50,50,0.15); }
+.callout.ok   { background: var(--ok-bg);  color: var(--ok);  border: 1px solid rgba(30,125,74,0.15); }
+
+/* ─── Crawl config ───────────────────────────── */
+.config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.mini-select {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: var(--font-body);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--t);
+}
+.mini-select:focus { border-color: var(--accent); }
+.mini-input {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: var(--font-body);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--t);
+}
+.mini-input:focus { border-color: var(--accent); }
+
+/* Scope pills */
+.scope-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 20px; }
+.scope-pill {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 11px;
+  border-radius: 100px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  font-size: 12px; font-weight: 500; color: var(--text2);
+  cursor: pointer; font-family: var(--font-body);
+  transition: all var(--t);
+}
+.scope-pill:hover { border-color: var(--accent); color: var(--accent); }
+.scope-pill.selected { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+.scope-pill .check { display: none; font-size: 10px; }
+.scope-pill.selected .check { display: inline; }
+
+/* ─── Progress simulation ────────────────────── */
+.crawl-status-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.crawl-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.crawl-status-label { font-size: 13px; font-weight: 600; }
+.crawl-status-pct { font-family: var(--font-mono); font-size: 13px; color: var(--accent); }
+.progress-track {
+  background: var(--bg2);
+  border-radius: 100px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--brand-accent, #4aaa68));
+  border-radius: 100px;
+  transition: width 0.4s var(--ease);
+  position: relative;
+  overflow: hidden;
+}
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; right: 0; bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: shimmer 1.5s ease infinite;
+}
+@keyframes shimmer { to { left: 200%; } }
+.crawl-meta {
+  display: flex; gap: 16px;
+  font-size: 11px; color: var(--text3);
+  font-family: var(--font-mono);
+}
+.crawl-log {
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-top: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text3);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.log-line { display: flex; gap: 8px; }
+.log-ok { color: var(--ok); }
+.log-processing { color: var(--gold); }
+.log-ts { opacity: 0.5; }
+
+/* ─── Review & Launch ────────────────────────── */
+.review-section { margin-bottom: 28px; }
+.review-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 10px;
+}
+.review-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+  font-size: 13px;
+  gap: 16px;
+}
+.review-key { color: var(--text3); flex-shrink: 0; }
+.review-val { color: var(--text); font-weight: 500; text-align: right; font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
+.review-colors {
+  display: flex; gap: 4px;
+}
+.review-color-dot {
+  width: 16px; height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+/* Brand preview card (review) */
+.final-preview {
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 24px;
+  box-shadow: 0 0 0 4px var(--accent-glow);
+}
+.final-preview-header {
+  background: var(--accent);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.final-preview-mark {
+  width: 28px; height: 28px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.final-preview-name {
+  font-family: var(--font-disp);
+  color: white;
+  font-size: 16px;
+}
+.final-preview-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ─── Nav buttons ────────────────────────────── */
+.step-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.btn-back {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 16px;
+  background: transparent;
+  color: var(--text2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; font-family: var(--font-body);
+  transition: all var(--t);
+}
+.btn-back:hover { border-color: var(--border-hi); color: var(--text); }
+.btn-next {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 24px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: var(--font-body);
+  transition: opacity var(--t), transform var(--t), box-shadow var(--t);
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+.btn-next:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 8px 28px var(--accent-glow); }
+.btn-next:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btn-launch {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 28px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 15px; font-weight: 700;
+  cursor: pointer; font-family: var(--font-body);
+  transition: all var(--t);
+  box-shadow: 0 6px 24px var(--accent-glow);
+}
+.btn-launch:hover { opacity: 0.9; transform: translateY(-2px); }
+
+/* ─── Success screen ─────────────────────────── */
+.success-view {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 60px 48px;
+}
+.success-view.active { display: flex; }
+.success-icon {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: var(--ok-bg);
+  border: 2px solid var(--ok);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px;
+  margin-bottom: 24px;
+  animation: popIn 0.5s var(--ease);
+}
+@keyframes popIn {
+  0% { transform: scale(0); opacity: 0; }
+  70% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.success-title {
+  font-family: var(--font-disp);
+  font-size: 36px; font-weight: 300;
+  letter-spacing: -0.02em;
+  color: var(--text); margin-bottom: 10px;
+}
+.success-sub { font-size: 15px; color: var(--text2); max-width: 400px; margin-bottom: 36px; line-height: 1.7; }
+.next-steps {
+  display: flex; flex-direction: column; gap: 8px;
+  width: 100%; max-width: 480px; margin-bottom: 36px;
+}
+.next-step {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+.next-step-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.next-step-body h4 { font-size: 13px; font-weight: 600; }
+.next-step-body p { font-size: 12px; color: var(--text3); }
+.env-block {
+  width: 100%; max-width: 480px;
+  background: var(--text);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(255,255,255,0.6);
+  line-height: 1.8;
+}
+.env-key { color: #7dd3fc; }
+.env-val { color: #86efac; }
+.env-comment { color: rgba(255,255,255,0.3); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 4px; }
+
+/* Toast */
+.toast-area {
+  position: fixed; bottom: 24px; right: 24px; z-index: 999;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  background: var(--text); color: var(--bg);
+  padding: 10px 16px; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  animation: tIn 0.22s var(--ease);
+  display: flex; align-items: center; gap: 8px;
+}
+@keyframes tIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<div class="shell" id="onboarding-shell">
+
+  <!-- ══════════════════════════════════
+       LEFT PANEL — steps & branding
+  ══════════════════════════════════ -->
+  <aside class="left-panel" id="left-panel">
+    <div class="lp-logo">
+      <div class="lp-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2">
+          <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+          <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+        </svg>
+      </div>
+      <span class="lp-wordmark">EduRAG</span>
+    </div>
+
+    <div class="lp-headline">
+      Set up your<br><em>university</em><br>knowledge base
+    </div>
+    <p class="lp-sub">Takes about 5 minutes. We'll detect your university's branding automatically and index your website content.</p>
+
+    <div class="steps">
+      <div class="step active" id="track-1">
+        <div class="step-circle">1</div>
+        <span class="step-label">University URL</span>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step" id="track-2">
+        <div class="step-circle">2</div>
+        <span class="step-label">Brand detection</span>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step" id="track-3">
+        <div class="step-circle">3</div>
+        <span class="step-label">Crawl scope</span>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step" id="track-4">
+        <div class="step-circle">4</div>
+        <span class="step-label">Crawling & indexing</span>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step" id="track-5">
+        <div class="step-circle">5</div>
+        <span class="step-label">Review & launch</span>
+      </div>
+    </div>
+
+    <div class="lp-footer">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Credentials stored only in your .env file
+    </div>
+  </aside>
+
+  <!-- ══════════════════════════════════
+       RIGHT PANEL — step content
+  ══════════════════════════════════ -->
+  <main class="right-panel" id="right-panel">
+
+    <!-- ─── STEP 1: University URL ────────────── -->
+    <div class="step-page active" id="page-1">
+      <div class="step-tag">Step 1 of 5</div>
+      <h1 class="step-title">What's your<br><em>university's URL?</em></h1>
+      <p class="step-desc">Enter the root URL of the university website. We'll use Tavily to detect the logo, colours, and site structure automatically.</p>
+
+      <div class="form-group">
+        <label class="form-label">University website URL</label>
+        <div class="url-field">
+          <input
+            class="form-input"
+            id="uni-url"
+            type="url"
+            placeholder="https://university.edu"
+            value="https://mit.edu"
+          />
+          <button class="detect-btn" id="detect-btn" onclick="runDetection()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            Detect
+          </button>
+        </div>
+        <p class="form-hint">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          Uses Tavily Extract API to fetch the homepage and parse metadata, favicon, og:image, and CSS colour tokens
+        </p>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-icon">🔍</span>
+        <div>
+          <strong>What we detect:</strong> logo / favicon URL, og:image, CSS custom properties starting with <code style="font-family:var(--font-mono);font-size:11px">--color-</code> or <code style="font-family:var(--font-mono);font-size:11px">--brand-</code>, and dominant colours from the logo via <code style="font-family:var(--font-mono);font-size:11px">sharp.stats()</code>.
+        </div>
+      </div>
+
+      <div class="callout warn" id="warn-no-url" style="display:none">
+        <span class="callout-icon">⚠️</span>
+        Please enter a valid URL before continuing.
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">University short name</label>
+        <input class="form-input" id="uni-name" type="text" placeholder="e.g. MIT" value="MIT" />
+        <p class="form-hint">Used as the app title, e.g. <em>MIT EduRAG</em></p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Full university name</label>
+        <input class="form-input" id="uni-full-name" type="text" placeholder="e.g. Massachusetts Institute of Technology" value="Massachusetts Institute of Technology" />
+      </div>
+
+      <div class="step-nav">
+        <div></div>
+        <button class="btn-next" onclick="goStep(2)">
+          Continue
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── STEP 2: Brand Detection ───────────── -->
+    <div class="step-page" id="page-2">
+      <div class="step-tag">Step 2 of 5</div>
+      <h1 class="step-title"><em>Brand detected</em><br>— confirm your palette</h1>
+      <p class="step-desc">We've extracted the university's logo and colour palette. Choose your primary colour and we'll theme the entire interface automatically.</p>
+
+      <div class="extraction-card" id="extraction-card">
+        <div class="extraction-header">
+          <div class="extraction-favicon" id="brand-favicon">🎓</div>
+          <div class="extraction-name">
+            <h3 id="brand-uni-name">MIT</h3>
+            <p id="brand-uni-url">mit.edu</p>
+          </div>
+          <div class="extraction-status done" id="extraction-status">Detected</div>
+        </div>
+        <div class="extraction-body">
+
+          <p style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Extracted colours — select primary</p>
+          <div class="swatch-row" id="swatch-row">
+            <!-- populated by JS -->
+          </div>
+
+          <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+          <p style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Preview with selected palette</p>
+          <div class="brand-preview" id="brand-preview">
+            <div class="preview-nav">
+              <div class="preview-logo-mark" id="prev-mark" style="background:#1e4d2b;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+              </div>
+              <span class="preview-wordmark" id="prev-wordmark">MIT EduRAG</span>
+            </div>
+            <div class="preview-chat-bubble" id="prev-bubble" style="background:#e6efe9;color:#1e4d2b;">
+              Hi! Ask me anything about MIT admissions, programs, or campus life.
+            </div>
+            <div class="preview-cta" id="prev-cta" style="background:#1e4d2b;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2 11 13M22 2 15 22 11 13 2 9l20-7z"/></svg>
+              Start chatting
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-icon">💡</span>
+        <div>The selected colour becomes <code style="font-family:var(--font-mono);font-size:11px">BRAND_PRIMARY</code> in your <code style="font-family:var(--font-mono);font-size:11px">.env</code> and is injected as CSS custom properties at build time via <code style="font-family:var(--font-mono);font-size:11px">next.config.ts</code>.</div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn-back" onclick="goStep(1)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Back
+        </button>
+        <button class="btn-next" onclick="goStep(3)">
+          Looks good, continue
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── STEP 3: Crawl Scope ───────────────── -->
+    <div class="step-page" id="page-3">
+      <div class="step-tag">Step 3 of 5</div>
+      <h1 class="step-title">Configure your<br><em>crawl scope</em></h1>
+      <p class="step-desc">Choose which sections to index, add external sources, exclude paths, and set file-type rules. These become your default crawl rules — editable anytime from the admin dashboard.</p>
+
+      <!-- ── 3A: University sections ── -->
+      <div class="scope-section-head">
+        <span class="scope-section-num">A</span>
+        <div>
+          <strong>University site sections</strong>
+          <p class="form-hint" style="margin-top:1px">Each selected section becomes a separate Tavily crawl job</p>
+        </div>
+      </div>
+
+      <div class="scope-pills" id="scope-pills" style="margin-bottom:18px">
+        <button class="scope-pill selected" onclick="togglePill(this)" data-path="/admissions"><span class="check">✓</span> Admissions</button>
+        <button class="scope-pill selected" onclick="togglePill(this)" data-path="/academics"><span class="check">✓</span> Academics &amp; Programs</button>
+        <button class="scope-pill selected" onclick="togglePill(this)" data-path="/tuition"><span class="check">✓</span> Tuition &amp; Financial Aid</button>
+        <button class="scope-pill" onclick="togglePill(this)" data-path="/housing"><span class="check">✓</span> Student Housing</button>
+        <button class="scope-pill" onclick="togglePill(this)" data-path="/student-life"><span class="check">✓</span> Student Life</button>
+        <button class="scope-pill" onclick="togglePill(this)" data-path="/research"><span class="check">✓</span> Research</button>
+        <button class="scope-pill" onclick="togglePill(this)" data-path="/events"><span class="check">✓</span> Events &amp; Calendar</button>
+        <button class="scope-pill" onclick="togglePill(this)" data-path="/departments"><span class="check">✓</span> Departments &amp; Faculty</button>
+      </div>
+
+      <div class="config-grid" style="margin-bottom:22px">
+        <div class="form-group">
+          <label class="form-label">Max crawl depth</label>
+          <select class="mini-select" id="cfg-depth">
+            <option value="1">1 — surface only</option>
+            <option value="2" selected>2 — recommended</option>
+            <option value="3">3 — deep</option>
+            <option value="4">4 — comprehensive</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pages per section</label>
+          <select class="mini-select" id="cfg-limit">
+            <option value="50">50 — fast</option>
+            <option value="100" selected>100 — balanced</option>
+            <option value="200">200 — thorough</option>
+            <option value="500">500 — complete</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Extract depth</label>
+          <select class="mini-select" id="cfg-extract">
+            <option value="basic">Basic</option>
+            <option value="advanced" selected>Advanced</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Format</label>
+          <select class="mini-select">
+            <option value="markdown" selected>Markdown</option>
+            <option value="text">Plain text</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:24px">
+        <label class="form-label">Crawler instructions <span style="font-weight:400;text-transform:none;color:var(--text3)">(natural language)</span></label>
+        <textarea class="form-input" rows="2" style="resize:vertical;">Focus on student-facing information about programs, admissions requirements, costs, and deadlines. Skip portals, login pages, and course management systems.</textarea>
+        <p class="form-hint">Passed directly to Tavily's <code style="font-family:var(--font-mono);font-size:10px">instructions</code> parameter</p>
+      </div>
+
+      <div class="scope-divider"></div>
+
+      <!-- ── 3B: External URLs ── -->
+      <div class="scope-section-head">
+        <span class="scope-section-num">B</span>
+        <div>
+          <strong>External sources</strong>
+          <p class="form-hint" style="margin-top:1px">Index content from other domains — partner institutions, government aid sites, external handbooks</p>
+        </div>
+      </div>
+
+      <div id="ext-url-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+        <div class="ext-url-row">
+          <input class="form-input" type="url" value="https://studentaid.gov/understand-aid" placeholder="https://…" style="flex:1;margin:0"/>
+          <input class="form-input" type="text" value="Federal Aid" placeholder="Label" style="width:120px;margin:0;flex-shrink:0"/>
+          <button class="ext-rm-btn" onclick="removeExtRow(this)" title="Remove">✕</button>
+        </div>
+      </div>
+      <button class="add-ext-btn" onclick="addExtRow()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add external URL
+      </button>
+
+      <div class="callout info" style="margin-top:14px">
+        <span class="callout-icon">🔗</span>
+        <div>External URLs use <code style="font-family:var(--font-mono);font-size:10px">allowExternal: true</code> on their own crawl job and are stored with <code style="font-family:var(--font-mono);font-size:10px">sourceType: "external"</code> metadata so they can be filtered separately in the admin dashboard.</div>
+      </div>
+
+      <div class="scope-divider"></div>
+
+      <!-- ── 3C: Exclude paths ── -->
+      <div class="scope-section-head">
+        <span class="scope-section-num">C</span>
+        <div>
+          <strong>Excluded paths</strong>
+          <p class="form-hint" style="margin-top:1px">Paths the crawler will never follow — globally applied to the university domain</p>
+        </div>
+      </div>
+
+      <div class="tags-wrap-ob" id="excl-tags" onclick="this.querySelector('.tag-in').focus()" style="margin-bottom:8px">
+        <div class="ob-tag">/admin<span class="ob-rm" onclick="removeTag(this)">✕</span></div>
+        <div class="ob-tag">/login<span class="ob-rm" onclick="removeTag(this)">✕</span></div>
+        <div class="ob-tag">/portal<span class="ob-rm" onclick="removeTag(this)">✕</span></div>
+        <div class="ob-tag">/cms<span class="ob-rm" onclick="removeTag(this)">✕</span></div>
+        <div class="ob-tag">/api<span class="ob-rm" onclick="removeTag(this)">✕</span></div>
+        <div class="ob-tag">/cdn<span class="ob-rm" onclick="removeTag(this)">✕</span></div>
+        <input class="tag-in" placeholder="Type /path and press Enter…" onkeydown="addExclTag(event)"/>
+      </div>
+      <p class="form-hint" style="margin-bottom:22px">Prefix-matched. <code style="font-family:var(--font-mono);font-size:10px">/login</code> blocks <code style="font-family:var(--font-mono);font-size:10px">/login</code>, <code style="font-family:var(--font-mono);font-size:10px">/login/saml</code>, <code style="font-family:var(--font-mono);font-size:10px">/login/student</code> etc. You can always add more in the admin Crawl Rules panel.</p>
+
+      <div class="scope-divider"></div>
+
+      <!-- ── 3D: File type rules ── -->
+      <div class="scope-section-head">
+        <span class="scope-section-num">D</span>
+        <div>
+          <strong>File type handling</strong>
+          <p class="form-hint" style="margin-top:1px">What to do when the crawler finds a linked file</p>
+        </div>
+      </div>
+
+      <div class="filetype-grid">
+        <div class="filetype-row">
+          <span class="filetype-name">
+            <span class="filetype-dot" style="background:#dc2626"></span>
+            PDF files
+          </span>
+          <div class="filetype-opts">
+            <label class="fto"><input type="radio" name="ft-pdf" value="index" checked/> Download &amp; index</label>
+            <label class="fto"><input type="radio" name="ft-pdf" value="skip"/> Skip</label>
+          </div>
+        </div>
+        <div class="filetype-row">
+          <span class="filetype-name">
+            <span class="filetype-dot" style="background:#2563eb"></span>
+            Word docs (DOCX)
+          </span>
+          <div class="filetype-opts">
+            <label class="fto"><input type="radio" name="ft-docx" value="index" checked/> Download &amp; index</label>
+            <label class="fto"><input type="radio" name="ft-docx" value="skip"/> Skip</label>
+          </div>
+        </div>
+        <div class="filetype-row">
+          <span class="filetype-name">
+            <span class="filetype-dot" style="background:#059669"></span>
+            CSV / spreadsheets
+          </span>
+          <div class="filetype-opts">
+            <label class="fto"><input type="radio" name="ft-csv" value="index"/> Download &amp; index</label>
+            <label class="fto"><input type="radio" name="ft-csv" value="skip" checked/> Skip</label>
+          </div>
+        </div>
+        <div class="filetype-row">
+          <span class="filetype-name">
+            <span class="filetype-dot" style="background:#9ca3af"></span>
+            Images / video / ZIP
+          </span>
+          <div class="filetype-opts">
+            <label class="fto"><input type="radio" name="ft-bin" value="skip" checked disabled/> Always skip</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout info" style="margin-top:14px;margin-bottom:0">
+        <span class="callout-icon">💾</span>
+        <div>These settings are written to MongoDB as <strong>global crawl rules</strong> during setup — the same rules you can edit anytime from the admin <em>Crawl Rules</em> panel. Per-domain overrides can be set from the admin Web Crawl page for any subsequent crawl job.</div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn-back" onclick="goStep(2)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Back
+        </button>
+        <button class="btn-next" onclick="goStep(4); startCrawlSim()">
+          Begin crawling
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── STEP 4: Crawling ───────────────────── -->
+    <div class="step-page" id="page-4">
+      <div class="step-tag">Step 4 of 5</div>
+      <h1 class="step-title"><em>Crawling</em><br>in progress…</h1>
+      <p class="step-desc">EduRAG is crawling your selected sections, splitting content into chunks, embedding them, and indexing into MongoDB Atlas.</p>
+
+      <div class="crawl-status-card">
+        <div class="crawl-status-row">
+          <span class="crawl-status-label" id="crawl-label">Initialising crawl jobs…</span>
+          <span class="crawl-status-pct" id="crawl-pct">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="crawl-fill" style="width:0%"></div>
+        </div>
+        <div class="crawl-meta">
+          <span id="crawl-pages">0 pages</span>
+          <span id="crawl-chunks">0 chunks</span>
+          <span id="crawl-docs">0 docs indexed</span>
+        </div>
+        <div class="crawl-log" id="crawl-log"></div>
+      </div>
+
+      <div class="callout info">
+        <span class="callout-icon">🏗</span>
+        <div>
+          <strong>What's happening:</strong> Tavily crawls each section → content is split via <code style="font-family:var(--font-mono);font-size:11px">RecursiveCharacterTextSplitter</code> (1000 tokens, 200 overlap) → embedded using your configured embedding model → stored in MongoDB Atlas vector store with metadata (<code style="font-family:var(--font-mono);font-size:11px">threadId, base_url, timestamp</code>).
+        </div>
+      </div>
+
+      <div id="crawl-done-msg" style="display:none">
+        <div class="callout ok">
+          <span class="callout-icon">✅</span>
+          <div><strong>Indexing complete!</strong> All content has been embedded and stored. Your knowledge base is ready.</div>
+        </div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn-back" onclick="goStep(3)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Back
+        </button>
+        <button class="btn-next" id="next-4" onclick="goStep(5)" disabled>
+          Review configuration
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── STEP 5: Review & Launch ───────────── -->
+    <div class="step-page" id="page-5">
+      <div class="step-tag">Step 5 of 5</div>
+      <h1 class="step-title">Review &amp;<br><em>launch</em></h1>
+      <p class="step-desc">Everything is set. Here's a summary of your configuration. Click Launch to write the .env file and start EduRAG.</p>
+
+      <!-- Branded preview -->
+      <div class="final-preview" id="final-preview">
+        <div class="final-preview-header" id="final-preview-header">
+          <div class="final-preview-mark" id="final-mark">🎓</div>
+          <span class="final-preview-name" id="final-name">MIT EduRAG</span>
+        </div>
+        <div class="final-preview-body">
+          <div style="font-size:12px;color:var(--text3);">Your branded student portal will look like this →</div>
+          <div style="background:var(--bg2);border-radius:8px;padding:12px;font-size:12px;color:var(--text2);border-left:3px solid var(--accent);">
+            "What are the undergraduate admission requirements?" → cited answer from mit.edu/admissions
+          </div>
+        </div>
+      </div>
+
+      <div class="review-section">
+        <div class="review-title">University</div>
+        <div class="review-row"><span class="review-key">Short name</span><span class="review-val" id="rv-name">MIT</span></div>
+        <div class="review-row"><span class="review-key">Full name</span><span class="review-val" id="rv-fullname">Massachusetts Institute of Technology</span></div>
+        <div class="review-row"><span class="review-key">Base URL</span><span class="review-val" id="rv-url">https://mit.edu</span></div>
+      </div>
+
+      <div class="review-section">
+        <div class="review-title">Brand</div>
+        <div class="review-row">
+          <span class="review-key">Primary colour</span>
+          <span class="review-val" style="display:flex;align-items:center;gap:8px;">
+            <span id="rv-color-dot" style="width:14px;height:14px;border-radius:4px;background:#1e4d2b;border:1px solid rgba(0,0,0,0.1);display:inline-block;"></span>
+            <span id="rv-color">#1e4d2b</span>
+          </span>
+        </div>
+        <div class="review-row"><span class="review-key">Logo source</span><span class="review-val" id="rv-logo">favicon extracted</span></div>
+      </div>
+
+      <div class="review-section">
+        <div class="review-title">Crawl</div>
+        <div class="review-row"><span class="review-key">Sections indexed</span><span class="review-val" id="rv-sections">Admissions, Academics, Tuition</span></div>
+        <div class="review-row"><span class="review-key">Total documents</span><span class="review-val" id="rv-docs">847 docs</span></div>
+        <div class="review-row"><span class="review-key">Max depth</span><span class="review-val" id="rv-depth">2</span></div>
+        <div class="review-row"><span class="review-key">Vector index</span><span class="review-val">MongoDB Atlas — cosine similarity</span></div>
+      </div>
+
+      <div class="review-section">
+        <div class="review-title">.env file preview</div>
+        <div class="env-block" id="env-block">
+          <span class="env-comment"># Generated by EduRAG onboarding</span><br>
+          <span class="env-key">NEXT_PUBLIC_APP_NAME</span>=<span class="env-val" id="env-app-name">"MIT EduRAG"</span><br>
+          <span class="env-key">NEXT_PUBLIC_APP_URL</span>=<span class="env-val">"https://your-domain.vercel.app"</span><br>
+          <span class="env-key">NEXT_PUBLIC_UNI_URL</span>=<span class="env-val" id="env-uni-url">"https://mit.edu"</span><br>
+          <span class="env-key">BRAND_PRIMARY</span>=<span class="env-val" id="env-brand">"#1e4d2b"</span><br>
+          <span class="env-key">BRAND_LOGO_URL</span>=<span class="env-val" id="env-logo">"https://mit.edu/favicon.ico"</span><br>
+          <span class="env-comment"># Add your API keys below</span><br>
+          <span class="env-key">CHAT_API_KEY</span>=<span class="env-val">"..."</span><br>
+          <span class="env-key">EMBEDDING_API_KEY</span>=<span class="env-val">"..."</span><br>
+          <span class="env-key">TAVILY_API_KEY</span>=<span class="env-val">"..."</span><br>
+          <span class="env-key">MONGODB_URI</span>=<span class="env-val">"..."</span><br>
+          <span class="env-key">ADMIN_SECRET</span>=<span class="env-val">"..."</span>
+        </div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn-back" onclick="goStep(4)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Back
+        </button>
+        <button class="btn-launch" onclick="launch()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5,3 19,12 5,21 5,3"/></svg>
+          Launch EduRAG
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ══════════════════════════════════
+       SUCCESS SCREEN (replaces right panel)
+  ══════════════════════════════════ -->
+  <div class="success-view" id="success-view">
+    <div class="success-icon">🎉</div>
+    <h1 class="success-title">You're live!</h1>
+    <p class="success-sub">MIT EduRAG is running. Students can now ask questions and get cited answers from official university pages.</p>
+
+    <div class="next-steps">
+      <div class="next-step">
+        <div class="next-step-num">1</div>
+        <div class="next-step-body">
+          <h4>Open the student portal</h4>
+          <p>Visit <code style="font-family:var(--font-mono);font-size:11px">localhost:3000</code> to see the live branded interface</p>
+        </div>
+      </div>
+      <div class="next-step">
+        <div class="next-step-num">2</div>
+        <div class="next-step-body">
+          <h4>Review the admin dashboard</h4>
+          <p>Go to <code style="font-family:var(--font-mono);font-size:11px">localhost:3000/admin</code> to manage domains and approve FAQs</p>
+        </div>
+      </div>
+      <div class="next-step">
+        <div class="next-step-num">3</div>
+        <div class="next-step-body">
+          <h4>Add remaining API keys</h4>
+          <p>Your <code style="font-family:var(--font-mono);font-size:11px">.env.local</code> needs CHAT_API_KEY, EMBEDDING_API_KEY, and MONGODB_URI</p>
+        </div>
+      </div>
+      <div class="next-step">
+        <div class="next-step-num">4</div>
+        <div class="next-step-body">
+          <h4>Deploy to Vercel</h4>
+          <p>Push to GitHub and import at vercel.com — app router, SSE, and ISR all work natively</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="env-block" style="margin-bottom:0">
+      <span class="env-comment"># .env.local written at /project-root/.env.local</span><br>
+      <span class="env-key">NEXT_PUBLIC_APP_NAME</span>=<span class="env-val">"MIT EduRAG"</span><br>
+      <span class="env-key">BRAND_PRIMARY</span>=<span class="env-val" id="success-brand">"#1e4d2b"</span><br>
+      <span class="env-key">NEXT_PUBLIC_UNI_URL</span>=<span class="env-val">"https://mit.edu"</span>
+    </div>
+  </div>
+</div>
+
+<div class="toast-area" id="toast-area"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const state = {
+  step: 1,
+  uniUrl: 'https://mit.edu',
+  uniName: 'MIT',
+  uniFullName: 'Massachusetts Institute of Technology',
+  selectedColor: '#1e4d2b',
+  extractedColors: [],
+  logoUrl: null,
+  totalDocs: 0,
+};
+
+// Simulated extracted brand colors (in real impl these come from /api/onboarding/detect)
+const DEMO_PALETTES = {
+  'mit.edu':        ['#A31F34','#8A1729','#1D2951','#6C757D','#C3C3C3'],
+  'stanford.edu':   ['#8C1515','#B83A4B','#006B81','#007C92','#E98300'],
+  'harvard.edu':    ['#A41034','#C90016','#1E1656','#767676','#B6B6B6'],
+  'oxford.ac.uk':   ['#002147','#0F3460','#A6192E','#BE0F34','#D4AF37'],
+  'cambridge.ac.uk':['#003977','#A3C1AD','#00B5AD','#009B8D','#6CACE4'],
+  'default':        ['#1e4d2b','#2563eb','#7c3aed','#b45309','#0f766e'],
+};
+
+function getPalette() {
+  const url = state.uniUrl.toLowerCase();
+  for (const [k, v] of Object.entries(DEMO_PALETTES)) {
+    if (url.includes(k)) return v;
+  }
+  return DEMO_PALETTES.default;
+}
+
+// ═══════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════
+function goStep(n) {
+  if (n === 1) {
+    state.uniUrl = document.getElementById('uni-url').value.trim() || state.uniUrl;
+    state.uniName = document.getElementById('uni-name').value.trim() || state.uniName;
+    state.uniFullName = document.getElementById('uni-full-name').value.trim() || state.uniFullName;
+  }
+
+  // Mark old step done
+  const oldTrack = document.getElementById('track-' + state.step);
+  if (oldTrack) { oldTrack.classList.remove('active'); oldTrack.classList.add('done'); oldTrack.querySelector('.step-circle').textContent = '✓'; }
+
+  state.step = n;
+
+  // Activate new step
+  for (let i = 1; i <= 5; i++) {
+    const t = document.getElementById('track-' + i);
+    const p = document.getElementById('page-' + i);
+    if (t) t.classList.remove('active', 'done');
+    if (p) p.classList.remove('active');
+  }
+  // Re-mark done
+  for (let i = 1; i < n; i++) {
+    const t = document.getElementById('track-' + i);
+    if (t) { t.classList.add('done'); t.querySelector('.step-circle').textContent = '✓'; }
+  }
+  const newTrack = document.getElementById('track-' + n);
+  const newPage = document.getElementById('page-' + n);
+  if (newTrack) newTrack.classList.add('active');
+  if (newPage) newPage.classList.add('active');
+
+  if (n === 2) renderBrandStep();
+  if (n === 5) renderReviewStep();
+
+  document.getElementById('right-panel').scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ═══════════════════════════════════════════════
+//  STEP 1 — Detection simulation
+// ═══════════════════════════════════════════════
+async function runDetection() {
+  const urlInput = document.getElementById('uni-url');
+  const btn = document.getElementById('detect-btn');
+  const url = urlInput.value.trim();
+  if (!url) { document.getElementById('warn-no-url').style.display = 'flex'; return; }
+  document.getElementById('warn-no-url').style.display = 'none';
+
+  btn.disabled = true;
+  btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin .8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Detecting…`;
+
+  await sleep(1800);
+
+  // Auto-fill university name from domain
+  try {
+    const domain = new URL(url).hostname.replace('www.', '');
+    const parts = domain.split('.');
+    const name = parts[0].toUpperCase();
+    document.getElementById('uni-name').value = name;
+    document.getElementById('uni-full-name').value = name + ' University';
+    state.uniName = name;
+    state.uniUrl = url;
+  } catch (e) {}
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12"/></svg> Re-detect`;
+  showToast('Brand data extracted from ' + url);
+}
+
+// ═══════════════════════════════════════════════
+//  STEP 2 — Brand rendering
+// ═══════════════════════════════════════════════
+function renderBrandStep() {
+  const colors = getPalette();
+  state.extractedColors = colors;
+
+  document.getElementById('brand-uni-name').textContent = state.uniName;
+  document.getElementById('brand-uni-url').textContent = new URL(state.uniUrl).hostname;
+
+  const row = document.getElementById('swatch-row');
+  const labels = ['Primary','Secondary','Tertiary','Neutral','Subtle'];
+  row.innerHTML = colors.map((c, i) => `
+    <div class="swatch">
+      <div class="swatch-dot ${i === 0 ? 'selected' : ''}"
+           style="background:${c}"
+           onclick="selectColor('${c}', this)"
+           title="${c}">
+      </div>
+      <span class="swatch-label">${labels[i] || 'Alt'}</span>
+    </div>
+  `).join('');
+
+  // Default to first color
+  selectColor(colors[0], row.querySelector('.swatch-dot'));
+}
+
+function selectColor(color, el) {
+  state.selectedColor = color;
+  document.querySelectorAll('.swatch-dot').forEach(d => d.classList.remove('selected'));
+  el.classList.add('selected');
+
+  // Update preview
+  document.getElementById('prev-mark').style.background = color;
+  document.getElementById('prev-bubble').style.background = hexToLight(color);
+  document.getElementById('prev-bubble').style.color = color;
+  document.getElementById('prev-cta').style.background = color;
+  document.getElementById('prev-wordmark').textContent = state.uniName + ' EduRAG';
+
+  // Update left panel
+  document.getElementById('left-panel').style.background = color;
+
+  // Update CSS variable for other accented elements
+  document.documentElement.style.setProperty('--accent', color);
+  document.documentElement.style.setProperty('--accent-light', hexToLight(color));
+  document.documentElement.style.setProperty('--accent-glow', hexToGlow(color));
+}
+
+function hexToLight(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},0.08)`;
+}
+function hexToGlow(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},0.12)`;
+}
+
+// ═══════════════════════════════════════════════
+//  STEP 3 — Scope + extended config
+// ═══════════════════════════════════════════════
+function togglePill(btn) { btn.classList.toggle('selected'); }
+
+function addExtRow() {
+  const list = document.getElementById('ext-url-list');
+  const row = document.createElement('div');
+  row.className = 'ext-url-row';
+  row.innerHTML = '<input class="form-input" type="url" placeholder="https://…" style="flex:1;margin:0"/><input class="form-input" type="text" placeholder="Label" style="width:120px;margin:0;flex-shrink:0"/><button class="ext-rm-btn" onclick="removeExtRow(this)" title="Remove">✕</button>';
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}
+function removeExtRow(btn) { btn.closest('.ext-url-row').remove(); }
+
+function addExclTag(e) {
+  if (e.key !== 'Enter' && e.key !== ',') return;
+  e.preventDefault();
+  const v = e.target.value.trim().replace(/,/g,'');
+  if (!v) return;
+  const tag = document.createElement('div');
+  tag.className = 'ob-tag';
+  tag.innerHTML = v + '<span class="ob-rm" onclick="removeTag(this)">✕</span>';
+  e.target.parentNode.insertBefore(tag, e.target);
+  e.target.value = '';
+}
+function removeTag(btn) { btn.closest('.ob-tag').remove(); }
+
+function collectCrawlConfig() {
+  const sections = Array.from(document.querySelectorAll('.scope-pill.selected'))
+    .map(p => ({ path: p.dataset.path, label: p.textContent.replace('✓','').trim() }));
+  const externals = Array.from(document.querySelectorAll('#ext-url-list .ext-url-row'))
+    .map(row => { const ins = row.querySelectorAll('input'); return { url: ins[0].value.trim(), label: ins[1].value.trim() }; })
+    .filter(e => e.url);
+  const excludePaths = Array.from(document.querySelectorAll('#excl-tags .ob-tag'))
+    .map(t => t.childNodes[0].textContent.trim());
+  const fileTypeRules = {
+    pdf:  document.querySelector('[name=ft-pdf]:checked')?.value || 'index',
+    docx: document.querySelector('[name=ft-docx]:checked')?.value || 'index',
+    csv:  document.querySelector('[name=ft-csv]:checked')?.value || 'skip',
+  };
+  return { sections, externals, excludePaths, fileTypeRules };
+}
+
+// ═══════════════════════════════════════════════
+//  STEP 4 — Crawl simulation
+// ═══════════════════════════════════════════════
+const LOG_LINES = [
+  { t:'ok', m:'Crawl job started for /admissions (max_depth:2, limit:100)' },
+  { t:'processing', m:'Fetching https://mit.edu/admissions…' },
+  { t:'ok', m:'Page crawled: /admissions — 12,400 chars extracted' },
+  { t:'processing', m:'Fetching https://mit.edu/admissions/requirements…' },
+  { t:'ok', m:'Page crawled: /admissions/requirements — 8,200 chars' },
+  { t:'processing', m:'RecursiveCharacterTextSplitter: 24 chunks from /admissions' },
+  { t:'ok', m:'Embeddings computed for 24 chunks (Voyage voyage-4-large)' },
+  { t:'ok', m:'Stored 24 vectors in MongoDB Atlas (crawled_index)' },
+  { t:'processing', m:'Crawl job started for /academics…' },
+  { t:'ok', m:'Page crawled: /academics — 19,800 chars extracted' },
+  { t:'processing', m:'Fetching https://mit.edu/academics/programs…' },
+  { t:'ok', m:'Page crawled: /academics/programs — 31,200 chars' },
+  { t:'processing', m:'Chunking /academics/programs → 42 chunks' },
+  { t:'ok', m:'Embeddings computed for 42 chunks' },
+  { t:'ok', m:'Stored 42 vectors in MongoDB Atlas' },
+  { t:'processing', m:'Crawl job started for /tuition…' },
+  { t:'ok', m:'Page crawled: /tuition — 6,100 chars extracted' },
+  { t:'ok', m:'Embeddings computed for 12 chunks' },
+  { t:'ok', m:'Stored 12 vectors in MongoDB Atlas' },
+  { t:'ok', m:'All crawl jobs complete — 847 documents indexed ✓' },
+];
+let crawlTimer = null;
+
+function startCrawlSim() {
+  const fill = document.getElementById('crawl-fill');
+  const pct = document.getElementById('crawl-pct');
+  const label = document.getElementById('crawl-label');
+  const pages = document.getElementById('crawl-pages');
+  const chunks = document.getElementById('crawl-chunks');
+  const docs = document.getElementById('crawl-docs');
+  const log = document.getElementById('crawl-log');
+  log.innerHTML = '';
+
+  let p = 0;
+  let logIdx = 0;
+  clearInterval(crawlTimer);
+
+  crawlTimer = setInterval(async () => {
+    p += Math.random() * 3 + 0.5;
+    if (p >= 100) p = 100;
+    const pc = Math.round(p);
+    fill.style.width = pc + '%';
+    pct.textContent = pc + '%';
+    pages.textContent = Math.round(p * 2.8) + ' pages';
+    chunks.textContent = Math.round(p * 9.4) + ' chunks';
+    docs.textContent = Math.round(p * 8.47) + ' docs';
+
+    // Progress label
+    if (p < 33) label.textContent = 'Crawling /admissions…';
+    else if (p < 66) label.textContent = 'Crawling /academics…';
+    else if (p < 90) label.textContent = 'Crawling /tuition & embedding…';
+    else label.textContent = 'Finalising MongoDB index…';
+
+    // Add log lines progressively
+    if (logIdx < LOG_LINES.length && p > (logIdx / LOG_LINES.length) * 100) {
+      const line = LOG_LINES[logIdx++];
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      div.innerHTML = `<span class="log-ts">${timestamp()}</span><span class="${line.t === 'ok' ? 'log-ok' : 'log-processing'}">${line.m}</span>`;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    if (p >= 100) {
+      clearInterval(crawlTimer);
+      state.totalDocs = 847;
+      document.getElementById('crawl-done-msg').style.display = 'block';
+      document.getElementById('next-4').disabled = false;
+      showToast('✓ 847 documents indexed successfully');
+    }
+  }, 200);
+}
+
+function timestamp() {
+  const n = new Date();
+  return [n.getHours().toString().padStart(2,'0'), n.getMinutes().toString().padStart(2,'0'), n.getSeconds().toString().padStart(2,'0')].join(':');
+}
+
+// ═══════════════════════════════════════════════
+//  STEP 5 — Review
+// ═══════════════════════════════════════════════
+function renderReviewStep() {
+  const sections = Array.from(document.querySelectorAll('.scope-pill.selected')).map(p => p.textContent.replace('✓','').trim()).join(', ');
+  const color = state.selectedColor;
+
+  document.getElementById('rv-name').textContent = state.uniName;
+  document.getElementById('rv-fullname').textContent = state.uniFullName;
+  document.getElementById('rv-url').textContent = state.uniUrl;
+  document.getElementById('rv-color').textContent = color;
+  document.getElementById('rv-color-dot').style.background = color;
+  document.getElementById('rv-logo').textContent = 'favicon extracted via Tavily';
+  const cfg = collectCrawlConfig();
+  const sectionLabels = cfg.sections.map(s => s.label).join(', ') || 'Admissions, Academics, Tuition';
+  document.getElementById('rv-sections').textContent = sectionLabels;
+  document.getElementById('rv-docs').textContent = state.totalDocs || 847;
+  document.getElementById('rv-depth').textContent = document.getElementById('cfg-depth')?.value || '2';
+
+  // Crawl rules summary rows (add if not already there)
+  const crawlSection = document.querySelector('.review-section:nth-child(3)');
+  if (crawlSection && cfg.excludePaths.length) {
+    let excRow = document.getElementById('rv-excl-row');
+    if (!excRow) {
+      excRow = document.createElement('div');
+      excRow.id = 'rv-excl-row';
+      excRow.className = 'review-row';
+      excRow.innerHTML = '<span class="review-key">Excluded paths</span><span class="review-val" style="font-family:var(--font-mono);font-size:11px;word-break:break-all"></span>';
+      crawlSection.appendChild(excRow);
+    }
+    excRow.querySelector('.review-val').textContent = cfg.excludePaths.join(', ');
+  }
+  if (crawlSection && cfg.externals.length) {
+    let extRow = document.getElementById('rv-ext-row');
+    if (!extRow) {
+      extRow = document.createElement('div');
+      extRow.id = 'rv-ext-row';
+      extRow.className = 'review-row';
+      extRow.innerHTML = '<span class="review-key">External sources</span><span class="review-val" style="font-family:var(--font-mono);font-size:11px;word-break:break-all"></span>';
+      crawlSection.appendChild(extRow);
+    }
+    extRow.querySelector('.review-val').textContent = cfg.externals.map(e => e.label || e.url).join(', ');
+  }
+
+  // Env preview
+  const appName = state.uniName + ' EduRAG';
+  document.getElementById('env-app-name').textContent = `"${appName}"`;
+  document.getElementById('env-uni-url').textContent = `"${state.uniUrl}"`;
+  document.getElementById('env-brand').textContent = `"${color}"`;
+  document.getElementById('env-logo').textContent = `"${state.uniUrl}/favicon.ico"`;
+
+  // Final preview header
+  document.getElementById('final-preview-header').style.background = color;
+  document.getElementById('final-name').textContent = appName;
+}
+
+// ═══════════════════════════════════════════════
+//  LAUNCH
+// ═══════════════════════════════════════════════
+function launch() {
+  showToast('Writing .env.local and starting server…');
+  setTimeout(() => {
+    // Swap right panel for success screen
+    document.getElementById('right-panel').style.display = 'none';
+    const sv = document.getElementById('success-view');
+    sv.classList.add('active');
+    document.querySelector('.shell').appendChild(sv);
+    document.getElementById('success-brand').textContent = `"${state.selectedColor}"`;
+
+    // Update left panel
+    document.querySelectorAll('.step').forEach(s => { s.classList.remove('active'); s.classList.add('done'); s.querySelector('.step-circle').textContent = '✓'; });
+    const lh = document.querySelector('.lp-headline');
+    lh.innerHTML = `<em>You're live!</em><br>${state.uniName} EduRAG<br>is running`;
+  }, 1200);
+}
+
+// ═══════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════
+function showToast(msg, dur = 2800) {
+  const area = document.getElementById('toast-area');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12"/></svg> ${msg}`;
+  area.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; t.style.transform='translateY(6px)'; t.style.transition='.18s'; setTimeout(()=>t.remove(),200); }, dur);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// CSS spin animation for loading button
+const style = document.createElement('style');
+style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+document.head.appendChild(style);
+</script>
+</body>
+</html>

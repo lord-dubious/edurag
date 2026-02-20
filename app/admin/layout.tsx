@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { ThemeProvider } from 'next-themes';
 
 export default async function AdminLayout({
   children,
@@ -14,18 +15,18 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <div className="flex">
-        <aside className="w-64 min-h-screen border-r bg-card p-4">
-          <div className="font-bold text-lg mb-6">{process.env.NEXT_PUBLIC_APP_NAME || 'EduRAG'}</div>
-          <nav className="space-y-2">
-            <a href="/admin" className="block px-3 py-2 rounded-md hover:bg-muted">Dashboard</a>
-            <a href="/admin/domains" className="block px-3 py-2 rounded-md hover:bg-muted">Domains</a>
-            <a href="/admin/faqs" className="block px-3 py-2 rounded-md hover:bg-muted">FAQs</a>
-          </nav>
-        </aside>
-        <main className="flex-1 p-6">{children}</main>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <div className="min-h-screen bg-background">
+        <AdminSidebar />
+        <main className="ml-56 pt-14 min-h-screen">
+          <div className="p-6">{children}</div>
+        </main>
       </div>
-    </div>
+    </ThemeProvider>
   );
 }

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { MongoClient } from 'mongodb';
 import { similaritySearchWithScore, getMongoCollection, closeMongoClient } from '../lib/vectorstore';
 import { env } from '../lib/env';
-import { embeddings } from '../lib/providers';
+import { getEmbeddings } from '../lib/providers';
 import { Document } from '@langchain/core/documents';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 
@@ -18,6 +18,7 @@ describe('Vector Store', () => {
 
   beforeAll(async () => {
     const collection = await getMongoCollection(env.VECTOR_COLLECTION);
+    const embeddingsInstance = getEmbeddings();
     
     const docs = [
       new Document({
@@ -34,7 +35,7 @@ describe('Vector Store', () => {
       }),
     ];
 
-    await MongoDBAtlasVectorSearch.fromDocuments(docs, embeddings, {
+    await MongoDBAtlasVectorSearch.fromDocuments(docs, embeddingsInstance, {
       collection,
       indexName: env.VECTOR_INDEX_NAME,
       textKey: 'text',
@@ -54,7 +55,7 @@ describe('Vector Store', () => {
   });
 
   it('should perform similarity search with scores', async () => {
-    const results = await similaritySearchWithScore('computer science programs', TEST_THREAD_ID, 3);
+    const results = await similaritySearchWithScore('computer science programs', 3);
 
     console.log(`Found ${results.length} similar documents`);
     if (results.length > 0) {
@@ -65,7 +66,7 @@ describe('Vector Store', () => {
   });
 
   it('should return relevant results', async () => {
-    const results = await similaritySearchWithScore('tuition costs', TEST_THREAD_ID, 3);
+    const results = await similaritySearchWithScore('tuition costs', 3);
 
     console.log('Search results with scores:');
     results.forEach(([doc, score]) => {
@@ -76,13 +77,13 @@ describe('Vector Store', () => {
     expect(results[0][1]).toBeGreaterThanOrEqual(0);
   });
 
-  it('should filter by threadId', async () => {
-    const results = await similaritySearchWithScore('deadlines', TEST_THREAD_ID, 5);
+  it('should return documents matching the query', async () => {
+    const results = await similaritySearchWithScore('deadlines', 5);
 
-    results.forEach(([doc]) => {
-      expect(doc.metadata.threadId).toBe(TEST_THREAD_ID);
-    });
-    
     expect(results.length).toBeGreaterThan(0);
+    results.forEach(([doc]) => {
+      expect(doc.pageContent.length).toBeGreaterThan(0);
+      expect(doc.metadata.url).toBeDefined();
+    });
   }, 30000);
 });

@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduRAG Admin — Knowledge Base</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300;1,9..144,400&family=Cabinet+Grotesk:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f1eb;--bg2:#ece8e0;--bg3:#ddd8ce;
+  --surface:#fdfcf9;--surface2:#f8f5ef;
+  --border:#d6d0c4;--border-hi:#b8b09e;
+  --text:#18140e;--text2:#5c5344;--text3:#9a8e7e;
+  --accent:#1e4d2b;--accent-mid:#2e7042;--accent-light:#e6efe9;--accent-glow:rgba(30,77,43,0.10);
+  --ok:#1e7d4a;--ok-bg:#e8f5ed;
+  --warn:#b83232;--warn-bg:#fdf0f0;
+  --info:#1a5c9e;--info-bg:#e8f0fc;
+  --gold:#b07a1a;--gold-bg:#fdf6e8;
+  --purple:#6b34ac;--purple-bg:#f3eefb;
+  --radius:12px;--radius-sm:8px;--radius-lg:18px;
+  --shadow-sm:0 1px 4px rgba(24,20,14,0.06);
+  --shadow:0 3px 16px rgba(24,20,14,0.09);
+  --shadow-lg:0 10px 40px rgba(24,20,14,0.13);
+  --font-disp:'Fraunces',Georgia,serif;
+  --font-body:'Cabinet Grotesk',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --sidebar-w:220px;--header-h:56px;
+  --t:0.16s;--ease:cubic-bezier(0.4,0,0.2,1);
+}
+[data-theme="dark"]{
+  --bg:#0e0c08;--bg2:#161310;--bg3:#1e1b16;
+  --surface:#141108;--surface2:#100e0a;
+  --border:#282318;--border-hi:#3a3428;
+  --text:#f0ebe0;--text2:#a09278;--text3:#6a5e4a;
+  --accent:#4aaa68;--accent-mid:#3d8e56;--accent-light:#0e1e12;--accent-glow:rgba(74,170,104,0.12);
+  --ok:#3aaa6a;--ok-bg:#081a0e;
+  --warn:#e05050;--warn-bg:#180a0a;
+  --info:#5b9ef0;--info-bg:#080e1a;
+  --gold:#d4a030;--gold-bg:#160e00;
+  --purple:#a06adc;--purple-bg:#110820;
+  --shadow-sm:0 1px 4px rgba(0,0,0,0.28);
+  --shadow:0 3px 16px rgba(0,0,0,0.38);
+  --shadow-lg:0 10px 40px rgba(0,0,0,0.5);
+}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);height:100dvh;overflow:hidden;font-size:14px;-webkit-font-smoothing:antialiased;}
+.shell{display:flex;height:100dvh;}
+
+/* topbar */
+.topbar{position:fixed;top:0;left:0;right:0;height:var(--header-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:12px;z-index:100;}
+.logo{display:flex;align-items:center;gap:9px;font-family:var(--font-disp);font-size:17px;color:var(--text);}
+.logo-mark{width:30px;height:30px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;}
+.admin-chip{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold);border-radius:100px;padding:2px 8px;}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.icon-btn{width:32px;height:32px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--t);}
+.icon-btn:hover{background:var(--bg2);color:var(--text);}
+
+/* sidebar */
+.sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--surface2);border-right:1px solid var(--border);padding-top:calc(var(--header-h) + 14px);display:flex;flex-direction:column;overflow-y:auto;}
+.nav-section{font-size:10px;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:var(--text3);padding:10px 14px 4px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 10px;margin:1px 8px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);border:none;background:transparent;width:calc(100% - 16px);text-align:left;font-family:var(--font-body);transition:all var(--t);}
+.nav-item:hover{background:var(--bg2);color:var(--text);}
+.nav-item.active{background:var(--accent-light);color:var(--accent);}
+.nav-item svg{width:15px;height:15px;flex-shrink:0;}
+.nav-badge{margin-left:auto;min-width:18px;height:18px;background:var(--warn);color:white;border-radius:100px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 5px;}
+.nav-badge.ok{background:var(--ok);}
+
+/* main */
+.main{flex:1;overflow-y:auto;padding:calc(var(--header-h) + 28px) 32px 40px;background:var(--bg);}
+.page{display:none;}
+.page.active{display:block;}
+.page-title{font-family:var(--font-disp);font-size:26px;font-weight:300;margin-bottom:3px;}
+.page-sub{font-size:13px;color:var(--text3);margin-bottom:28px;}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+.card-title{font-size:14px;font-weight:700;margin-bottom:2px;}
+.card-sub{font-size:12px;color:var(--text3);}
+
+/* form */
+.form-row{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+.form-group{flex:1;min-width:140px;display:flex;flex-direction:column;gap:5px;}
+.form-label{font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--text2);}
+.form-input,.form-select,.form-textarea{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;font-size:13px;color:var(--text);font-family:var(--font-body);outline:none;transition:border-color var(--t),box-shadow var(--t);width:100%);}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow);}
+.form-textarea{resize:vertical;min-height:72px;line-height:1.55;}
+.form-hint{font-size:11px;color:var(--text3);}
+.form-select{cursor:pointer;}
+
+/* tags */
+.tags-wrap{display:flex;flex-wrap:wrap;gap:5px;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;min-height:42px;align-items:center;cursor:text;transition:border-color var(--t);}
+.tags-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow);}
+.tag-pill{display:flex;align-items:center;gap:5px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px;font-family:var(--font-mono);color:var(--text2);}
+.tag-pill .rm{cursor:pointer;color:var(--text3);font-size:11px;line-height:1;}
+.tag-pill .rm:hover{color:var(--warn);}
+.tag-input{border:none;outline:none;background:transparent;font-family:var(--font-mono);font-size:12px;color:var(--text);flex:1;min-width:100px;padding:2px 0;}
+.tag-input::placeholder{color:var(--text3);}
+
+/* type badges */
+.type-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:600;}
+.type-web{background:var(--info-bg);color:var(--info);}
+.type-pdf{background:var(--warn-bg);color:var(--warn);}
+.type-docx{background:var(--info-bg);color:var(--info);}
+.type-txt{background:var(--bg2);color:var(--text3);}
+.type-manual{background:var(--purple-bg);color:var(--purple);}
+.type-csv{background:var(--ok-bg);color:var(--ok);}
+
+/* status badges */
+.sb{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:100px;font-size:11px;font-weight:600;}
+.sb::before{content:'';width:5px;height:5px;border-radius:50%;}
+.s-ok{background:var(--ok-bg);color:var(--ok);}
+.s-ok::before{background:var(--ok);}
+.s-run{background:var(--gold-bg);color:var(--gold);}
+.s-run::before{background:var(--gold);animation:pulse 1.2s ease infinite;}
+.s-err{background:var(--warn-bg);color:var(--warn);}
+.s-err::before{background:var(--warn);}
+.s-pend{background:var(--info-bg);color:var(--info);}
+.s-pend::before{background:var(--info);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* table */
+.tbl{width:100%;border-collapse:collapse;}
+.tbl th{font-size:10px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--text3);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;}
+.tbl td{padding:11px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tbody tr:hover td{background:var(--bg2);}
+.mono{font-family:var(--font-mono);font-size:11px;color:var(--text2);}
+.tbl-act{display:flex;gap:5px;}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:all var(--t);border:none;}
+.btn-p{background:var(--accent);color:white;box-shadow:0 2px 8px var(--accent-glow);}
+.btn-p:hover{opacity:0.88;transform:translateY(-1px);}
+.btn-o{background:transparent;color:var(--text2);border:1.5px solid var(--border);}
+.btn-o:hover{color:var(--text);border-color:var(--border-hi);background:var(--bg2);}
+.btn-d{background:var(--warn);color:white;}
+.btn-d:hover{opacity:0.85;}
+.sm{padding:4px 10px;font-size:11px;font-weight:500;border-radius:6px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-family:var(--font-body);transition:all var(--t);}
+.sm-o{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.sm-o:hover{color:var(--text);border-color:var(--border-hi);background:var(--bg2);}
+.sm-r:hover{background:var(--warn-bg);color:var(--warn);border-color:var(--warn);}
+
+/* upload zone */
+.drop-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:32px 24px;text-align:center;cursor:pointer;transition:all var(--t);background:var(--bg);}
+.drop-zone:hover,.drop-zone.over{border-color:var(--accent);background:var(--accent-light);}
+.upload-icon{font-size:32px;margin-bottom:10px;display:block;}
+.upload-title{font-size:14px;font-weight:600;margin-bottom:4px;}
+.upload-sub{font-size:12px;color:var(--text3);}
+.ftype-row{display:flex;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.ftype-tag{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;}
+
+/* upload queue */
+.uq{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+.uq-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.uq-icon{font-size:20px;flex-shrink:0;}
+.uq-info{flex:1;min-width:0;}
+.uq-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.uq-meta{font-size:11px;color:var(--text3);}
+.uq-prog{width:100%;height:3px;background:var(--bg2);border-radius:100px;margin-top:5px;overflow:hidden;}
+.uq-fill{height:100%;background:var(--accent);border-radius:100px;transition:width .3s;}
+
+/* progress */
+.prog-wrap{background:var(--bg2);border-radius:100px;height:6px;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-mid));border-radius:100px;transition:width .35s var(--ease);}
+
+/* callout */
+.callout{display:flex;gap:10px;padding:12px 14px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:12px;line-height:1.6;align-items:flex-start;}
+.ci{flex-shrink:0;font-size:14px;}
+.c-info{background:var(--info-bg);color:var(--info);border:1px solid rgba(26,92,158,0.15);}
+.c-ok{background:var(--ok-bg);color:var(--ok);border:1px solid rgba(30,125,74,0.15);}
+.c-warn{background:var(--warn-bg);color:var(--warn);border:1px solid rgba(184,50,50,0.15);}
+
+/* toggle */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-info h4{font-size:13px;font-weight:500;}
+.toggle-info p{font-size:11px;color:var(--text3);margin-top:1px;}
+.tgl{width:40px;height:22px;border-radius:11px;background:var(--bg3);cursor:pointer;position:relative;transition:background var(--t);flex-shrink:0;border:none;}
+.tgl.on{background:var(--accent);}
+.tgl::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:white;top:3px;left:3px;transition:transform var(--t);box-shadow:var(--shadow-sm);}
+.tgl.on::after{transform:translateX(18px);}
+
+/* exception section */
+.exc-section{margin-bottom:18px;}
+.exc-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.exc-help{font-size:11px;color:var(--text3);padding:8px 12px;background:var(--bg2);border-radius:var(--radius-sm);margin-top:6px;font-family:var(--font-mono);line-height:1.7;}
+
+/* dialog */
+.dialog-overlay{position:fixed;inset:0;background:rgba(24,20,14,.45);backdrop-filter:blur(4px);z-index:999;display:none;align-items:center;justify-content:center;}
+.dialog-overlay.open{display:flex;}
+.dialog{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;width:420px;max-width:92vw;box-shadow:var(--shadow-lg);animation:dIn .18s var(--ease);}
+@keyframes dIn{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:scale(1)}}
+.dialog-title{font-size:16px;font-weight:600;margin-bottom:6px;}
+.dialog-body{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px;}
+.dialog-foot{display:flex;gap:8px;justify-content:flex-end;}
+
+/* toasts */
+.toasts{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:7px;}
+.toast{background:var(--text);color:var(--bg);padding:9px 16px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;box-shadow:var(--shadow-lg);animation:tIn .2s var(--ease);display:flex;align-items:center;gap:7px;}
+@keyframes tIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="logo">
+    <div class="logo-mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
+    EduRAG
+  </div>
+  <span class="admin-chip">Admin</span>
+  <div class="tb-right">
+    <button class="icon-btn" onclick="toggleTheme()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+    </button>
+    <button class="btn btn-o sm" onclick="toast('Signed out')">Sign out</button>
+  </div>
+</nav>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="nav-section">Knowledge Base</div>
+    <button class="nav-item active" id="ni-sources" onclick="showPage('sources',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+      All Sources
+      <span class="nav-badge ok">12</span>
+    </button>
+    <button class="nav-item" id="ni-crawl" onclick="showPage('crawl',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Web Crawl
+    </button>
+    <button class="nav-item" id="ni-upload" onclick="showPage('upload',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16,16 12,12 8,16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+      Upload Docs
+    </button>
+    <button class="nav-item" id="ni-manual" onclick="showPage('manual',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Manual Entry
+    </button>
+    <div class="nav-section" style="margin-top:8px">Settings</div>
+    <button class="nav-item" id="ni-rules" onclick="showPage('rules',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46 22,3"/></svg>
+      Crawl Rules
+    </button>
+    <button class="nav-item" id="ni-faqs" onclick="showPage('faqs',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
+      FAQ Approval
+      <span class="nav-badge">3</span>
+    </button>
+  </aside>
+
+  <main class="main">
+
+    <!-- ALL SOURCES -->
+    <div class="page active" id="page-sources">
+      <h1 class="page-title">All Sources</h1>
+      <p class="page-sub">Everything indexed into the knowledge base — websites, documents, and manual entries</p>
+
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:22px">
+        <div class="card" style="padding:14px;margin-bottom:0"><div style="font-family:var(--font-disp);font-size:26px;color:var(--accent)">2,976</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Total chunks</div></div>
+        <div class="card" style="padding:14px;margin-bottom:0"><div style="font-family:var(--font-disp);font-size:26px;color:var(--info)">8</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Web domains</div></div>
+        <div class="card" style="padding:14px;margin-bottom:0"><div style="font-family:var(--font-disp);font-size:26px;color:var(--warn)">3</div><div style="font-size:11px;color:var(--text3);margin-top:2px">PDF / DOCX</div></div>
+        <div class="card" style="padding:14px;margin-bottom:0"><div style="font-family:var(--font-disp);font-size:26px;color:var(--purple)">1</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Manual entries</div></div>
+        <div class="card" style="padding:14px;margin-bottom:0"><div style="font-family:var(--font-disp);font-size:26px;color:var(--gold)">1</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Crawling now</div></div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <input class="form-input" type="search" placeholder="Search sources…" style="max-width:260px;padding:7px 12px;margin:0">
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn btn-o sm" onclick="showPage('upload',document.getElementById('ni-upload'))">+ Upload</button>
+            <button class="btn btn-o sm" onclick="showPage('manual',document.getElementById('ni-manual'))">+ Manual</button>
+            <button class="btn btn-p sm" onclick="showPage('crawl',document.getElementById('ni-crawl'))">+ Add domain</button>
+          </div>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Source</th><th>Type</th><th>Chunks</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><div style="font-weight:500">Admissions</div><div class="mono">university.edu/admissions</div></td>
+              <td><span class="type-badge type-web">🌐 Web</span></td><td>380</td>
+              <td><span class="sb s-ok">Indexed</span></td>
+              <td style="color:var(--text3);font-size:12px">Feb 18</td>
+              <td><div class="tbl-act"><button class="sm sm-o" onclick="toast('Re-index queued')">Re-index</button><button class="sm sm-o sm-r" onclick="openDel('university.edu/admissions')">Delete</button></div></td>
+            </tr>
+            <tr>
+              <td><div style="font-weight:500">Academics &amp; Programs</div><div class="mono">university.edu/academics</div></td>
+              <td><span class="type-badge type-web">🌐 Web</span></td><td>1,240</td>
+              <td><span class="sb s-ok">Indexed</span></td>
+              <td style="color:var(--text3);font-size:12px">Feb 18</td>
+              <td><div class="tbl-act"><button class="sm sm-o" onclick="toast('Re-index queued')">Re-index</button><button class="sm sm-o sm-r" onclick="openDel('university.edu/academics')">Delete</button></div></td>
+            </tr>
+            <tr>
+              <td><div style="font-weight:500">Student Life</div><div class="mono">university.edu/student-life</div></td>
+              <td><span class="type-badge type-web">🌐 Web</span></td><td>—</td>
+              <td><span class="sb s-run">Crawling</span></td>
+              <td style="color:var(--text3);font-size:12px">In progress</td>
+              <td><div class="tbl-act"><button class="sm sm-o sm-r" onclick="toast('Crawl cancelled')">Cancel</button></div></td>
+            </tr>
+            <tr>
+              <td><div style="font-weight:500">UG Handbook 2025</div><div class="mono">UG_Handbook_2025.pdf</div></td>
+              <td><span class="type-badge type-pdf">📄 PDF</span></td><td>214</td>
+              <td><span class="sb s-ok">Indexed</span></td>
+              <td style="color:var(--text3);font-size:12px">Feb 10</td>
+              <td><div class="tbl-act"><button class="sm sm-o sm-r" onclick="openDel('UG_Handbook_2025.pdf')">Delete</button></div></td>
+            </tr>
+            <tr>
+              <td><div style="font-weight:500">Financial Aid Policy</div><div class="mono">FinAid_Policy_2025.docx</div></td>
+              <td><span class="type-badge type-docx">📝 DOCX</span></td><td>88</td>
+              <td><span class="sb s-ok">Indexed</span></td>
+              <td style="color:var(--text3);font-size:12px">Feb 8</td>
+              <td><div class="tbl-act"><button class="sm sm-o sm-r" onclick="openDel('FinAid_Policy_2025.docx')">Delete</button></div></td>
+            </tr>
+            <tr>
+              <td><div style="font-weight:500">Scholarship Listing 2025</div><div class="mono">scholarships.csv</div></td>
+              <td><span class="type-badge type-csv">📊 CSV</span></td><td>42</td>
+              <td><span class="sb s-ok">Indexed</span></td>
+              <td style="color:var(--text3);font-size:12px">Feb 5</td>
+              <td><div class="tbl-act"><button class="sm sm-o sm-r" onclick="openDel('scholarships.csv')">Delete</button></div></td>
+            </tr>
+            <tr>
+              <td><div style="font-weight:500">Campus Parking &amp; Transport</div><div class="mono" style="color:var(--purple)">Manual entry</div></td>
+              <td><span class="type-badge type-manual">✏️ Manual</span></td><td>12</td>
+              <td><span class="sb s-ok">Indexed</span></td>
+              <td style="color:var(--text3);font-size:12px">Jan 30</td>
+              <td><div class="tbl-act"><button class="sm sm-o" onclick="toast('Opening editor')">Edit</button><button class="sm sm-o sm-r" onclick="openDel('Campus Parking')">Delete</button></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- WEB CRAWL -->
+    <div class="page" id="page-crawl">
+      <h1 class="page-title">Web Crawl</h1>
+      <p class="page-sub">Add any public URL — university pages, partner handbooks, external resources. Tavily crawls and indexes the content.</p>
+
+      <div class="card">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px">
+          <div><div class="card-title">Add domain or URL</div><div class="card-sub">Crawls respect global Crawl Rules unless per-domain overrides are set below</div></div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group" style="flex:3">
+            <label class="form-label">Start URL</label>
+            <input class="form-input" id="crawl-url" type="url" placeholder="https://university.edu/research" value="https://university.edu/research"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max depth</label>
+            <select class="form-select">
+              <option>1 — surface</option>
+              <option selected>2 — standard</option>
+              <option>3 — deep</option>
+              <option>Unlimited ⚠</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Page limit</label>
+            <select class="form-select">
+              <option>50</option>
+              <option selected>100</option>
+              <option>250</option>
+              <option>500</option>
+              <option>No limit ⚠</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label">Crawl instructions <span style="font-weight:400;text-transform:none;color:var(--text3)">(natural language)</span></label>
+          <textarea class="form-textarea" rows="2">Focus on research labs, faculty profiles, and publications. Skip news archives older than 2022.</textarea>
+          <p class="form-hint">Passed directly to Tavily as the <code style="font-family:var(--font-mono);font-size:10px">instructions</code> param — be specific about what to prioritise and what to skip.</p>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="form-group">
+            <label class="form-label">Include only paths <span style="font-size:10px;font-weight:400;text-transform:none;color:var(--text3);margin-left:3px">selectPaths</span></label>
+            <div class="tags-wrap" id="sp-tags" onclick="this.querySelector('.tag-input').focus()">
+              <div class="tag-pill">/research<span class="rm" onclick="removeTag(this)">✕</span></div>
+              <div class="tag-pill">/labs<span class="rm" onclick="removeTag(this)">✕</span></div>
+              <input class="tag-input" placeholder="/path…" onkeydown="addTag(event,'sp-tags')"/>
+            </div>
+            <p class="form-hint">Only follow URLs matching these prefixes. Leave empty = follow all (minus excludePaths).</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Exclude paths <span style="font-size:10px;font-weight:400;text-transform:none;color:var(--text3);margin-left:3px">excludePaths</span></label>
+            <div class="tags-wrap" id="ep-tags" onclick="this.querySelector('.tag-input').focus()">
+              <div class="tag-pill">/admin<span class="rm" onclick="removeTag(this)">✕</span></div>
+              <div class="tag-pill">/login<span class="rm" onclick="removeTag(this)">✕</span></div>
+              <div class="tag-pill">/archive<span class="rm" onclick="removeTag(this)">✕</span></div>
+              <input class="tag-input" placeholder="/path…" onkeydown="addTag(event,'ep-tags')"/>
+            </div>
+            <p class="form-hint">Always skip these paths even if depth allows them.</p>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px">
+          <div class="form-group">
+            <label class="form-label">Allow external links</label>
+            <select class="form-select"><option selected>No — stay on domain</option><option>Yes — follow external</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Extract depth</label>
+            <select class="form-select"><option>Basic</option><option selected>Advanced</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Format</label>
+            <select class="form-select"><option selected>Markdown</option><option>Plain text</option></select>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-p" onclick="startCrawl()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5,3 19,12 5,21 5,3"/></svg>
+            Start crawl
+          </button>
+          <span id="cst" style="font-size:12px;color:var(--text3)"></span>
+        </div>
+
+        <div id="prog-area" style="display:none;margin-top:16px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px" id="prog-lbl">Starting…</div>
+          <div class="prog-wrap"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:4px;font-family:var(--font-mono)"><span id="prog-pages">0 pages</span><span id="prog-pct">0%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- UPLOAD DOCS -->
+    <div class="page" id="page-upload">
+      <h1 class="page-title">Upload Documents</h1>
+      <p class="page-sub">Index PDFs, Word docs, plain text files, and CSVs. The file is parsed, chunked, embedded, and stored — the original file is not kept.</p>
+
+      <div class="callout c-info">
+        <span class="ci">💡</span>
+        <div><strong>Loaders used:</strong> <code style="font-family:var(--font-mono);font-size:10px">PDFLoader</code> from <code style="font-family:var(--font-mono);font-size:10px">@langchain/community</code> for PDFs, <code style="font-family:var(--font-mono);font-size:10px">DocxLoader</code> for Word files, <code style="font-family:var(--font-mono);font-size:10px">CSVLoader</code> for spreadsheets. Each row/page becomes a separate document before chunking. Text files are loaded directly. All pass through <code style="font-family:var(--font-mono);font-size:10px">RecursiveCharacterTextSplitter</code> then your embedding model.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="margin-bottom:4px">Drop files here</div>
+        <div class="card-sub" style="margin-bottom:14px">Content is parsed to plain text then indexed — the agent retrieves text chunks, not the original file</div>
+
+        <div class="drop-zone" id="dz"
+          ondragover="event.preventDefault();this.classList.add('over')"
+          ondragleave="this.classList.remove('over')"
+          ondrop="handleDrop(event)"
+          onclick="document.getElementById('fi').click()">
+          <span class="upload-icon">📂</span>
+          <div class="upload-title">Drop files or <span style="color:var(--accent)">click to browse</span></div>
+          <div class="upload-sub">PDF · DOCX · TXT · MD · CSV — up to 50 MB each</div>
+          <div class="ftype-row">
+            <span class="ftype-tag type-pdf">PDF</span>
+            <span class="ftype-tag type-docx">DOCX</span>
+            <span class="ftype-tag type-txt">TXT</span>
+            <span class="ftype-tag type-txt">MD</span>
+            <span class="ftype-tag type-csv">CSV</span>
+          </div>
+        </div>
+        <input type="file" id="fi" multiple accept=".pdf,.docx,.txt,.md,.csv" style="display:none" onchange="handleFI(this)">
+
+        <div class="uq" id="uq">
+          <div class="uq-item">
+            <span class="uq-icon">📄</span>
+            <div class="uq-info">
+              <div class="uq-name">UG_Handbook_2025.pdf</div>
+              <div class="uq-meta">4.2 MB · 214 chunks indexed</div>
+              <div class="uq-prog"><div class="uq-fill" style="width:100%;background:var(--ok)"></div></div>
+            </div>
+            <span class="sb s-ok" style="flex-shrink:0">Indexed</span>
+          </div>
+          <div class="uq-item">
+            <span class="uq-icon">📝</span>
+            <div class="uq-info">
+              <div class="uq-name">FinAid_Policy_2025.docx</div>
+              <div class="uq-meta">880 KB · 88 chunks indexed</div>
+              <div class="uq-prog"><div class="uq-fill" style="width:100%;background:var(--ok)"></div></div>
+            </div>
+            <span class="sb s-ok" style="flex-shrink:0">Indexed</span>
+          </div>
+          <div class="uq-item" id="demo-uq">
+            <span class="uq-icon">📊</span>
+            <div class="uq-info">
+              <div class="uq-name">scholarships_2025.csv</div>
+              <div class="uq-meta" id="du-meta">42 KB · parsing rows…</div>
+              <div class="uq-prog"><div class="uq-fill" id="du-fill" style="width:60%"></div></div>
+            </div>
+            <span class="sb s-pend" style="flex-shrink:0" id="du-stat">Indexing</span>
+          </div>
+        </div>
+
+        <div style="margin-top:18px">
+          <div class="form-group">
+            <label class="form-label">Document tags <span style="font-weight:400;text-transform:none;color:var(--text3)">(stored as metadata on each chunk)</span></label>
+            <div class="tags-wrap" onclick="this.querySelector('.tag-input').focus()">
+              <div class="tag-pill">financial-aid<span class="rm" onclick="removeTag(this)">✕</span></div>
+              <div class="tag-pill">2025<span class="rm" onclick="removeTag(this)">✕</span></div>
+              <input class="tag-input" placeholder="add tag…"/>
+            </div>
+            <p class="form-hint">The agent can filter results by tag in tool calls: <code style="font-family:var(--font-mono);font-size:10px">{ filter: { tags: { $in: ['financial-aid'] } } }</code></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MANUAL ENTRY -->
+    <div class="page" id="page-manual">
+      <h1 class="page-title">Manual Entry</h1>
+      <p class="page-sub">Write or paste custom content directly into the knowledge base — internal policies, custom instructions, or anything not on the web</p>
+
+      <div class="callout c-ok">
+        <span class="ci">✏️</span>
+        <div>Manual entries are treated identically to crawled pages — chunked, embedded, and retrieved by the agent. Use this for internal policies, staff-only info, or context you want the agent to always know.</div>
+      </div>
+
+      <div class="card">
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label class="form-label">Title</label>
+            <input class="form-input" type="text" value="Campus Parking &amp; Transport Guide 2025" placeholder="Descriptive title…"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Source label</label>
+            <input class="form-input" type="text" value="campus-services"/>
+            <p class="form-hint">Stored as <code style="font-family:var(--font-mono);font-size:10px">metadata.source</code> on each chunk</p>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Content — Markdown supported</label>
+          <textarea class="form-textarea" rows="13" style="font-family:var(--font-mono);font-size:12px"># Campus Parking & Transport Guide 2025
+
+## Parking Permits
+All students wishing to park on campus must purchase a valid parking permit through the student portal. Annual permits cost $320 for resident students and $180 for commuter students.
+
+**Available zones:**
+- Zone A (Academic core): Faculty and staff only
+- Zone B (Residential): Resident students with overnight permit
+- Zone C (Commuter lots): All permit holders, first-come basis
+
+## Shuttle Services
+Free campus shuttles run every 15 minutes on weekdays 7am–11pm.
+
+Route 1: Main Gate → Library → Residence Halls → Sports Complex
+Route 2: Medical Centre → Engineering → Arts Faculty → Bus Terminal
+
+## Bicycle Storage
+Secure bike storage is available at all residence halls and the main library. Register at campus security to access covered shelters.</textarea>
+          <div style="display:flex;justify-content:space-between;margin-top:5px">
+            <p class="form-hint">~1,100 chars → approximately 2–3 chunks at default chunk size</p>
+            <span style="font-size:11px;color:var(--text3);font-family:var(--font-mono)">~1,100 chars</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tags</label>
+            <div class="tags-wrap" onclick="this.querySelector('.tag-input').focus()">
+              <div class="tag-pill">campus-services<span class="rm" onclick="removeTag(this)">✕</span></div>
+              <div class="tag-pill">transport<span class="rm" onclick="removeTag(this)">✕</span></div>
+              <input class="tag-input" placeholder="add tag…"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Chunk size override</label>
+            <select class="form-select">
+              <option selected>Default (1000t / 200 overlap)</option>
+              <option>Small (500 / 100) — dense factual content</option>
+              <option>Large (2000 / 400) — policy / narrative text</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:8px">
+          <button class="btn btn-p" onclick="toast('Entry indexed — 3 chunks created')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12"/></svg>
+            Save &amp; index
+          </button>
+          <button class="btn btn-o" onclick="toast('Draft saved')">Save draft</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border)"><div class="card-title">Existing manual entries</div></div>
+        <table class="tbl">
+          <thead><tr><th>Title</th><th>Chunks</th><th>Tags</th><th>Updated</th><th>Actions</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:500">Campus Emergency Procedures</td>
+              <td>12</td>
+              <td><span class="tag-pill" style="font-size:10px">safety</span></td>
+              <td style="color:var(--text3);font-size:12px">Jan 30</td>
+              <td><div class="tbl-act"><button class="sm sm-o">Edit</button><button class="sm sm-o sm-r" onclick="toast('Entry deleted')">Delete</button></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CRAWL RULES -->
+    <div class="page" id="page-rules">
+      <h1 class="page-title">Crawl Rules</h1>
+      <p class="page-sub">Global path rules and behaviour settings applied to every crawl job. Per-domain overrides can be set when adding a domain in Web Crawl.</p>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+          <div><div class="card-title">Global path rules</div><div class="card-sub">These defaults apply to all crawl jobs unless overridden per-domain</div></div>
+          <button class="btn btn-p sm" onclick="toast('Global rules saved')">Save rules</button>
+        </div>
+
+        <div class="exc-section">
+          <div class="exc-label" style="color:var(--ok)">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12"/></svg>
+            Include only paths — <code style="font-family:var(--font-mono);font-size:10px;font-weight:400">selectPaths</code>
+          </div>
+          <div class="tags-wrap" id="gi" onclick="this.querySelector('.tag-input').focus()">
+            <div class="tag-pill">/admissions<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">/academics<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">/tuition<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">/financial-aid<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">/housing<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <input class="tag-input" placeholder="/path…" onkeydown="addTag(event,'gi')"/>
+          </div>
+          <div class="exc-help">Prefix-matched. /admissions matches /admissions, /admissions/requirements, /admissions/international etc.<br>Leave empty to allow all paths (minus excludePaths).</div>
+        </div>
+
+        <div class="exc-section">
+          <div class="exc-label" style="color:var(--warn)">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Always exclude paths — <code style="font-family:var(--font-mono);font-size:10px;font-weight:400">excludePaths</code>
+          </div>
+          <div class="tags-wrap" id="ge" onclick="this.querySelector('.tag-input').focus()">
+            <div class="tag-pill">/admin<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">/login<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">/portal<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">/cms<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">/wp-admin<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">/api<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">/cdn<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <input class="tag-input" placeholder="/path…" onkeydown="addTag(event,'ge')"/>
+          </div>
+        </div>
+
+        <div class="exc-section">
+          <div class="exc-label" style="color:var(--purple)">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            Exclude subdomains — <code style="font-family:var(--font-mono);font-size:10px;font-weight:400">excludeDomains</code>
+          </div>
+          <div class="tags-wrap" id="gd" onclick="this.querySelector('.tag-input').focus()">
+            <div class="tag-pill">ads.university.edu<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <div class="tag-pill">mail.university.edu<span class="rm" onclick="removeTag(this)">✕</span></div>
+            <input class="tag-input" placeholder="subdomain.example.edu…" onkeydown="addTag(event,'gd')"/>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px">Crawl behaviour</div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Follow external links <code style="font-family:var(--font-mono);font-size:10px">allowExternal</code></h4><p>Allow crawls to leave the base domain</p></div>
+          <button class="tgl" onclick="this.classList.toggle('on');toast('Setting updated')"></button>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Index PDFs linked from crawled pages</h4><p>When the crawler finds a PDF link, download and index it via PDFLoader</p></div>
+          <button class="tgl on" onclick="this.classList.toggle('on');toast('Setting updated')"></button>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Index DOCX links found during crawl</h4><p>Same as above but for Word documents</p></div>
+          <button class="tgl on" onclick="this.classList.toggle('on');toast('Setting updated')"></button>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Weekly re-crawl schedule</h4><p>Auto re-index each domain every 7 days to keep content fresh</p></div>
+          <button class="tgl" onclick="this.classList.toggle('on');toast('Setting updated')"></button>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Skip pages with no content change</h4><p>Hash-compare page before re-indexing — skips unchanged pages (saves API credits)</p></div>
+          <button class="tgl on" onclick="this.classList.toggle('on');toast('Setting updated')"></button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border)"><div class="card-title">File type handling</div><div class="card-sub" style="margin-top:2px">What to do when the crawler encounters a file link</div></div>
+        <table class="tbl">
+          <thead><tr><th>File type</th><th>Action</th><th>Implementation</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="type-badge type-pdf">PDF</span></td>
+              <td><select class="form-select" style="padding:5px 10px;font-size:12px;width:auto"><option selected>Download &amp; index</option><option>Skip</option><option>Index link text only</option></select></td>
+              <td class="mono">PDFLoader — @langchain/community/document_loaders/fs/pdf</td>
+            </tr>
+            <tr>
+              <td><span class="type-badge type-docx">DOCX / DOC</span></td>
+              <td><select class="form-select" style="padding:5px 10px;font-size:12px;width:auto"><option selected>Download &amp; index</option><option>Skip</option></select></td>
+              <td class="mono">DocxLoader — @langchain/community/document_loaders/fs/docx</td>
+            </tr>
+            <tr>
+              <td><span class="type-badge type-txt">TXT / MD</span></td>
+              <td><select class="form-select" style="padding:5px 10px;font-size:12px;width:auto"><option selected>Download &amp; index</option><option>Skip</option></select></td>
+              <td class="mono">TextLoader — @langchain/community/document_loaders/fs/text</td>
+            </tr>
+            <tr>
+              <td><span class="type-badge" style="background:var(--bg2);color:var(--text3)">Images / Video</span></td>
+              <td><select class="form-select" style="padding:5px 10px;font-size:12px;width:auto"><option selected>Always skip</option></select></td>
+              <td class="mono">Binary — not indexable as text</td>
+            </tr>
+            <tr>
+              <td><span class="type-badge" style="background:var(--bg2);color:var(--text3)">ZIP / EXE</span></td>
+              <td><select class="form-select" style="padding:5px 10px;font-size:12px;width:auto"><option selected>Always skip</option></select></td>
+              <td class="mono">Binary — always skipped</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FAQS -->
+    <div class="page" id="page-faqs">
+      <h1 class="page-title">FAQ Approval</h1>
+      <p class="page-sub">AI-synthesized answers waiting for review before appearing on the student landing page</p>
+      <div class="card" style="display:flex;align-items:center;gap:14px;padding:16px">
+        <span style="font-family:var(--font-disp);font-size:32px;color:var(--gold)">3</span>
+        <div><div style="font-weight:600">Pending approval</div><div style="font-size:12px;color:var(--text3)">Each reached the FAQ_THRESHOLD of 5 asks</div></div>
+        <button class="btn btn-p sm" style="margin-left:auto" onclick="toast('Opening full FAQ panel…')">Review all</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Delete dialog -->
+<div class="dialog-overlay" id="del-ov">
+  <div class="dialog">
+    <div style="width:42px;height:42px;border-radius:var(--radius-sm);background:var(--warn-bg);color:var(--warn);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px">⚠️</div>
+    <div class="dialog-title">Delete source?</div>
+    <div class="dialog-body">All indexed chunks for <strong id="del-name"></strong> will be permanently removed from MongoDB Atlas. This cannot be undone.</div>
+    <div class="dialog-foot">
+      <button class="btn btn-o" style="padding:8px 16px" onclick="closeDel()">Cancel</button>
+      <button class="btn btn-d" style="padding:8px 16px" onclick="confirmDel()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+function showPage(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+function toggleTheme(){
+  document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';
+}
+function addTag(e,id){
+  if(e.key!=='Enter'&&e.key!==',')return;
+  e.preventDefault();
+  const v=e.target.value.trim().replace(/,/g,'');
+  if(!v)return;
+  const p=document.createElement('div');
+  p.className='tag-pill';
+  p.innerHTML=v+'<span class="rm" onclick="removeTag(this)">✕</span>';
+  e.target.parentNode.insertBefore(p,e.target);
+  e.target.value='';
+}
+function removeTag(btn){btn.closest('.tag-pill').remove();}
+
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dz').classList.remove('over');
+  Array.from(e.dataTransfer.files).forEach(addUploadItem);
+}
+function handleFI(input){Array.from(input.files).forEach(addUploadItem);}
+function addUploadItem(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  const icons={pdf:'📄',docx:'📝',doc:'📝',txt:'📃',md:'📃',csv:'📊'};
+  const item=document.createElement('div');
+  item.className='uq-item';
+  item.innerHTML=`<span class="uq-icon">${icons[ext]||'📁'}</span><div class="uq-info"><div class="uq-name">${file.name}</div><div class="uq-meta">${(file.size/1024).toFixed(0)} KB · parsing…</div><div class="uq-prog"><div class="uq-fill" style="width:0%"></div></div></div><span class="sb s-pend" style="flex-shrink:0">Parsing</span>`;
+  document.getElementById('uq').prepend(item);
+  let p=0;
+  const fill=item.querySelector('.uq-fill'),stat=item.querySelector('.sb'),meta=item.querySelector('.uq-meta');
+  const t=setInterval(()=>{
+    p+=Math.random()*10+3;
+    if(p>=100){
+      p=100;clearInterval(t);
+      fill.style.width='100%';fill.style.background='var(--ok)';
+      stat.className='sb s-ok';stat.textContent='Indexed';
+      const c=Math.round(Math.random()*80+20);
+      meta.textContent=`${(file.size/1024).toFixed(0)} KB · ${c} chunks indexed`;
+      toast(`${file.name} indexed — ${c} chunks`);
+    } else {
+      fill.style.width=p+'%';stat.textContent=p<50?'Parsing':'Embedding';
+    }
+  },200);
+}
+
+let crawlT;
+function startCrawl(){
+  const url=document.getElementById('crawl-url').value.trim();
+  if(!url){toast('Enter a URL');return;}
+  const pa=document.getElementById('prog-area');
+  const lbl=document.getElementById('prog-lbl');
+  const fill=document.getElementById('prog-fill');
+  const pages=document.getElementById('prog-pages');
+  const pct=document.getElementById('prog-pct');
+  pa.style.display='block';
+  let p=0;fill.style.width='0%';
+  clearInterval(crawlT);
+  crawlT=setInterval(()=>{
+    p+=Math.random()*3+1;
+    if(p>=100){
+      p=100;clearInterval(crawlT);
+      lbl.textContent='✓ Complete — 186 documents indexed';
+      lbl.style.color='var(--ok)';
+      document.getElementById('cst').textContent='186 docs';
+      toast('Crawl complete — 186 docs indexed');
+      setTimeout(()=>{pa.style.display='none';lbl.style.color='';},3500);
+      return;
+    }
+    const pc=Math.round(p);
+    fill.style.width=pc+'%';
+    pages.textContent=Math.round(p*2.1)+' pages';
+    pct.textContent=pc+'%';
+    lbl.textContent=`Crawling ${url} — ${Math.round(p*2.1)} pages processed`;
+  },180);
+}
+
+let pendingDel;
+function openDel(name){pendingDel=name;document.getElementById('del-name').textContent=name;document.getElementById('del-ov').classList.add('open');}
+function closeDel(){document.getElementById('del-ov').classList.remove('open');}
+function confirmDel(){toast(pendingDel+' removed');closeDel();}
+document.getElementById('del-ov').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDel();});
+
+function toast(msg,dur=2600){
+  const w=document.getElementById('toasts');
+  const t=document.createElement('div');
+  t.className='toast';
+  t.innerHTML=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12"/></svg> ${msg}`;
+  w.appendChild(t);
+  setTimeout(()=>{t.style.transition='.18s';t.style.opacity='0';t.style.transform='translateY(6px)';setTimeout(()=>t.remove(),200);},dur);
+}
+
+// Demo CSV upload finish
+setTimeout(()=>{
+  const f=document.getElementById('du-fill');
+  const s=document.getElementById('du-stat');
+  const m=document.getElementById('du-meta');
+  if(!f)return;
+  f.style.width='100%';f.style.background='var(--ok)';
+  s.className='sb s-ok';s.textContent='Indexed';
+  m.textContent='42 KB · 42 chunks indexed';
+},3000);
+</script>
+</body>
+</html>

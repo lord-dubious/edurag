@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type UIMessage } from 'ai';
+import { type UIMessage, type TextUIPart, type ToolUIPart } from 'ai';
 import { runAgent } from '@/lib/agent';
 import { getHistory, appendMessage } from '@/lib/conversation';
 import { trackAndMaybeGenerateFaq } from '@/lib/faq-manager';
@@ -10,13 +10,35 @@ const bodySchema = z.object({
   messages: z.array(z.object({
     id: z.string(),
     role: z.enum(['user', 'assistant', 'system']),
-    parts: z.array(z.any()),
+    parts: z.array(z.record(z.string(), z.unknown())),
     content: z.string().optional(),
   })),
   threadId: z.string().min(1),
 });
 
 export const maxDuration = 60;
+
+type PartRecord = Record<string, unknown>;
+
+function isTextPart(part: PartRecord): part is { type: 'text'; text: string } {
+  return part.type === 'text' && typeof part.text === 'string';
+}
+
+function isToolPart(part: PartRecord): part is { type: `tool-${string}`; toolName: string; toolCallId: string; input: unknown; state: string; output?: unknown } {
+  return typeof part.type === 'string' && part.type.startsWith('tool-');
+}
+
+function convertToUIMessageParts(parts: PartRecord[]): Array<TextUIPart | ToolUIPart> {
+  return parts.map((part): TextUIPart | ToolUIPart => {
+    if (isTextPart(part)) {
+      return { type: 'text', text: part.text };
+    }
+    if (isToolPart(part)) {
+      return part as ToolUIPart;
+    }
+    return { type: 'text', text: JSON.stringify(part) };
+  });
+}
 
 export async function POST(req: Request) {
   let body: z.infer<typeof bodySchema>;
@@ -34,8 +56,8 @@ export async function POST(req: Request) {
   }
 
   const userText = lastMessage.parts
-    .filter(p => p.type === 'text')
-    .map(p => (p as any).text)
+    .filter(isTextPart)
+    .map(p => p.text)
     .join('') || lastMessage.content || '';
 
   trackAndMaybeGenerateFaq(userText).catch(err =>
@@ -45,16 +67,23 @@ export async function POST(req: Request) {
   try {
     const history = await getHistory(threadId);
 
+    const historyMessageIds = new Set(history.map(m => `${m.role}:${m.content.slice(0, 50)}`));
+    const clientMessages = messages.filter(m => {
+      if (m.role !== 'user' && m.role !== 'assistant') return true;
+      const text = m.parts.filter(isTextPart).map(p => p.text).join('') || m.content || '';
+      return !historyMessageIds.has(`${m.role}:${text.slice(0, 50)}`);
+    });
+
     const uiMessages: UIMessage[] = [
-      ...history.map(m => ({
+      ...history.map((m): UIMessage => ({
         id: nanoid(),
         role: m.role as 'user' | 'assistant',
-        parts: [{ type: 'text' as const, text: m.content }],
+        parts: [{ type: 'text', text: m.content }] as TextUIPart[],
       })),
-      ...messages.map(m => ({
+      ...clientMessages.map((m): UIMessage => ({
         id: m.id,
         role: m.role as 'user' | 'assistant',
-        parts: m.parts,
+        parts: convertToUIMessageParts(m.parts),
       })),
     ];
 
@@ -76,6 +105,7 @@ export async function POST(req: Request) {
     return (await result).toUIMessageStreamResponse();
   } catch (err) {
     console.error('[Chat] agent error:', err);
-    return errorResponse('AGENT_ERROR', 'Agent failed to process request', 500);
+    const message = err instanceof Error ? err.message : 'Agent failed to process request';
+    return errorResponse('AGENT_ERROR', message, 500);
   }
 }

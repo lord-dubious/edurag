@@ -294,23 +294,25 @@ Question: {QUESTION}`;
 
 Each tool is a self-contained export. **To add a new tool**: add an export here, register it in `lib/agent/index.ts`. No other files need to change.
 
+> **IMPORTANT**: AI SDK 6 uses `inputSchema` (not `parameters`) for Zod schema definition.
+
 ```typescript
 import { tool } from 'ai';
 import { z } from 'zod';
-import { getVectorStore } from '../vectorstore';
+import { similaritySearchWithScore } from '../vectorstore';
 
 // ─── Tool: Vector Search ─────────────────────────────────────────────────────
 export const createVectorSearchTool = (threadId: string) =>
   tool({
     description:
       'Search the university knowledge base for information about programs, admissions, fees, campus life, deadlines, and any other university-related topics.',
-    inputSchema: z.object({
+    inputSchema: z.object({  // Use inputSchema, NOT parameters
       query: z.string().describe('A specific search query. Be precise for better results.'),
       topK: z.number().optional().default(5),
     }),
     execute: async ({ query, topK = 5 }) => {
-      const vectorStore = await getVectorStore(threadId);
-      const results = await vectorStore.similaritySearchWithScore(query, topK);
+      // Post-filtering: search all, then filter in code
+      const results = await similaritySearchWithScore(query, topK, threadId);
 
       if (results.length === 0) return { found: false, results: [] };
 
@@ -329,7 +331,7 @@ export const createVectorSearchTool = (threadId: string) =>
 // ─── Tool: Get Popular FAQs ───────────────────────────────────────────────────
 export const getPopularFaqsTool = tool({
   description: 'Retrieve the most frequently asked questions to suggest related topics.',
-  inputSchema: z.object({ limit: z.number().optional().default(3) }),
+  inputSchema: z.object({ limit: z.number().optional().default(3) }),  // Use inputSchema
   execute: async ({ limit }) => {
     const { getPublicFaqs } = await import('../faq-manager');
     const faqs = await getPublicFaqs(limit);
@@ -595,6 +597,8 @@ export async function POST(req: Request) {
 
 ### 5.9 `lib/crawl.ts`
 
+> **IMPORTANT**: Tavily JS SDK uses camelCase (not snake_case like Python SDK).
+
 ```typescript
 import { tavily } from '@tavily/core';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
@@ -627,15 +631,16 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
   const excludePaths = opts.excludePaths
     ?? env.CRAWL_EXCLUDE_PATHS?.split(',').map(p => p.trim()).filter(Boolean);
 
+  // Tavily JS SDK uses camelCase, NOT snake_case
   const crawlResponse = await client.crawl(opts.url, {
-    maxDepth: opts.maxDepth ?? env.CRAWL_MAX_DEPTH,
-    maxBreadth: opts.maxBreadth ?? env.CRAWL_MAX_BREADTH,
+    maxDepth: opts.maxDepth ?? env.CRAWL_MAX_DEPTH,        // NOT max_depth
+    maxBreadth: opts.maxBreadth ?? env.CRAWL_MAX_BREADTH,  // NOT max_breadth
     limit: opts.limit ?? env.CRAWL_LIMIT,
-    extractDepth: opts.extractDepth ?? env.CRAWL_EXTRACT_DEPTH,
+    extractDepth: opts.extractDepth ?? env.CRAWL_EXTRACT_DEPTH,  // NOT extract_depth
     instructions: opts.instructions ?? env.CRAWL_INSTRUCTIONS,
-    selectPaths: selectPaths?.length ? selectPaths : undefined,
-    excludePaths: excludePaths?.length ? excludePaths : undefined,
-    allowExternal: opts.allowExternal ?? env.CRAWL_ALLOW_EXTERNAL,
+    selectPaths: selectPaths?.length ? selectPaths : undefined,   // NOT select_paths
+    excludePaths: excludePaths?.length ? excludePaths : undefined, // NOT exclude_paths
+    allowExternal: opts.allowExternal ?? env.CRAWL_ALLOW_EXTERNAL, // NOT allow_external
     format: opts.format ?? env.CRAWL_FORMAT,
   });
 
@@ -651,11 +656,12 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
     const result = crawlResponse.results[i];
     opts.onProgress?.(i + 1, total);
 
+    // JS SDK uses rawContent (camelCase), NOT raw_content
     const chunks = await splitter.createDocuments([result.rawContent], [{
       url: result.url,
       title: result.title,
-      thread_id: opts.threadId,
-      base_url: opts.url,
+      threadId: opts.threadId,  // Stored at root level (LangChain spreads metadata)
+      baseUrl: opts.url,
       timestamp: new Date().toISOString(),
     }]);
     documents.push(...chunks);
@@ -674,7 +680,8 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
 
 export async function deleteCrawlData(threadId: string): Promise<number> {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
-  const result = await collection.deleteMany({ 'metadata.thread_id': threadId });
+  // Metadata is stored at ROOT level by LangChain, not in a subdocument
+  const result = await collection.deleteMany({ threadId });
   return result.deletedCount;
 }
 ```
@@ -752,6 +759,55 @@ npx ai-elements@latest add attachments
 After installing `message`, add to `app/globals.css`:
 ```css
 @source "../node_modules/streamdown/dist/*.js";
+```
+
+### AI SDK 6 `useChat` Hook
+
+> **IMPORTANT**: AI SDK 6 has a different API than v4.
+
+```typescript
+import { useChat } from '@ai-sdk/react';
+
+const { 
+  messages,      // UIMessage[] - has .parts[] array
+  sendMessage,   // (message: PromptInputMessage) => void
+  status,        // 'submitted' | 'streaming' | 'ready' | 'error'
+  regenerate,    // () => void - regenerate last response
+  error,         // Error | null
+} = useChat({
+  api: '/api/chat',
+  body: { threadId },
+});
+```
+
+### UIMessage Types (AI SDK 6)
+
+```typescript
+import type { UIMessage, TextUIPart, ToolResultUIPart } from 'ai';
+
+// UIMessage.parts is an array of:
+type UIMessagePart = TextUIPart | ToolResultUIPart | ...;
+
+// TextUIPart
+interface TextUIPart {
+  type: 'text';
+  text: string;
+  state?: 'streaming' | 'done';
+}
+
+// ToolResultUIPart - output from tool calls
+interface ToolResultUIPart {
+  type: `tool-${string}`;  // e.g., 'tool-vector_search'
+  toolCallId: string;
+  toolName: string;
+  state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
+  output?: unknown;  // Only available when state is 'output-available'
+}
+
+// Type guard for extracting tool output
+function isToolResultPart(part: { type: string }): part is ToolResultUIPart {
+  return part.type.startsWith('tool-');
+}
 ```
 
 ### Component Usage Map
@@ -1069,17 +1125,30 @@ Mobile: sidebar → drawer, sources panel → bottom sheet via "Sources (N)" bad
 
 ### Vector Index (create in Atlas UI on `crawled_index`)
 
+> **IMPORTANT**: We use **post-filtering** (filter in code after search), matching the original crawl2rag approach. No filter fields needed in index.
+
 ```json
 {
   "fields": [
-    { "type": "vector", "path": "embedding", "numDimensions": 2048, "similarity": "cosine" },
-    { "type": "filter", "path": "metadata.thread_id" },
-    { "type": "filter", "path": "metadata.base_url" }
+    { "type": "vector", "path": "embedding", "numDimensions": 2048, "similarity": "cosine" }
   ]
 }
 ```
 
 > `numDimensions` must match `EMBEDDING_DIMENSIONS`. Voyage `voyage-4-large` = `2048`, OpenAI `text-embedding-3-large` = `3072`.
+
+### Why No Filter Fields?
+
+LangChain's `MongoDBAtlasVectorSearch.fromDocuments()` stores metadata at the **root level** of MongoDB documents (not in a `metadata` subdocument). Instead of pre-filtering via Atlas Vector Search (which requires filter fields in index), we use **post-filtering**:
+
+1. Search all documents with similarity search
+2. Filter results in code by `threadId`
+3. Return filtered results
+
+This approach:
+- Matches the original Python crawl2rag implementation
+- Requires no special index configuration
+- Is simpler and more flexible
 
 ### Collections
 
@@ -1205,6 +1274,15 @@ npx ai-elements@latest add message conversation prompt-input inline-citation con
 
 | Area | Change |
 |---|---|
+| **AI SDK Version** | Upgraded to AI SDK 6.x |
+| **tool() syntax** | Uses `inputSchema` (not `parameters`) for Zod schema definition |
+| **useChat API** | Changed: `sendMessage` instead of `handleSubmit`, no `input/setInput` |
+| **Tavily JS SDK** | Uses camelCase (`maxDepth`, `rawContent`) not snake_case |
+| **MongoDB Index** | Simplified - no filter fields needed (uses post-filtering) |
+| **Metadata storage** | LangChain stores at root level, not `metadata` subdocument |
+| **Post-filtering** | Filter in code after search (matches original crawl2rag) |
+| **Type safety** | No `any` types - strict TypeScript throughout |
+| **UI Components** | Full Admin UI + Student UI with AI Elements + shadcn/ui |
 | **Docker** | Removed — replaced with Vercel, Render, Netlify guides |
 | **Agent module** | Refactored into `lib/agent/` (prompts.ts, tools.ts, index.ts) for extensibility |
 | **System prompt** | Full prompt added to `lib/agent/prompts.ts` — mirrors `backend/prompts.py` |
@@ -1215,3 +1293,278 @@ npx ai-elements@latest add message conversation prompt-input inline-citation con
 | **AI Elements** | Full component map + `ChatMessages.tsx` + `ChatInput.tsx` reference implementations |
 | **Reference LLMs** | Table of all LLM.txt URLs at document top |
 | **FAQ approval** | FAQ auto-synthesized answers go to `pendingApproval: true` before admin promotes to `public: true` |
+
+---
+
+## 15. Recent Updates (2026-02-19)
+
+### 15.1 Crawl Pipeline Improvements
+
+#### Content Cleaning (`lib/crawl.ts`)
+
+Added robust content cleaning to remove navigation menus, cookie banners, and boilerplate:
+
+```typescript
+function cleanContent(raw: string | null | undefined): string {
+  if (!raw) return '';
+  return raw
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+    .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\b(?:Skip to content|Main menu|Navigation|Search|Login|Sign in|Menu|Close|Accept|Decline|Cookie|We use cookies)[^\n]*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+```
+
+#### Title Extraction
+
+Tavily `crawl()` API does NOT return `title` field. Extract from HTML:
+
+```typescript
+function extractTitle(rawContent: string, url: string): string {
+  const titleMatch = rawContent.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (titleMatch?.[1]) {
+    return titleMatch[1].trim().split('|')[0].trim();
+  }
+  const h1Match = rawContent.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+  if (h1Match?.[1]) {
+    return h1Match[1].trim();
+  }
+  return new URL(url).hostname;
+}
+```
+
+#### Chunk Quality Filter
+
+```typescript
+function isQualityChunk(content: string): boolean {
+  if (content.length < 100) return false;
+  const uniqueWords = new Set(content.toLowerCase().split(/\s+/));
+  if (uniqueWords.size < 10) return false;
+  return true;
+}
+```
+
+#### Increased Chunk Size
+
+```typescript
+const splitter = new RecursiveCharacterTextSplitter({
+  chunkSize: 1500,    // Increased from 1000
+  chunkOverlap: 300,  // Increased from 200
+});
+```
+
+---
+
+### 15.2 Citation System
+
+#### Dual Format Support
+
+The model outputs citations in multiple formats. Parse both:
+
+```typescript
+const CITATION_REGEX = /【(\d+)(?:†L\d+-L\d+)?】|\[(\d+)\]/g;
+
+// Matches:
+// - 【1†L1-L30】  (Perplexity-style)
+// - 【1】         (Simplified)
+// - [1]          (Markdown-style)
+```
+
+#### Clickable Citation Links
+
+```tsx
+// In ChatMessages.tsx
+<citation-link
+  data-index={num}
+  href={source.url}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="cursor-pointer text-primary hover:underline"
+>
+  [{num}]
+</citation-link>
+```
+
+---
+
+### 15.3 Markdown Rendering
+
+Added `react-markdown` for proper markdown rendering with citations:
+
+```bash
+npm install react-markdown
+```
+
+```tsx
+import ReactMarkdown from 'react-markdown';
+
+function renderMarkdownWithCitations(text: string, sources: Source[]) {
+  const parts = text.split(CITATION_REGEX);
+  
+  return parts.map((part, i) => {
+    const citationNum = part;
+    if (citationNum && sources[parseInt(citationNum) - 1]) {
+      const source = sources[parseInt(citationNum) - 1];
+      return (
+        <a key={i} href={source.url} target="_blank" className="text-primary hover:underline">
+          [{citationNum}]
+        </a>
+      );
+    }
+    return <ReactMarkdown key={i}>{part}</ReactMarkdown>;
+  });
+}
+```
+
+---
+
+### 15.4 System Prompt Enhancements
+
+Added explicit instructions for citation format and response generation:
+
+```typescript
+export const AGENT_SYSTEM_PROMPT = `You are a knowledgeable and helpful university assistant...
+
+## Citation Format
+
+When you use information from search results, cite your sources using numbered brackets:
+- Use [1], [2], [3] format for citations
+- Place citations immediately after the relevant statement
+- Multiple sources: "Statement [1][2][3]."
+
+## Response Requirements
+
+CRITICAL: After using the vector_search tool, you MUST generate a text response.
+- Never end with only tool calls
+- Always synthesize the results into a helpful answer
+- If no results found, state that clearly and suggest alternatives
+
+...`;
+```
+
+---
+
+### 15.5 Agent Configuration
+
+Added `maxOutputTokens` and increased `maxSteps`:
+
+```typescript
+export function runAgent({ messages, threadId, ... }: AgentOptions) {
+  return streamText({
+    model: chatModel,
+    maxTokens: 2048,        // Added
+    maxSteps: 5,            // Increased from 3
+    system,
+    messages,
+    tools: { vector_search: createVectorSearchTool(threadId) },
+  });
+}
+```
+
+---
+
+### 15.6 UI Improvements
+
+#### Home Page Header
+
+Simplified to just app name and theme toggle (removed redundant "Start Chatting" button):
+
+```tsx
+<header className="flex items-center justify-between p-4 border-b">
+  <span className="font-semibold text-lg">{env.NEXT_PUBLIC_APP_NAME}</span>
+  <ThemeToggle />
+</header>
+```
+
+#### Hero Section
+
+Added italic emphasis and quick suggestion chips:
+
+```tsx
+<h1>
+  Ask questions about <em className="text-primary">{appName}</em>
+</h1>
+<div className="flex flex-wrap gap-2">
+  {['Programs', 'Tuition', 'Admissions', 'Campus Life'].map(chip => (
+    <button onClick={() => navigate(`/chat?q=${chip}`)}>{chip}</button>
+  ))}
+</div>
+```
+
+#### Tool Execution Indicator
+
+Added visual feedback during tool execution:
+
+```tsx
+{message.parts.map(part => {
+  if (part.type === 'text') return <MessageResponse>{part.text}</MessageResponse>;
+  if (part.type.startsWith('tool-')) {
+    return <div className="text-muted-foreground">Searching knowledge base...</div>;
+  }
+  return null;
+})}
+
+// Fallback if no text generated
+{!hasTextPart && <MessageResponse>I found relevant information but couldn't generate a response. Please try again.</MessageResponse>}
+```
+
+---
+
+### 15.7 Source Preview Cleaning
+
+```typescript
+function cleanSourcePreview(content: string, maxLength = 150): string {
+  // Detect navigation-heavy content
+  const navKeywords = ['Services', 'About', 'Contact', 'Menu', 'Home', 'Search'];
+  const wordCount = content.split(/\s+/).length;
+  const navKeywordCount = navKeywords.reduce((acc, kw) => 
+    acc + (content.match(new RegExp(kw, 'gi')) || []).length, 0);
+  
+  // If >30% navigation keywords, skip this source
+  if (navKeywordCount / wordCount > 0.3) {
+    return 'Content from this page...';
+  }
+  
+  return content
+    .replace(/We use cookies[^.\n]*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+```
+
+---
+
+### 15.8 Environment Variables Updated
+
+```bash
+# Updated defaults
+CRAWL_MAX_DEPTH=3           # Increased from 2
+CRAWL_LIMIT=300             # Increased from 100
+CRAWL_MAX_BREADTH=50        # Increased from 20
+CRAWL_FORMAT=text           # Changed from markdown (cleaner output)
+CRAWL_EXCLUDE_PATHS=/archive/*,/admin/*,/login/*,/search/*,/tag/*,/news/*,/events/*
+```
+
+---
+
+### 15.9 Bug Fixes
+
+| Issue | Fix |
+|-------|-----|
+| Empty AI responses | Added fallback UI + explicit "MUST RESPOND" prompt |
+| Duplicate messages | Fixed localStorage session handling |
+| Non-clickable citations | Parse both `【1†L1-L30】` and `[1]` formats, render as links |
+| Markdown not rendering | Added `react-markdown` integration |
+| Navigation in sources | Added navigation detection and filtering |
+| Cookie text in content | Added cookie/banner removal in `cleanContent()` |
+| Poor title extraction | Parse HTML `<title>` tag from rawContent |
+| Small chunks | Increased chunkSize to 1500, overlap to 300 |

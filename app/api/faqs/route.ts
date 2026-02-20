@@ -1,6 +1,6 @@
 import { getPublicFaqs } from '@/lib/faq-manager';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const faqs = await getPublicFaqs(20);

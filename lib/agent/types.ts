@@ -32,4 +32,5 @@ export interface VectorSearchResult {
 export interface ToolResult {
   found: boolean;
   results: VectorSearchResult[];
+  instruction?: string;
 }

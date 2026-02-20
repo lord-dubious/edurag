@@ -5,9 +5,8 @@ import { MongoClient } from 'mongodb';
 import { Document } from '@langchain/core/documents';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { getMongoCollection, closeMongoClient, similaritySearchWithScore } from '../lib/vectorstore';
-import { chatModel } from '../lib/providers';
+import { getChatModel, getEmbeddings } from '../lib/providers';
 import { createVectorSearchTool } from '../lib/agent/tools';
-import { embeddings } from '../lib/providers';
 import { env } from '../lib/env';
 
 const TEST_THREAD_ID = 'test-agent-thread-' + Date.now();
@@ -16,10 +15,11 @@ describe('Agent Tools', () => {
   let client: MongoClient;
 
   beforeAll(async () => {
-    client = new MongoClient(env.MONGODB_URI);
+    client = new MongoClient(env.MONGODB_URI!);
     await client.connect();
     
-    const collection = await getMongoCollection(env.VECTOR_COLLECTION);
+    const collection = await getMongoCollection(env.VECTOR_COLLECTION!);
+    const embeddingsInstance = getEmbeddings();
     
     const docs = [
       new Document({
@@ -32,9 +32,9 @@ describe('Agent Tools', () => {
       }),
     ];
 
-    await MongoDBAtlasVectorSearch.fromDocuments(docs, embeddings, {
+    await MongoDBAtlasVectorSearch.fromDocuments(docs, embeddingsInstance, {
       collection,
-      indexName: env.VECTOR_INDEX_NAME,
+      indexName: env.VECTOR_INDEX_NAME!,
       textKey: 'text',
       embeddingKey: 'embedding',
     });
@@ -45,7 +45,7 @@ describe('Agent Tools', () => {
   }, 90000);
 
   afterAll(async () => {
-    const collection = await getMongoCollection(env.VECTOR_COLLECTION);
+    const collection = await getMongoCollection(env.VECTOR_COLLECTION!);
     await collection.deleteMany({ threadId: TEST_THREAD_ID });
     await closeMongoClient();
     await client.close();
@@ -53,14 +53,14 @@ describe('Agent Tools', () => {
 
   describe('Vector Search Tool', () => {
     it('should find relevant documents', async () => {
-      const results = await similaritySearchWithScore('MBA program requirements', TEST_THREAD_ID, 5);
+      const results = await similaritySearchWithScore('MBA program requirements', 5);
 
       expect(results.length).toBeGreaterThan(0);
       expect(results[0][0].pageContent).toContain('MBA');
     });
 
     it('should return empty results for irrelevant queries', async () => {
-      const results = await similaritySearchWithScore('quantum physics mars rover', TEST_THREAD_ID, 5);
+      const results = await similaritySearchWithScore('quantum physics mars rover', 5);
 
       console.log(`Irrelevant query returned ${results.length} results`);
     });
@@ -68,10 +68,10 @@ describe('Agent Tools', () => {
 
   describe('Agent with Tools', () => {
     it('should use vector_search tool to answer question', async () => {
-      const vectorSearchTool = createVectorSearchTool(TEST_THREAD_ID);
+      const vectorSearchTool = createVectorSearchTool();
 
       const result = await generateText({
-        model: chatModel,
+        model: getChatModel(),
         tools: {
           vector_search: vectorSearchTool,
         },
@@ -89,10 +89,10 @@ describe('Agent Tools', () => {
     }, 60000);
 
     it('should cite sources when using vector_search', async () => {
-      const vectorSearchTool = createVectorSearchTool(TEST_THREAD_ID);
+      const vectorSearchTool = createVectorSearchTool();
 
       const result = await generateText({
-        model: chatModel,
+        model: getChatModel(),
         tools: {
           vector_search: vectorSearchTool,
         },
