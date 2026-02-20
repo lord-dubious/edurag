@@ -46,7 +46,7 @@ export const createVectorSearchTool = (threadId?: string) =>
       return {
         found: true,
         results: cleanedResults,
-        instruction: 'Above are the search results. You MUST now write a helpful response to the user based on this information. Use citations [1], [2], etc. for each source used.',
+        instruction: 'Above are the search results. You MUST now write a helpful response to the user based on this information. For citations, you MUST use the format [Clean, Short Title](cite:1) where 1 is the 1-based index of the result, and "Clean, Short Title" is a highly readable, concise name (2-4 words) you create that elegantly describes the source instead of its raw title.',
       };
     },
   });

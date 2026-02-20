@@ -42,20 +42,20 @@ export async function POST(req: NextRequest) {
           ...body,
           onProgress: (page, total) => send({ type: 'progress', page, total }),
         });
-        
+
         // Update domain with document count
         const domainsCollection = await getMongoCollection(env.DOMAINS_COLLECTION);
         await domainsCollection.updateOne(
           { threadId: body.threadId },
-          { 
-            $set: { 
+          {
+            $set: {
               documentCount: count,
               lastCrawled: new Date(),
               status: 'indexed'
-            } 
+            }
           }
         );
-        
+
         send({ type: 'complete', documentsIndexed: count });
       } catch (err) {
         send({ type: 'error', message: err instanceof Error ? err.message : 'Crawl failed' });

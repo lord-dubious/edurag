@@ -90,6 +90,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
       body: { threadId },
     }),
     messages: (() => {
+      if (initialQuery) return [];
       const sessions = loadSessions();
       const session = sessions.find(s => s.id === threadId);
       return session?.messages ?? [];

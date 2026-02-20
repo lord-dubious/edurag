@@ -15,7 +15,7 @@ import { mermaid } from '@streamdown/mermaid';
 import { CopyIcon, RefreshCcwIcon, ExternalLinkIcon, MessageCircleQuestionIcon, FileTextIcon } from 'lucide-react';
 import { Fragment, useMemo, memo } from 'react';
 
-const CITATION_REGEX = /(?:【(\d+)(?:†L\d+-L\d+)?】|\[(\d+)\])/g;
+const CITATION_REGEX = /(?:\[([^\]]+)\]\(cite:(\d+)\))|(?:【(\d+)(?:†[^】]+)?】|\[(\d+)\])/g;
 
 const streamdownPlugins = { cjk, code, math, mermaid };
 
@@ -24,21 +24,20 @@ const CITATION_ALLOWED_TAGS: AllowedTags = {
 };
 
 /**
- * Preprocess text to convert citation patterns into custom HTML tags
- * that Streamdown can render via allowedTags + components.
- *
- * [1] or 【1†L1-L30】 → <cite-ref data-index="0" data-url="..." data-title="..." />
+ * Preprocess text to extract LLM-chosen source titles and convert to html.
+ * [Clean Title](cite:1) → <cite-ref data-index="0" data-title="Clean Title" ... />
  */
 function preprocessCitations(text: string, sources: Source[]): string {
-  return text.replace(CITATION_REGEX, (_match, g1, g2) => {
-    const citationIndex = parseInt(g1 ?? g2, 10) - 1;
+  return text.replace(CITATION_REGEX, (_match, customTitle, g2, g3, g4) => {
+    const citationIndex = parseInt(g2 ?? g3 ?? g4, 10) - 1;
     const source = sources[citationIndex];
     if (source) {
       const safeUrl = source.url.replace(/"/g, '&quot;');
-      const safeTitle = (source.title || '').replace(/"/g, '&quot;');
+      const finalTitle = customTitle || source.title || '';
+      const safeTitle = finalTitle.replace(/"/g, '&quot;');
       return `<cite-ref data-index="${citationIndex}" data-url="${safeUrl}" data-title="${safeTitle}" />`;
     }
-    return `[${citationIndex + 1}]`;
+    return _match;
   });
 }
 
@@ -64,24 +63,27 @@ interface Props {
   onRegenerate: () => void;
 }
 
-function CitationChip({ index, source }: { index: number; source: Source }) {
+function CitationChip({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
+  const displayTitle = customTitle || source.title || new URL(source.url).hostname;
   return (
     <a
       href={source.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-primary/10 border border-primary/20 rounded-full text-xs font-medium text-primary hover:bg-primary hover:text-white transition-colors cursor-pointer no-underline"
-      title={source.title || source.url}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-[11px] font-medium text-primary hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer no-underline group"
+      title={source.url}
     >
-      <span className="size-4 bg-primary text-white rounded-full flex items-center justify-center text-[10px] font-mono">
+      <span className="flex size-[16px] shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-mono text-primary-foreground group-hover:bg-primary-foreground/30 transition-colors">
         {index + 1}
       </span>
+      {displayTitle}
     </a>
   );
 }
 
-function SourceCard({ index, source }: { index: number; source: Source }) {
+function SourceCard({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
   const domain = new URL(source.url).hostname.replace('www.', '');
+  const displayTitle = customTitle || source.title || domain;
 
   return (
     <a
@@ -96,7 +98,7 @@ function SourceCard({ index, source }: { index: number; source: Source }) {
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium text-foreground group-hover:text-primary">
-            {source.title || domain}
+            {displayTitle}
           </span>
           <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
@@ -116,12 +118,13 @@ const RenderedMessage = memo(function RenderedMessage({ text, sources }: { text:
   const citationComponents = useMemo(() => ({
     'cite-ref': (props: Record<string, unknown>) => {
       const idx = parseInt(String(props['data-index'] ?? '0'), 10);
+      const customTitle = props['data-title'] as string | undefined;
       const source = sources[idx];
       if (source) {
-        return <CitationChip index={idx} source={source} />;
+        return <CitationChip index={idx} source={source} customTitle={customTitle} />;
       }
       return (
-        <span className="inline-flex items-center justify-center size-4 bg-muted rounded-full text-[10px] text-muted-foreground">
+        <span className="inline-flex items-center justify-center size-[16px] bg-muted rounded-full text-[10px] text-muted-foreground">
           {idx + 1}
         </span>
       );
@@ -164,9 +167,24 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
         const isLast = idx === messages.length - 1;
         const msgSources = sources[message.id] ?? [];
 
+        // Pre-parse text parts to find custom source titles generated by LLM
+        const extractedTitles: Record<number, string> = {};
+        message.parts.forEach(part => {
+          if (part.type === 'text') {
+            const matches = Array.from((part as TextUIPart).text.matchAll(CITATION_REGEX));
+            matches.forEach(m => {
+              const customTitle = m[1];
+              const citationIndex = parseInt(m[2] ?? m[3] ?? m[4], 10) - 1;
+              if (customTitle && !extractedTitles[citationIndex]) {
+                extractedTitles[citationIndex] = customTitle;
+              }
+            });
+          }
+        });
+
         return (
           <Fragment key={message.id}>
-            <Message from={message.role}>
+            <Message from={message.role} className="animate-in fade-in slide-in-from-bottom-3 duration-300">
               <MessageContent>
                 {message.parts.map((part, i) => {
                   if (part.type === 'text') {
@@ -222,7 +240,7 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
                 </div>
                 <div className="grid gap-2">
                   {msgSources.slice(0, 6).map((source, i) => (
-                    <SourceCard key={`${source.url}-${i}`} index={i} source={source} />
+                    <SourceCard key={`${source.url}-${i}`} index={i} source={source} customTitle={extractedTitles[i]} />
                   ))}
                 </div>
               </div>
