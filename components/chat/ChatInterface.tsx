@@ -140,6 +140,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
 
   useEffect(() => {
     if (messages.length === 0) return;
+    if (status === 'streaming') return;
 
     const sessions = loadSessions();
     const existingIndex = sessions.findIndex(s => s.id === threadId);
@@ -164,7 +165,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     }
 
     saveSessions(sessions);
-  }, [messages, sources, threadId]);
+  }, [messages, sources, threadId, status]);
 
   const handleSubmit = useCallback(
     (message: { text: string }) => {

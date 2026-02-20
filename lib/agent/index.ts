@@ -26,7 +26,7 @@ export async function runAgent({
     messages: await convertToModelMessages(messages),
     maxOutputTokens: env.CHAT_MAX_TOKENS,
     tools: {
-      vector_search: createVectorSearchTool(threadId),
+      vector_search: createVectorSearchTool(),
       get_popular_faqs: getPopularFaqsTool,
       ...extraTools,
     },

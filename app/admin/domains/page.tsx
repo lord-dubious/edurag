@@ -131,29 +131,36 @@ export default function DomainsPage() {
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
+      let buffer = '';
 
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const text = decoder.decode(value);
-          const lines = text.split('\n').filter(line => line.startsWith('data: '));
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
-            const data = JSON.parse(line.slice(6));
-            if (data.type === 'status') {
-              setCrawlProgress(p => p ? { ...p, message: data.message } : null);
-            } else if (data.type === 'progress') {
-              setCrawlProgress(p => p ? { ...p, page: data.page, total: data.total } : null);
-            } else if (data.type === 'complete') {
-              setCrawlProgress(null);
-              fetchDomains();
-            } else if (data.type === 'error') {
-              setCrawlProgress(null);
-              setDomains(domains.map(d => 
-                d.threadId === domain.threadId ? { ...d, status: 'error' as const } : d
-              ));
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'status') {
+                setCrawlProgress(p => p ? { ...p, message: data.message } : null);
+              } else if (data.type === 'progress') {
+                setCrawlProgress(p => p ? { ...p, page: data.page, total: data.total } : null);
+              } else if (data.type === 'complete') {
+                setCrawlProgress(null);
+                fetchDomains();
+              } else if (data.type === 'error') {
+                setCrawlProgress(null);
+                setDomains(domains.map(d => 
+                  d.threadId === domain.threadId ? { ...d, status: 'error' as const } : d
+                ));
+              }
+            } catch {
+              // Skip malformed JSON
             }
           }
         }

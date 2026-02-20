@@ -1,4 +1,6 @@
-import { getPublicFaqs } from '@/lib/faq-manager';
+'use client';
+
+import { useEffect, useState } from 'react';
 import {
   Accordion,
   AccordionContent,
@@ -6,10 +8,49 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLinkIcon } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export async function FaqSection() {
-  const faqs = await getPublicFaqs(10);
+type Faq = {
+  _id: string;
+  question: string;
+  answer: string;
+};
+
+export function FaqSection() {
+  const [faqs, setFaqs] = useState<Faq[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchFaqs() {
+      try {
+        const res = await fetch('/api/faqs');
+        if (res.ok) {
+          const data = await res.json();
+          setFaqs(data.faqs || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch FAQs:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchFaqs();
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="w-full max-w-3xl mx-auto px-4 py-12">
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <Skeleton className="h-8 w-64" />
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   if (faqs.length === 0) return null;
 
@@ -25,7 +66,7 @@ export async function FaqSection() {
       <Accordion type="single" collapsible className="space-y-2">
         {faqs.map((faq, index) => (
           <AccordionItem
-            key={faq._id.toString()}
+            key={faq._id}
             value={`faq-${index}`}
             className="border rounded-lg px-4 data-[state=open]:bg-accent/50"
           >

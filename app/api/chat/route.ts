@@ -67,13 +67,20 @@ export async function POST(req: Request) {
   try {
     const history = await getHistory(threadId);
 
+    const historyMessageIds = new Set(history.map(m => `${m.role}:${m.content.slice(0, 50)}`));
+    const clientMessages = messages.filter(m => {
+      if (m.role !== 'user' && m.role !== 'assistant') return true;
+      const text = m.parts.filter(isTextPart).map(p => p.text).join('') || m.content || '';
+      return !historyMessageIds.has(`${m.role}:${text.slice(0, 50)}`);
+    });
+
     const uiMessages: UIMessage[] = [
       ...history.map((m): UIMessage => ({
         id: nanoid(),
         role: m.role as 'user' | 'assistant',
         parts: [{ type: 'text', text: m.content }] as TextUIPart[],
       })),
-      ...messages.map((m): UIMessage => ({
+      ...clientMessages.map((m): UIMessage => ({
         id: m.id,
         role: m.role as 'user' | 'assistant',
         parts: convertToUIMessageParts(m.parts),
@@ -98,6 +105,7 @@ export async function POST(req: Request) {
     return (await result).toUIMessageStreamResponse();
   } catch (err) {
     console.error('[Chat] agent error:', err);
-    return errorResponse('AGENT_ERROR', 'Agent failed to process request', 500);
+    const message = err instanceof Error ? err.message : 'Agent failed to process request';
+    return errorResponse('AGENT_ERROR', message, 500);
   }
 }

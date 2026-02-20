@@ -4,7 +4,7 @@ import { SuggestionChipsWrapper } from '@/components/landing/SuggestionChips';
 import { ThemeToggle } from '@/components/providers/theme-toggle';
 import Link from 'next/link';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const appName = process.env.NEXT_PUBLIC_APP_NAME ?? 'Knowledge Base';

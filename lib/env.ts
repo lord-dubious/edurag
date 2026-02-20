@@ -1,18 +1,18 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  CHAT_API_KEY: z.string().min(1),
-  CHAT_BASE_URL: z.string().url(),
-  CHAT_MODEL: z.string(),
+  CHAT_API_KEY: z.string().min(1).optional(),
+  CHAT_BASE_URL: z.string().url().optional().or(z.literal('')),
+  CHAT_MODEL: z.string().default('gpt-oss-120b'),
   CHAT_MAX_TOKENS: z.coerce.number().default(32000),
   CHAT_CONTEXT_LENGTH: z.coerce.number().default(65536),
 
-  EMBEDDING_API_KEY: z.string().min(1),
-  EMBEDDING_BASE_URL: z.string().url(),
-  EMBEDDING_MODEL: z.string(),
+  EMBEDDING_API_KEY: z.string().min(1).optional(),
+  EMBEDDING_BASE_URL: z.string().url().optional().or(z.literal('')),
+  EMBEDDING_MODEL: z.string().default('voyage-4-large'),
   EMBEDDING_DIMENSIONS: z.coerce.number().default(2048),
 
-  MONGODB_URI: z.string().min(1),
+  MONGODB_URI: z.string().min(1).optional(),
   DB_NAME: z.string().default('edurag'),
   COLLECTION1: z.string().default('crawled_index'),
   COLLECTION2: z.string().default('checkpoints_aio'),
@@ -24,7 +24,7 @@ const envSchema = z.object({
   DOMAINS_COLLECTION: z.string().default('domains'),
 
   FAQ_THRESHOLD: z.coerce.number().default(5),
-  TAVILY_API_KEY: z.string().min(1),
+  TAVILY_API_KEY: z.string().min(1).optional(),
 
   CRAWL_MAX_DEPTH: z.coerce.number().min(1).max(5).default(2),
   CRAWL_MAX_BREADTH: z.coerce.number().min(1).max(100).default(20),
@@ -36,10 +36,24 @@ const envSchema = z.object({
   CRAWL_ALLOW_EXTERNAL: z.coerce.boolean().default(false),
   CRAWL_FORMAT: z.enum(['markdown', 'text']).default('markdown'),
 
-  ADMIN_SECRET: z.string().min(16),
+  ADMIN_SECRET: z.string().min(16).optional(),
   NEXT_PUBLIC_APP_NAME: z.string().default('University Knowledge Base'),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
 });
 
-export const env = envSchema.parse(process.env);
+let _env: z.infer<typeof envSchema> | undefined;
+
+export function getEnv(): z.infer<typeof envSchema> {
+  if (!_env) {
+    _env = envSchema.parse(process.env);
+  }
+  return _env;
+}
+
+export const env = new Proxy({} as z.infer<typeof envSchema>, {
+  get(_, prop) {
+    return getEnv()[prop as keyof z.infer<typeof envSchema>];
+  },
+});
+
 export type Env = z.infer<typeof envSchema>;

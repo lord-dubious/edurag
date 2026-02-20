@@ -9,7 +9,7 @@ function cleanForDisplay(content: string): string {
     .trim();
 }
 
-export const createVectorSearchTool = (threadId?: string) =>
+export const createVectorSearchTool = () =>
   tool({
     description:
       'Search the university knowledge base for information about programs, admissions, fees, campus life, deadlines, and any other university-related topics. IMPORTANT: After receiving results, you MUST provide a text response to the user.',
@@ -18,7 +18,7 @@ export const createVectorSearchTool = (threadId?: string) =>
       topK: z.number().optional().default(6),
     }),
     execute: async ({ query, topK = 6 }): Promise<ToolResult> => {
-      const results = await similaritySearchWithScore(query, threadId, topK);
+      const results = await similaritySearchWithScore(query, topK);
 
       if (results.length === 0) {
         console.log('[vector_search] No results found for query:', query);
