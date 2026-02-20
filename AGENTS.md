@@ -51,7 +51,7 @@ import { streamText } from 'ai';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 
 // 4. Internal lib imports (use @/ alias for lib/)
-import { chatModel, embeddingModel } from '@/lib/providers';
+import { getChatModel, getEmbeddings } from '@/lib/providers';
 import { AGENT_SYSTEM_PROMPT } from '@/lib/agent/prompts';
 
 // 5. Internal components (use @/ alias)
@@ -173,6 +173,21 @@ const { messages, sendMessage, status } = useChat({
 - Uses **post-filtering** approach — no filter fields in MongoDB index
 - Embeddings: **Voyage AI** with 2048 dimensions (`voyage-4-large`)
 - Collection: `crawled_index` with vector index on `embedding` field
+- **No threadId filtering** — search returns all documents (single-university setup)
+- MongoDB connection uses **global pattern** for Next.js hot reload stability
+
+### Lazy-loaded Providers
+
+Providers are lazy-loaded to avoid env validation at build time:
+
+```typescript
+// lib/providers.ts exports functions, not direct instances
+import { getChatModel, getEmbeddings } from '@/lib/providers';
+
+// Use in tools/agent
+const model = getChatModel();
+const embeddings = getEmbeddings();
+```
 
 ### Content Crawling
 
@@ -180,12 +195,20 @@ const { messages, sendMessage, status } = useChat({
 - Content cleaning removes navigation menus, cookies text, HTML tags
 - Chunking: 1500 chars with 300 overlap
 - Title extraction from HTML `<title>` tag parsing
+- **SSE streaming** for crawl progress — use buffer-based parsing, not line splitting
 
 ### Chat Citations
 
 - Supports dual citation formats: `【1†L1-L30】` and `[1]`
 - Citations rendered as clickable links to source URLs
 - Source previews cleaned of navigation patterns
+
+### Chat Interface
+
+- Uses `react-markdown` for rendering AI responses
+- Citations parsed and converted to clickable links
+- localStorage persistence for chat history (saved only on stream finish)
+- Client-side only rendering to avoid SSR hydration mismatches
 
 ### System Prompts
 
@@ -225,12 +248,20 @@ const handleSubmit = useCallback(async (text: string) => {
 Required in `.env.local`:
 
 ```
-MONGODB_URI=mongodb://...
+MONGODB_URI=mongodb+srv://...
 CHAT_MODEL=gpt-oss-120b
-CEREBRAS_API_KEY=...
+CHAT_API_KEY=...              # Cerebras API key
+CHAT_BASE_URL=...             # Cerebras base URL (optional)
 TAVILY_API_KEY=...
-EMBEDDING_API_KEY=...          # Voyage AI key
-ADMIN_TOKEN=...                 # Bearer token for admin access
+EMBEDDING_API_KEY=...         # Voyage AI key
+ADMIN_TOKEN=...               # Bearer token for admin access
+
+# Optional with defaults
+EMBEDDING_MODEL=voyage-4-large
+EMBEDDING_DIMENSIONS=2048
+CRAWL_MAX_DEPTH=3
+CRAWL_LIMIT=300
+CRAWL_EXCLUDE_PATHS=/archive/*,/admin/*,/login/*
 ```
 
 ---
