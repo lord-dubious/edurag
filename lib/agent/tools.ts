@@ -1,29 +1,52 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { similaritySearchWithScore } from '../vectorstore';
-import type { VectorSearchResult, ToolResult } from './types';
+import type { ToolResult } from './types';
 
-export const createVectorSearchTool = () =>
+function cleanForDisplay(content: string): string {
+  return content
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export const createVectorSearchTool = (threadId?: string) =>
   tool({
     description:
-      'Search the university knowledge base for information about programs, admissions, fees, campus life, deadlines, and any other university-related topics.',
+      'Search the university knowledge base for information about programs, admissions, fees, campus life, deadlines, and any other university-related topics. IMPORTANT: After receiving results, you MUST provide a text response to the user.',
     inputSchema: z.object({
       query: z.string().describe('A specific search query. Be precise for better results.'),
-      topK: z.number().optional().default(5),
+      topK: z.number().optional().default(6),
     }),
-    execute: async ({ query, topK = 5 }): Promise<ToolResult> => {
-      const results = await similaritySearchWithScore(query, undefined, topK);
+    execute: async ({ query, topK = 6 }): Promise<ToolResult> => {
+      const results = await similaritySearchWithScore(query, threadId, topK);
 
-      if (results.length === 0) return { found: false, results: [] };
+      if (results.length === 0) {
+        console.log('[vector_search] No results found for query:', query);
+        return {
+          found: false,
+          results: [],
+          instruction: 'No results found. Tell the user you could not find specific information and suggest they contact the university directly.'
+        };
+      }
 
-      return {
-        found: true,
-        results: results.map(([doc, score]) => ({
-          content: doc.pageContent,
+      console.log('[vector_search] Found', results.length, 'results for query:', query);
+
+      const cleanedResults = results.map(([doc, score]) => {
+        const cleaned = cleanForDisplay(doc.pageContent);
+        return {
+          content: cleaned.length > 1200 ? cleaned.slice(0, 1200) + '...' : cleaned,
           url: doc.metadata.url as string,
           title: doc.metadata.title as string | undefined,
           score: Math.round(score * 100) / 100,
-        })),
+        };
+      });
+
+      console.log('[vector_search] Top result:', cleanedResults[0]?.title, 'score:', cleanedResults[0]?.score);
+
+      return {
+        found: true,
+        results: cleanedResults,
+        instruction: 'Above are the search results. You MUST now write a helpful response to the user based on this information. Use citations [1], [2], etc. for each source used.',
       };
     },
   });

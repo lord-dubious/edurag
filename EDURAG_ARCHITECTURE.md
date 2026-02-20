@@ -1293,3 +1293,278 @@ npx ai-elements@latest add message conversation prompt-input inline-citation con
 | **AI Elements** | Full component map + `ChatMessages.tsx` + `ChatInput.tsx` reference implementations |
 | **Reference LLMs** | Table of all LLM.txt URLs at document top |
 | **FAQ approval** | FAQ auto-synthesized answers go to `pendingApproval: true` before admin promotes to `public: true` |
+
+---
+
+## 15. Recent Updates (2026-02-19)
+
+### 15.1 Crawl Pipeline Improvements
+
+#### Content Cleaning (`lib/crawl.ts`)
+
+Added robust content cleaning to remove navigation menus, cookie banners, and boilerplate:
+
+```typescript
+function cleanContent(raw: string | null | undefined): string {
+  if (!raw) return '';
+  return raw
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+    .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\b(?:Skip to content|Main menu|Navigation|Search|Login|Sign in|Menu|Close|Accept|Decline|Cookie|We use cookies)[^\n]*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+```
+
+#### Title Extraction
+
+Tavily `crawl()` API does NOT return `title` field. Extract from HTML:
+
+```typescript
+function extractTitle(rawContent: string, url: string): string {
+  const titleMatch = rawContent.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (titleMatch?.[1]) {
+    return titleMatch[1].trim().split('|')[0].trim();
+  }
+  const h1Match = rawContent.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+  if (h1Match?.[1]) {
+    return h1Match[1].trim();
+  }
+  return new URL(url).hostname;
+}
+```
+
+#### Chunk Quality Filter
+
+```typescript
+function isQualityChunk(content: string): boolean {
+  if (content.length < 100) return false;
+  const uniqueWords = new Set(content.toLowerCase().split(/\s+/));
+  if (uniqueWords.size < 10) return false;
+  return true;
+}
+```
+
+#### Increased Chunk Size
+
+```typescript
+const splitter = new RecursiveCharacterTextSplitter({
+  chunkSize: 1500,    // Increased from 1000
+  chunkOverlap: 300,  // Increased from 200
+});
+```
+
+---
+
+### 15.2 Citation System
+
+#### Dual Format Support
+
+The model outputs citations in multiple formats. Parse both:
+
+```typescript
+const CITATION_REGEX = /【(\d+)(?:†L\d+-L\d+)?】|\[(\d+)\]/g;
+
+// Matches:
+// - 【1†L1-L30】  (Perplexity-style)
+// - 【1】         (Simplified)
+// - [1]          (Markdown-style)
+```
+
+#### Clickable Citation Links
+
+```tsx
+// In ChatMessages.tsx
+<citation-link
+  data-index={num}
+  href={source.url}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="cursor-pointer text-primary hover:underline"
+>
+  [{num}]
+</citation-link>
+```
+
+---
+
+### 15.3 Markdown Rendering
+
+Added `react-markdown` for proper markdown rendering with citations:
+
+```bash
+npm install react-markdown
+```
+
+```tsx
+import ReactMarkdown from 'react-markdown';
+
+function renderMarkdownWithCitations(text: string, sources: Source[]) {
+  const parts = text.split(CITATION_REGEX);
+  
+  return parts.map((part, i) => {
+    const citationNum = part;
+    if (citationNum && sources[parseInt(citationNum) - 1]) {
+      const source = sources[parseInt(citationNum) - 1];
+      return (
+        <a key={i} href={source.url} target="_blank" className="text-primary hover:underline">
+          [{citationNum}]
+        </a>
+      );
+    }
+    return <ReactMarkdown key={i}>{part}</ReactMarkdown>;
+  });
+}
+```
+
+---
+
+### 15.4 System Prompt Enhancements
+
+Added explicit instructions for citation format and response generation:
+
+```typescript
+export const AGENT_SYSTEM_PROMPT = `You are a knowledgeable and helpful university assistant...
+
+## Citation Format
+
+When you use information from search results, cite your sources using numbered brackets:
+- Use [1], [2], [3] format for citations
+- Place citations immediately after the relevant statement
+- Multiple sources: "Statement [1][2][3]."
+
+## Response Requirements
+
+CRITICAL: After using the vector_search tool, you MUST generate a text response.
+- Never end with only tool calls
+- Always synthesize the results into a helpful answer
+- If no results found, state that clearly and suggest alternatives
+
+...`;
+```
+
+---
+
+### 15.5 Agent Configuration
+
+Added `maxOutputTokens` and increased `maxSteps`:
+
+```typescript
+export function runAgent({ messages, threadId, ... }: AgentOptions) {
+  return streamText({
+    model: chatModel,
+    maxTokens: 2048,        // Added
+    maxSteps: 5,            // Increased from 3
+    system,
+    messages,
+    tools: { vector_search: createVectorSearchTool(threadId) },
+  });
+}
+```
+
+---
+
+### 15.6 UI Improvements
+
+#### Home Page Header
+
+Simplified to just app name and theme toggle (removed redundant "Start Chatting" button):
+
+```tsx
+<header className="flex items-center justify-between p-4 border-b">
+  <span className="font-semibold text-lg">{env.NEXT_PUBLIC_APP_NAME}</span>
+  <ThemeToggle />
+</header>
+```
+
+#### Hero Section
+
+Added italic emphasis and quick suggestion chips:
+
+```tsx
+<h1>
+  Ask questions about <em className="text-primary">{appName}</em>
+</h1>
+<div className="flex flex-wrap gap-2">
+  {['Programs', 'Tuition', 'Admissions', 'Campus Life'].map(chip => (
+    <button onClick={() => navigate(`/chat?q=${chip}`)}>{chip}</button>
+  ))}
+</div>
+```
+
+#### Tool Execution Indicator
+
+Added visual feedback during tool execution:
+
+```tsx
+{message.parts.map(part => {
+  if (part.type === 'text') return <MessageResponse>{part.text}</MessageResponse>;
+  if (part.type.startsWith('tool-')) {
+    return <div className="text-muted-foreground">Searching knowledge base...</div>;
+  }
+  return null;
+})}
+
+// Fallback if no text generated
+{!hasTextPart && <MessageResponse>I found relevant information but couldn't generate a response. Please try again.</MessageResponse>}
+```
+
+---
+
+### 15.7 Source Preview Cleaning
+
+```typescript
+function cleanSourcePreview(content: string, maxLength = 150): string {
+  // Detect navigation-heavy content
+  const navKeywords = ['Services', 'About', 'Contact', 'Menu', 'Home', 'Search'];
+  const wordCount = content.split(/\s+/).length;
+  const navKeywordCount = navKeywords.reduce((acc, kw) => 
+    acc + (content.match(new RegExp(kw, 'gi')) || []).length, 0);
+  
+  // If >30% navigation keywords, skip this source
+  if (navKeywordCount / wordCount > 0.3) {
+    return 'Content from this page...';
+  }
+  
+  return content
+    .replace(/We use cookies[^.\n]*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+```
+
+---
+
+### 15.8 Environment Variables Updated
+
+```bash
+# Updated defaults
+CRAWL_MAX_DEPTH=3           # Increased from 2
+CRAWL_LIMIT=300             # Increased from 100
+CRAWL_MAX_BREADTH=50        # Increased from 20
+CRAWL_FORMAT=text           # Changed from markdown (cleaner output)
+CRAWL_EXCLUDE_PATHS=/archive/*,/admin/*,/login/*,/search/*,/tag/*,/news/*,/events/*
+```
+
+---
+
+### 15.9 Bug Fixes
+
+| Issue | Fix |
+|-------|-----|
+| Empty AI responses | Added fallback UI + explicit "MUST RESPOND" prompt |
+| Duplicate messages | Fixed localStorage session handling |
+| Non-clickable citations | Parse both `【1†L1-L30】` and `[1]` formats, render as links |
+| Markdown not rendering | Added `react-markdown` integration |
+| Navigation in sources | Added navigation detection and filtering |
+| Cookie text in content | Added cookie/banner removal in `cleanContent()` |
+| Poor title extraction | Parse HTML `<title>` tag from rawContent |
+| Small chunks | Increased chunkSize to 1500, overlap to 300 |

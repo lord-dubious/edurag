@@ -1,4 +1,4 @@
-import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
+import { streamText, convertToModelMessages, stepCountIs } from 'ai';
 import { chatModel } from '../providers';
 import { AGENT_SYSTEM_PROMPT } from './prompts';
 import { createVectorSearchTool, getPopularFaqsTool } from './tools';
@@ -10,7 +10,7 @@ export async function runAgent({
   threadId,
   universityName = env.NEXT_PUBLIC_APP_NAME,
   extraTools = {},
-  maxSteps = 3,
+  maxSteps = 5,
 }: AgentOptions) {
   const system = AGENT_SYSTEM_PROMPT
     .replace('{UNIVERSITY_NAME}', universityName)
@@ -18,15 +18,19 @@ export async function runAgent({
       year: 'numeric', month: 'long', day: 'numeric',
     }));
 
+  console.log('[agent] Running agent with', messages.length, 'messages, maxSteps:', maxSteps);
+
   return streamText({
     model: chatModel,
     system,
     messages: await convertToModelMessages(messages),
+    maxOutputTokens: env.CHAT_MAX_TOKENS,
     tools: {
-      vector_search: createVectorSearchTool(),
+      vector_search: createVectorSearchTool(threadId),
       get_popular_faqs: getPopularFaqsTool,
       ...extraTools,
     },
     stopWhen: stepCountIs(maxSteps),
+    experimental_telemetry: { isEnabled: false },
   });
 }

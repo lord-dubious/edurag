@@ -20,6 +20,18 @@ interface SourcesPanelProps {
   onClose?: () => void;
 }
 
+function cleanSourcePreview(content: string, maxLength = 150): string {
+  const cleaned = content
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/<[^>]+>/g, '')
+    .replace(/[#*_~`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  if (cleaned.length <= maxLength) return cleaned;
+  return cleaned.slice(0, maxLength).replace(/\s+\S*$/, '...');
+}
+
 function SourceCard({ source, index }: { source: Source; index: number }) {
   const hostname = new URL(source.url).hostname;
   const favicon = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
@@ -48,8 +60,7 @@ function SourceCard({ source, index }: { source: Source; index: number }) {
               )}
             </div>
             <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-              {source.content.slice(0, 150)}
-              {source.content.length > 150 ? '...' : ''}
+              {cleanSourcePreview(source.content, 150)}
             </p>
             <a
               href={source.url}

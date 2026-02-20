@@ -20,21 +20,25 @@ export function Hero({ appName }: HeroProps) {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] py-12 px-4">
-      <div className="text-center mb-8 max-w-3xl">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
+      <div className="text-center mb-8 max-w-2xl">
+        <p className="text-sm font-medium text-muted-foreground mb-4 tracking-wide">
           {name}
+        </p>
+        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight mb-4 leading-tight">
+          Ask questions about{' '}
+          <em className="text-primary not-italic font-semibold">{name}</em>
         </h1>
-        <p className="text-muted-foreground max-w-xl mx-auto">
-          Ask questions about admissions, programs, tuition, campus life, and more.
+        <p className="text-base text-muted-foreground">
+          Get instant answers about admissions, programs, tuition, campus life, and more.
         </p>
       </div>
 
-      <div className="w-full max-w-2xl">
-        <PromptInput onSubmit={handleSubmit} className="shadow-lg">
+      <div className="w-full max-w-xl">
+        <PromptInput onSubmit={handleSubmit} className="shadow-md">
           <PromptInputBody>
             <PromptInputTextarea 
               placeholder="Ask anything about the university..."
-              className="min-h-[56px] text-base"
+              className="min-h-[48px] text-base"
             />
           </PromptInputBody>
           <PromptInputFooter>
@@ -42,10 +46,6 @@ export function Hero({ appName }: HeroProps) {
             <PromptInputSubmit status={'ready' as ChatStatus} />
           </PromptInputFooter>
         </PromptInput>
-
-        <p className="text-xs text-muted-foreground text-center mt-3">
-          Press Enter to send, Shift+Enter for new line
-        </p>
       </div>
     </div>
   );
