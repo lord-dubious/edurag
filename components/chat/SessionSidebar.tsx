@@ -23,19 +23,21 @@ function getDateGroup(timestamp: number): string {
   const sessionDate = new Date(timestamp);
   const now = new Date();
   
-  const sessionMidnight = new Date(
+  const sessionNoon = new Date(
     sessionDate.getFullYear(),
     sessionDate.getMonth(),
-    sessionDate.getDate()
+    sessionDate.getDate(),
+    12, 0, 0, 0
   );
-  const nowMidnight = new Date(
+  const nowNoon = new Date(
     now.getFullYear(),
     now.getMonth(),
-    now.getDate()
+    now.getDate(),
+    12, 0, 0, 0
   );
   
   const dayMs = 24 * 60 * 60 * 1000;
-  const diff = Math.floor((nowMidnight.getTime() - sessionMidnight.getTime()) / dayMs);
+  const diff = Math.round((nowNoon.getTime() - sessionNoon.getTime()) / dayMs);
 
   if (diff <= 0) return 'Today';
   if (diff === 1) return 'Yesterday';
@@ -71,8 +73,8 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
       const stored = localStorage.getItem(SESSIONS_STORAGE_KEY);
       const latestSessions: Session[] = stored ? JSON.parse(stored) : [];
       const updated = latestSessions.filter(s => s.id !== sessionId);
-      setSessions(updated);
       localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(updated));
+      setSessions(updated);
       onDeleteSession(sessionId);
     } catch (e) {
       console.error('Failed to delete session:', e);
