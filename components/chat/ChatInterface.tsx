@@ -83,7 +83,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     const sessions = loadSessions();
     return sessions.length > 0 ? sessions[0].id : nanoid();
   });
-const [sources, setSources] = useState<Record<string, Source[]>>(() => {
+  const [sources, setSources] = useState<Record<string, Source[]>>(() => {
     const sessions = loadSessions();
     const session = sessions.find(s => s.id === threadId);
     return session?.sources ?? {};
@@ -91,6 +91,8 @@ const [sources, setSources] = useState<Record<string, Source[]>>(() => {
   const [showSources, setShowSources] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sessionsVersion, setSessionsVersion] = useState(0);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
+  const [pendingInput, setPendingInput] = useState<string | null>(null);
   const { theme, setTheme } = useTheme();
 
   const { messages, status, error, sendMessage, regenerate, setMessages } = useChat({
@@ -136,9 +138,7 @@ const [sources, setSources] = useState<Record<string, Source[]>>(() => {
     },
   });
 
-const initialQuerySentRef = useRef(false);
-  const isExistingSession = useRef(false);
-  const isLoadingSession = useRef(false);
+  const initialQuerySentRef = useRef(false);
 
   useEffect(() => {
     if (!initialQuery) return;
@@ -148,25 +148,28 @@ const initialQuerySentRef = useRef(false);
 
     const existingSession = findSessionByQuery(initialQuery);
     if (existingSession) {
-      isExistingSession.current = true;
-      isLoadingSession.current = true;
+      setIsLoadingSession(true);
       setThreadId(existingSession.id);
       setMessages(existingSession.messages);
       setSources(existingSession.sources);
-      setTimeout(() => {
-        isLoadingSession.current = false;
-      }, 100);
+      initialQuerySentRef.current = true;
       return;
     }
 
+    setPendingInput(initialQuery);
     initialQuerySentRef.current = true;
-    sendMessage({ text: initialQuery });
-  }, [initialQuery, status, messages.length, sendMessage, setMessages]);
+  }, [initialQuery, status, messages.length, setMessages]);
+
+  useEffect(() => {
+    if (isLoadingSession && status === 'ready') {
+      setIsLoadingSession(false);
+    }
+  }, [isLoadingSession, status]);
 
   useEffect(() => {
     if (messages.length === 0) return;
     if (status === 'streaming') return;
-    if (isLoadingSession.current) return;
+    if (isLoadingSession) return;
 
     const sessions = loadSessions();
     const existingIndex = sessions.findIndex(s => s.id === threadId);
@@ -204,26 +207,23 @@ const initialQuerySentRef = useRef(false);
     [sendMessage]
   );
 
-const handleNewChat = useCallback(() => {
+  const handleNewChat = useCallback(() => {
     const newId = nanoid();
     setThreadId(newId);
     setMessages([]);
     setSources({});
+    setPendingInput(null);
     initialQuerySentRef.current = false;
-    isExistingSession.current = false;
   }, [setMessages]);
 
-const handleSelectSession = useCallback((id: string) => {
+  const handleSelectSession = useCallback((id: string) => {
     const sessions = loadSessions();
     const session = sessions.find(s => s.id === id);
     if (session) {
-      isLoadingSession.current = true;
+      setIsLoadingSession(true);
       setThreadId(id);
       setMessages(session.messages);
       setSources(session.sources);
-      setTimeout(() => {
-        isLoadingSession.current = false;
-      }, 100);
     }
   }, [setMessages]);
 
@@ -240,7 +240,7 @@ const handleSelectSession = useCallback((id: string) => {
 
   return (
     <div className="flex h-screen">
-<SessionSidebar
+      <SessionSidebar
         currentThreadId={threadId}
         onNewChat={handleNewChat}
         onSelectSession={handleSelectSession}
@@ -314,7 +314,7 @@ const handleSelectSession = useCallback((id: string) => {
 
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10">
               <div className="max-w-3xl mx-auto">
-                <ChatInput onSubmit={handleSubmit} status={status} />
+                <ChatInput onSubmit={handleSubmit} status={status} defaultInput={pendingInput ?? undefined} />
               </div>
             </div>
           </main>
