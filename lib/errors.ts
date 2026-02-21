@@ -5,7 +5,9 @@ export type AppErrorCode =
   | 'AGENT_ERROR'
   | 'CRAWL_FAILED'
   | 'DB_ERROR'
-  | 'RATE_LIMITED';
+  | 'RATE_LIMITED'
+  | 'TIMEOUT'
+  | 'UPLOAD_FAILED';
 
 export interface AppError {
   error: string;

@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { 
-  Globe, 
-  FileText, 
-  HelpCircle, 
+import {
+  Globe,
+  FileText,
+  HelpCircle,
   MessageSquare,
   Plus,
-  ArrowRight 
+  ArrowRight
 } from 'lucide-react';
 
 export const revalidate = 60;
@@ -28,34 +28,34 @@ export default async function AdminDashboard() {
   ]);
 
   const stats = [
-    { 
-      title: 'Domains', 
-      value: domainCount, 
+    {
+      title: 'Domains',
+      value: domainCount,
       icon: Globe,
       href: '/admin/domains',
       color: 'text-blue-600',
       bg: 'bg-blue-100 dark:bg-blue-900/30'
     },
-    { 
-      title: 'Indexed Documents', 
-      value: totalDocs, 
+    {
+      title: 'Indexed Documents',
+      value: totalDocs,
       icon: FileText,
       href: '/admin/domains',
       color: 'text-green-600',
       bg: 'bg-green-100 dark:bg-green-900/30'
     },
-    { 
-      title: 'Pending FAQs', 
-      value: pendingFaqs, 
+    {
+      title: 'Pending FAQs',
+      value: pendingFaqs,
       icon: HelpCircle,
       href: '/admin/faqs',
       color: 'text-amber-600',
       bg: 'bg-amber-100 dark:bg-amber-900/30',
       badge: pendingFaqs > 0 ? `${pendingFaqs} pending` : undefined
     },
-    { 
-      title: 'Public FAQs', 
-      value: totalFaqs, 
+    {
+      title: 'Public FAQs',
+      value: totalFaqs,
       icon: MessageSquare,
       href: '/admin/faqs',
       color: 'text-purple-600',
@@ -64,7 +64,7 @@ export default async function AdminDashboard() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">
@@ -75,7 +75,7 @@ export default async function AdminDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <Link key={stat.title} href={stat.href}>
-            <Card className="hover:bg-accent/50 transition-colors cursor-pointer">
+            <Card className="hover:bg-accent/50 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
                   {stat.title}

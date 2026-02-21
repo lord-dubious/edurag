@@ -66,7 +66,7 @@ export function DomainTable({ domains, onReindex, onDelete, isLoading }: DomainT
   };
 
   return (
-    <>
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100 fill-mode-both overflow-hidden rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -115,7 +115,7 @@ export function DomainTable({ domains, onReindex, onDelete, isLoading }: DomainT
                         <RefreshCcw className="h-4 w-4 mr-2" />
                         Re-index
                       </DropdownMenuItem>
-                      <DropdownMenuItem 
+                      <DropdownMenuItem
                         onClick={() => setDeleteDomain(domain)}
                         className="text-destructive focus:text-destructive"
                       >
@@ -158,6 +158,6 @@ export function DomainTable({ domains, onReindex, onDelete, isLoading }: DomainT
           </>
         )}
       </Confirmation>
-    </>
+    </div>
   );
 }
