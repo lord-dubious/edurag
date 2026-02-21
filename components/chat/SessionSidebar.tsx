@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { PlusIcon, Trash2Icon, MessageSquareIcon } from 'lucide-react';
+import { SESSIONS_STORAGE_KEY } from '@/lib/constants';
 
 interface Session {
   id: string;
@@ -17,8 +18,6 @@ interface Props {
   collapsed?: boolean;
   sessionsVersion?: number;
 }
-
-const STORAGE_KEY = 'edurag_sessions';
 
 function getDateGroup(timestamp: number): string {
   const now = Date.now();
@@ -42,13 +41,16 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(SESSIONS_STORAGE_KEY);
       if (stored) {
         const parsed: Session[] = JSON.parse(stored);
         setSessions(parsed);
+      } else {
+        setSessions([]);
       }
     } catch (e) {
       console.error('Failed to load sessions:', e);
+      setSessions([]);
     }
   }, [sessionsVersion]);
 
@@ -56,7 +58,7 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
     e.stopPropagation();
     const updated = sessions.filter(s => s.id !== sessionId);
     setSessions(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(updated));
     onDeleteSession(sessionId);
   };
 
