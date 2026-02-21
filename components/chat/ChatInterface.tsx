@@ -38,17 +38,18 @@ function isVectorSearchToolPart(part: MessagePart): part is VectorSearchToolPart
   return part.type === 'tool-vector_search' && part.state === 'output-available' && 'output' in part;
 }
 
-interface StoredSession {
+export interface StoredSession {
   id: string;
   title: string;
   createdAt: number;
   messages: UIMessage[];
   sources: Record<string, Source[]>;
+  initialQuery?: string;
 }
 
 const STORAGE_KEY = 'edurag_sessions';
 
-function loadSessions(): StoredSession[] {
+export function loadSessions(): StoredSession[] {
   if (typeof window === 'undefined') return [];
   try {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -58,9 +59,14 @@ function loadSessions(): StoredSession[] {
   }
 }
 
-function saveSessions(sessions: StoredSession[]): void {
+export function saveSessions(sessions: StoredSession[]): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+}
+
+export function findSessionByQuery(query: string): StoredSession | undefined {
+  const sessions = loadSessions();
+  return sessions.find(s => s.initialQuery === query);
 }
 
 interface ChatInterfaceProps {
@@ -69,18 +75,22 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   const [threadId, setThreadId] = useState(() => {
-    if (initialQuery) return nanoid();
+    if (initialQuery) {
+      const existingSession = findSessionByQuery(initialQuery);
+      if (existingSession) return existingSession.id;
+      return nanoid();
+    }
     const sessions = loadSessions();
     return sessions.length > 0 ? sessions[0].id : nanoid();
   });
-  const [sources, setSources] = useState<Record<string, Source[]>>(() => {
-    if (initialQuery) return {};
+const [sources, setSources] = useState<Record<string, Source[]>>(() => {
     const sessions = loadSessions();
     const session = sessions.find(s => s.id === threadId);
     return session?.sources ?? {};
   });
   const [showSources, setShowSources] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sessionsVersion, setSessionsVersion] = useState(0);
   const { theme, setTheme } = useTheme();
 
   const { messages, status, error, sendMessage, regenerate, setMessages } = useChat({
@@ -126,7 +136,9 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     },
   });
 
-  const initialQuerySentRef = useRef(false);
+const initialQuerySentRef = useRef(false);
+  const isExistingSession = useRef(false);
+  const isLoadingSession = useRef(false);
 
   useEffect(() => {
     if (!initialQuery) return;
@@ -134,13 +146,27 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     if (status !== 'ready') return;
     if (messages.length > 0) return;
 
+    const existingSession = findSessionByQuery(initialQuery);
+    if (existingSession) {
+      isExistingSession.current = true;
+      isLoadingSession.current = true;
+      setThreadId(existingSession.id);
+      setMessages(existingSession.messages);
+      setSources(existingSession.sources);
+      setTimeout(() => {
+        isLoadingSession.current = false;
+      }, 100);
+      return;
+    }
+
     initialQuerySentRef.current = true;
     sendMessage({ text: initialQuery });
-  }, [initialQuery, status, messages.length, sendMessage]);
+  }, [initialQuery, status, messages.length, sendMessage, setMessages]);
 
   useEffect(() => {
     if (messages.length === 0) return;
     if (status === 'streaming') return;
+    if (isLoadingSession.current) return;
 
     const sessions = loadSessions();
     const existingIndex = sessions.findIndex(s => s.id === threadId);
@@ -150,12 +176,15 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
       .map(p => p.text)
       .join('')?.slice(0, 50) ?? 'New Chat';
 
+    const existingSession = existingIndex >= 0 ? sessions[existingIndex] : null;
+    
     const updatedSession: StoredSession = {
       id: threadId,
       title,
-      createdAt: existingIndex >= 0 ? sessions[existingIndex].createdAt : Date.now(),
+      createdAt: existingSession?.createdAt ?? Date.now(),
       messages,
       sources,
+      initialQuery: existingSession?.initialQuery ?? initialQuery,
     };
 
     if (existingIndex >= 0) {
@@ -165,7 +194,8 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     }
 
     saveSessions(sessions);
-  }, [messages, sources, threadId, status]);
+    setSessionsVersion(v => v + 1);
+  }, [messages, sources, threadId, status, initialQuery]);
 
   const handleSubmit = useCallback(
     (message: { text: string }) => {
@@ -174,20 +204,26 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     [sendMessage]
   );
 
-  const handleNewChat = useCallback(() => {
+const handleNewChat = useCallback(() => {
     const newId = nanoid();
     setThreadId(newId);
     setMessages([]);
     setSources({});
+    initialQuerySentRef.current = false;
+    isExistingSession.current = false;
   }, [setMessages]);
 
-  const handleSelectSession = useCallback((id: string) => {
+const handleSelectSession = useCallback((id: string) => {
     const sessions = loadSessions();
     const session = sessions.find(s => s.id === id);
     if (session) {
+      isLoadingSession.current = true;
       setThreadId(id);
       setMessages(session.messages);
       setSources(session.sources);
+      setTimeout(() => {
+        isLoadingSession.current = false;
+      }, 100);
     }
   }, [setMessages]);
 
@@ -204,12 +240,13 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
 
   return (
     <div className="flex h-screen">
-      <SessionSidebar
+<SessionSidebar
         currentThreadId={threadId}
         onNewChat={handleNewChat}
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         collapsed={sidebarCollapsed}
+        sessionsVersion={sessionsVersion}
       />
 
       <div className="flex-1 flex flex-col min-w-0">

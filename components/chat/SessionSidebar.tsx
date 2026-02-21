@@ -15,6 +15,7 @@ interface Props {
   onSelectSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
   collapsed?: boolean;
+  sessionsVersion?: number;
 }
 
 const STORAGE_KEY = 'edurag_sessions';
@@ -36,7 +37,7 @@ function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, onDeleteSession, collapsed }: Props) {
+export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, onDeleteSession, collapsed, sessionsVersion }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
 
   useEffect(() => {
@@ -49,7 +50,7 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
     } catch (e) {
       console.error('Failed to load sessions:', e);
     }
-  }, []);
+  }, [sessionsVersion]);
 
   const handleDelete = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
