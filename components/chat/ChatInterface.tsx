@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { nanoid } from 'nanoid';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
@@ -11,12 +11,7 @@ import { ChatInput } from './ChatInput';
 import { SessionSidebar } from './SessionSidebar';
 import { CitationPanel } from './CitationPanel';
 import { SESSIONS_STORAGE_KEY } from '@/lib/constants';
-
-interface Source {
-  url: string;
-  title?: string;
-  content: string;
-}
+import type { Source } from '@/lib/agent/types';
 
 interface VectorSearchResult {
   url: string;
@@ -65,7 +60,8 @@ export function saveSessions(sessions: StoredSession[]): void {
 
 export function findSessionByQuery(query: string): StoredSession | undefined {
   const sessions = loadSessions();
-  return sessions.find(s => s.initialQuery === query);
+  const normalizedQuery = query.trim().toLowerCase();
+  return sessions.find(s => s.initialQuery?.trim().toLowerCase() === normalizedQuery);
 }
 
 interface ChatInterfaceProps {
@@ -73,10 +69,18 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
-  const initialSessions = loadSessions();
-  const initialThreadId = initialQuery
-    ? (findSessionByQuery(initialQuery)?.id ?? nanoid())
-    : (initialSessions.length > 0 ? initialSessions[0].id : nanoid());
+  const initialSessionsRef = useRef<StoredSession[] | null>(null);
+  if (initialSessionsRef.current === null) {
+    initialSessionsRef.current = loadSessions();
+  }
+  const initialSessions = initialSessionsRef.current;
+  
+  const initialThreadId = useMemo(() => {
+    if (initialQuery) {
+      return findSessionByQuery(initialQuery)?.id ?? nanoid();
+    }
+    return initialSessions.length > 0 ? initialSessions[0].id : nanoid();
+  }, [initialQuery, initialSessions]);
   
   const [threadId, setThreadId] = useState(initialThreadId);
   const [sources, setSources] = useState<Record<string, Source[]>>(() => {
@@ -90,12 +94,14 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   const isLoadingSessionRef = useRef(false);
   const { theme, setTheme } = useTheme();
 
-const { messages, status, error, sendMessage, regenerate, setMessages } = useChat({
+  const transport = useMemo(() => new DefaultChatTransport({
+    api: '/api/chat',
+    body: () => ({ threadId }),
+  }), [threadId]);
+
+  const { messages, status, error, sendMessage, regenerate, setMessages } = useChat({
     id: threadId,
-    transport: new DefaultChatTransport({
-      api: '/api/chat',
-      body: { threadId },
-    }),
+    transport,
     messages: (() => {
       if (initialQuery) return [];
       const session = initialSessions.find(s => s.id === initialThreadId);
@@ -155,12 +161,11 @@ const { messages, status, error, sendMessage, regenerate, setMessages } = useCha
   }, [initialQuery, status, messages.length, setMessages]);
 
   useEffect(() => {
-    if (isLoadingSessionRef.current && status === 'ready') {
+    if (status === 'ready' && isLoadingSessionRef.current) {
       isLoadingSessionRef.current = false;
+      return;
     }
-  }, [status]);
-
-  useEffect(() => {
+    
     if (messages.length === 0) return;
     if (status === 'streaming') return;
     if (isLoadingSessionRef.current) return;
@@ -181,7 +186,7 @@ const { messages, status, error, sendMessage, regenerate, setMessages } = useCha
       createdAt: existingSession?.createdAt ?? Date.now(),
       messages,
       sources,
-      initialQuery: existingSession?.initialQuery ?? initialQuery,
+      initialQuery: existingSession ? existingSession.initialQuery : initialQuery,
     };
 
     if (existingIndex >= 0) {

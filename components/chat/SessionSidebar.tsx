@@ -20,11 +20,22 @@ interface Props {
 }
 
 function getDateGroup(timestamp: number): string {
-  const now = Date.now();
+  const sessionDate = new Date(timestamp);
+  const now = new Date();
+  
+  const sessionMidnight = new Date(
+    sessionDate.getFullYear(),
+    sessionDate.getMonth(),
+    sessionDate.getDate()
+  );
+  const nowMidnight = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+  
   const dayMs = 24 * 60 * 60 * 1000;
-  const today = Math.floor(now / dayMs);
-  const sessionDay = Math.floor(timestamp / dayMs);
-  const diff = today - sessionDay;
+  const diff = Math.floor((nowMidnight.getTime() - sessionMidnight.getTime()) / dayMs);
 
   if (diff === 0) return 'Today';
   if (diff === 1) return 'Yesterday';
@@ -56,9 +67,15 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
 
   const handleDelete = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    const updated = sessions.filter(s => s.id !== sessionId);
-    setSessions(updated);
-    localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(updated));
+    try {
+      const stored = localStorage.getItem(SESSIONS_STORAGE_KEY);
+      const latestSessions: Session[] = stored ? JSON.parse(stored) : [];
+      const updated = latestSessions.filter(s => s.id !== sessionId);
+      setSessions(updated);
+      localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(updated));
+    } catch {
+      console.error('Failed to delete session');
+    }
     onDeleteSession(sessionId);
   };
 
