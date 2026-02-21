@@ -7,6 +7,7 @@ import {
   PromptInputTextarea,
   PromptInputSubmit,
   PromptInputTools,
+  PromptInputProvider,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
 import type { ChatStatus } from 'ai';
@@ -14,10 +15,11 @@ import type { ChatStatus } from 'ai';
 interface Props {
   onSubmit: (message: PromptInputMessage) => void;
   status: ChatStatus;
+  defaultInput?: string;
 }
 
-export function ChatInput({ onSubmit, status }: Props) {
-  return (
+export function ChatInput({ onSubmit, status, defaultInput }: Props) {
+  const input = (
     <PromptInput onSubmit={onSubmit} className="w-full max-w-3xl mx-auto">
       <PromptInputBody>
         <PromptInputTextarea placeholder="Ask about admissions, programs, tuition…" />
@@ -28,4 +30,14 @@ export function ChatInput({ onSubmit, status }: Props) {
       </PromptInputFooter>
     </PromptInput>
   );
+
+  if (defaultInput) {
+    return (
+      <PromptInputProvider initialInput={defaultInput}>
+        {input}
+      </PromptInputProvider>
+    );
+  }
+
+  return input;
 }

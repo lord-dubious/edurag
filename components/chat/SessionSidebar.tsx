@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PlusIcon, Trash2Icon, MessageSquareIcon } from 'lucide-react';
+import { SESSIONS_STORAGE_KEY } from '@/lib/constants';
 
 interface Session {
   id: string;
@@ -15,19 +16,37 @@ interface Props {
   onSelectSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
   collapsed?: boolean;
+  sessionsVersion?: number;
 }
 
-const STORAGE_KEY = 'edurag_sessions';
-
-function getDateGroup(timestamp: number): string {
-  const now = Date.now();
+function getDateGroup(timestamp: number, todayDateString: string): string {
+  const sessionDate = new Date(timestamp);
+  const sessionDateString = sessionDate.toDateString();
+  
+  if (sessionDateString === todayDateString) return 'Today';
+  
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  if (sessionDateString === yesterday.toDateString()) return 'Yesterday';
+  
+  const sessionNoon = new Date(
+    sessionDate.getFullYear(),
+    sessionDate.getMonth(),
+    sessionDate.getDate(),
+    12, 0, 0, 0
+  );
+  const nowNoon = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    12, 0, 0, 0
+  );
+  
   const dayMs = 24 * 60 * 60 * 1000;
-  const today = Math.floor(now / dayMs);
-  const sessionDay = Math.floor(timestamp / dayMs);
-  const diff = today - sessionDay;
+  const diff = Math.round((nowNoon.getTime() - sessionNoon.getTime()) / dayMs);
 
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Yesterday';
   if (diff <= 7) return 'This Week';
   return 'Older';
 }
@@ -36,38 +55,63 @@ function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, onDeleteSession, collapsed }: Props) {
+export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, onDeleteSession, collapsed, sessionsVersion }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [todayDateString, setTodayDateString] = useState(() => new Date().toDateString());
+
+  useEffect(() => {
+    const updateDateKey = () => setTodayDateString(new Date().toDateString());
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+    
+    const timeout = setTimeout(() => {
+      updateDateKey();
+      const interval = setInterval(updateDateKey, 24 * 60 * 60 * 1000);
+      return () => clearInterval(interval);
+    }, msUntilMidnight);
+    
+    return () => clearTimeout(timeout);
+  }, []);
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(SESSIONS_STORAGE_KEY);
       if (stored) {
         const parsed: Session[] = JSON.parse(stored);
         setSessions(parsed);
+      } else {
+        setSessions([]);
       }
     } catch (e) {
       console.error('Failed to load sessions:', e);
+      setSessions([]);
     }
-  }, []);
+  }, [sessionsVersion]);
 
   const handleDelete = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    const updated = sessions.filter(s => s.id !== sessionId);
-    setSessions(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    onDeleteSession(sessionId);
+    try {
+      const stored = localStorage.getItem(SESSIONS_STORAGE_KEY);
+      const latestSessions: Session[] = stored ? JSON.parse(stored) : [];
+      const updated = latestSessions.filter(s => s.id !== sessionId);
+      localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(updated));
+      setSessions(updated);
+      onDeleteSession(sessionId);
+    } catch (e) {
+      console.error('Failed to delete session:', e);
+    }
   };
 
-  const groupedSessions = useMemo(() => {
+const groupedSessions = useMemo(() => {
     const groups: Record<string, Session[]> = {};
     sessions.forEach((session) => {
-      const group = getDateGroup(session.createdAt);
+      const group = getDateGroup(session.createdAt, todayDateString);
       if (!groups[group]) groups[group] = [];
       groups[group].push(session);
     });
     return groups;
-  }, [sessions]);
+  }, [sessions, todayDateString]);
 
   const groupOrder = ['Today', 'Yesterday', 'This Week', 'Older'];
 
@@ -132,9 +176,9 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
                         {formatTime(session.createdAt)}
                       </div>
                     </div>
-                    <button
+<button
                       onClick={(e) => handleDelete(e, session.id)}
-                      className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                      className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
                       title="Delete"
                     >
                       <Trash2Icon className="w-3 h-3" />

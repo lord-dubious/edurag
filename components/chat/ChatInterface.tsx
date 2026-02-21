@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { nanoid } from 'nanoid';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
@@ -10,12 +10,8 @@ import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { SessionSidebar } from './SessionSidebar';
 import { CitationPanel } from './CitationPanel';
-
-interface Source {
-  url: string;
-  title?: string;
-  content: string;
-}
+import { SESSIONS_STORAGE_KEY } from '@/lib/constants';
+import type { Source } from '@/lib/agent/types';
 
 interface VectorSearchResult {
   url: string;
@@ -38,29 +34,34 @@ function isVectorSearchToolPart(part: MessagePart): part is VectorSearchToolPart
   return part.type === 'tool-vector_search' && part.state === 'output-available' && 'output' in part;
 }
 
-interface StoredSession {
+export interface StoredSession {
   id: string;
   title: string;
   createdAt: number;
   messages: UIMessage[];
   sources: Record<string, Source[]>;
+  initialQuery?: string;
 }
 
-const STORAGE_KEY = 'edurag_sessions';
-
-function loadSessions(): StoredSession[] {
+export function loadSessions(): StoredSession[] {
   if (typeof window === 'undefined') return [];
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = localStorage.getItem(SESSIONS_STORAGE_KEY);
     return data ? JSON.parse(data) : [];
   } catch {
     return [];
   }
 }
 
-function saveSessions(sessions: StoredSession[]): void {
+export function saveSessions(sessions: StoredSession[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+}
+
+export function findSessionByQuery(query: string): StoredSession | undefined {
+  const sessions = loadSessions();
+  const normalizedQuery = query.trim().toLowerCase();
+  return sessions.find(s => s.initialQuery?.trim().toLowerCase() === normalizedQuery);
 }
 
 interface ChatInterfaceProps {
@@ -68,31 +69,42 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
-  const [threadId, setThreadId] = useState(() => {
-    if (initialQuery) return nanoid();
-    const sessions = loadSessions();
-    return sessions.length > 0 ? sessions[0].id : nanoid();
-  });
+  const initialSessionsRef = useRef<StoredSession[] | null>(null);
+  if (initialSessionsRef.current === null) {
+    initialSessionsRef.current = loadSessions();
+  }
+  const initialSessions = initialSessionsRef.current;
+  
+  const initialThreadId = useMemo(() => {
+    if (initialQuery) {
+      return findSessionByQuery(initialQuery)?.id ?? nanoid();
+    }
+    return initialSessions.length > 0 ? initialSessions[0].id : nanoid();
+  }, [initialQuery, initialSessions]);
+  
+  const [threadId, setThreadId] = useState(initialThreadId);
   const [sources, setSources] = useState<Record<string, Source[]>>(() => {
-    if (initialQuery) return {};
-    const sessions = loadSessions();
-    const session = sessions.find(s => s.id === threadId);
+    const session = initialSessions.find(s => s.id === initialThreadId);
     return session?.sources ?? {};
   });
   const [showSources, setShowSources] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sessionsVersion, setSessionsVersion] = useState(0);
+  const [pendingInput, setPendingInput] = useState<string | null>(null);
+  const isLoadingSessionRef = useRef(false);
   const { theme, setTheme } = useTheme();
+
+  const transport = useMemo(() => new DefaultChatTransport({
+    api: '/api/chat',
+    body: () => ({ threadId }),
+  }), [threadId]);
 
   const { messages, status, error, sendMessage, regenerate, setMessages } = useChat({
     id: threadId,
-    transport: new DefaultChatTransport({
-      api: '/api/chat',
-      body: { threadId },
-    }),
+    transport,
     messages: (() => {
       if (initialQuery) return [];
-      const sessions = loadSessions();
-      const session = sessions.find(s => s.id === threadId);
+      const session = initialSessions.find(s => s.id === initialThreadId);
       return session?.messages ?? [];
     })(),
     onFinish: ({ message }) => {
@@ -134,13 +146,29 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     if (status !== 'ready') return;
     if (messages.length > 0) return;
 
+    const existingSession = findSessionByQuery(initialQuery);
+    if (existingSession) {
+      isLoadingSessionRef.current = true;
+      setThreadId(existingSession.id);
+      setMessages(existingSession.messages);
+      setSources(existingSession.sources);
+      initialQuerySentRef.current = true;
+      return;
+    }
+
+    setPendingInput(initialQuery);
     initialQuerySentRef.current = true;
-    sendMessage({ text: initialQuery });
-  }, [initialQuery, status, messages.length, sendMessage]);
+  }, [initialQuery, status, messages.length, setMessages]);
 
   useEffect(() => {
+    if (status === 'ready' && isLoadingSessionRef.current) {
+      isLoadingSessionRef.current = false;
+      return;
+    }
+    
     if (messages.length === 0) return;
     if (status === 'streaming') return;
+    if (isLoadingSessionRef.current) return;
 
     const sessions = loadSessions();
     const existingIndex = sessions.findIndex(s => s.id === threadId);
@@ -150,12 +178,15 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
       .map(p => p.text)
       .join('')?.slice(0, 50) ?? 'New Chat';
 
+    const existingSession = existingIndex >= 0 ? sessions[existingIndex] : null;
+    
     const updatedSession: StoredSession = {
       id: threadId,
       title,
-      createdAt: existingIndex >= 0 ? sessions[existingIndex].createdAt : Date.now(),
+      createdAt: existingSession?.createdAt ?? Date.now(),
       messages,
       sources,
+      initialQuery: existingSession ? existingSession.initialQuery : initialQuery,
     };
 
     if (existingIndex >= 0) {
@@ -165,7 +196,8 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     }
 
     saveSessions(sessions);
-  }, [messages, sources, threadId, status]);
+    setSessionsVersion(v => v + 1);
+  }, [messages, sources, threadId, status, initialQuery]);
 
   const handleSubmit = useCallback(
     (message: { text: string }) => {
@@ -174,20 +206,24 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     [sendMessage]
   );
 
-  const handleNewChat = useCallback(() => {
+const handleNewChat = useCallback(() => {
     const newId = nanoid();
     setThreadId(newId);
     setMessages([]);
     setSources({});
+    setPendingInput(null);
+    initialQuerySentRef.current = true;
   }, [setMessages]);
 
   const handleSelectSession = useCallback((id: string) => {
     const sessions = loadSessions();
     const session = sessions.find(s => s.id === id);
     if (session) {
+      isLoadingSessionRef.current = true;
       setThreadId(id);
       setMessages(session.messages);
       setSources(session.sources);
+      setPendingInput(null);
     }
   }, [setMessages]);
 
@@ -210,6 +246,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         collapsed={sidebarCollapsed}
+        sessionsVersion={sessionsVersion}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -277,7 +314,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
 
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10">
               <div className="max-w-3xl mx-auto">
-                <ChatInput onSubmit={handleSubmit} status={status} />
+                <ChatInput onSubmit={handleSubmit} status={status} defaultInput={pendingInput ?? undefined} />
               </div>
             </div>
           </main>
