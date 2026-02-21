@@ -37,7 +37,7 @@ function getDateGroup(timestamp: number): string {
   const dayMs = 24 * 60 * 60 * 1000;
   const diff = Math.floor((nowMidnight.getTime() - sessionMidnight.getTime()) / dayMs);
 
-  if (diff === 0) return 'Today';
+  if (diff <= 0) return 'Today';
   if (diff === 1) return 'Yesterday';
   if (diff <= 7) return 'This Week';
   return 'Older';
@@ -73,10 +73,10 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
       const updated = latestSessions.filter(s => s.id !== sessionId);
       setSessions(updated);
       localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      console.error('Failed to delete session');
+      onDeleteSession(sessionId);
+    } catch (e) {
+      console.error('Failed to delete session:', e);
     }
-    onDeleteSession(sessionId);
   };
 
   const groupedSessions = useMemo(() => {
