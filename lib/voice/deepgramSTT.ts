@@ -42,6 +42,7 @@ function createDeepgramConnection(options: {
   let speaking = false;
   let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
   let pendingFinals: string[] = [];
+  let intentionalClose = false;
 
   const connection: ListenLiveClient = deepgram.listen.live({
     model,
@@ -99,9 +100,15 @@ function createDeepgramConnection(options: {
   });
 
   connection.on(LiveTranscriptionEvents.Close, () => {
-    if (keepaliveInterval) clearInterval(keepaliveInterval);
+    if (keepaliveInterval) {
+      clearInterval(keepaliveInterval);
+      keepaliveInterval = null;
+    }
     speaking = false;
-    onClose?.();
+    if (!intentionalClose) {
+      onClose?.();
+    }
+    intentionalClose = false;
   });
 
   return {
@@ -115,6 +122,7 @@ function createDeepgramConnection(options: {
         clearInterval(keepaliveInterval);
         keepaliveInterval = null;
       }
+      intentionalClose = true;
       connection.finish();
     },
     isSpeaking: () => speaking,

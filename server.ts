@@ -42,7 +42,11 @@ const sessions = new Map<WebSocket, VoiceSession>();
 
 function sendEvent(ws: WebSocket, event: VoiceEvent): void {
   if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(event));
+    try {
+      ws.send(JSON.stringify(event));
+    } catch {
+      // Socket closed between check and send
+    }
   }
 }
 
@@ -80,11 +84,7 @@ function startEncouragementTimer(session: VoiceSession): void {
   }, env.VOICE_ENCOURAGEMENT_MS);
 }
 
-async function processNextTurn(session: VoiceSession): Promise<void> {
-  if (session.processingLock || session.pendingTurns.length === 0) return;
-
-  const turn = session.pendingTurns.shift()!;
-  session.processingLock = true;
+async function consumeTurn(session: VoiceSession, turn: { text: string; timestamp: number }): Promise<void> {
   session.ttsAbort = null;
   session.agentAbort = new AbortController();
   session.agentChunks = [];
@@ -124,14 +124,24 @@ async function processNextTurn(session: VoiceSession): Promise<void> {
       sendEvent(session.ws, { type: 'error', message: 'Agent error' });
     }
   } finally {
-    session.processingLock = false;
     session.agentAbort = null;
     setAgentState(session, 'listening');
     startIdleTimer(session);
-    
-    if (session.pendingTurns.length > 0) {
-      await processNextTurn(session);
+  }
+}
+
+async function processNextTurn(session: VoiceSession): Promise<void> {
+  if (session.processingLock || session.pendingTurns.length === 0) return;
+
+  session.processingLock = true;
+
+  try {
+    while (session.pendingTurns.length > 0) {
+      const turn = session.pendingTurns.shift()!;
+      await consumeTurn(session, turn);
     }
+  } finally {
+    session.processingLock = false;
   }
 }
 
@@ -241,13 +251,21 @@ async function main() {
   });
 
   const shutdown = () => {
+    const forceExit = setTimeout(() => {
+      console.error('Forced exit: server.close() timed out');
+      process.exit(1);
+    }, 10000);
+
     for (const [ws, session] of sessions) {
       clearTimers(session);
       if (session.agentAbort) session.agentAbort.abort();
       if (session.ttsAbort) session.ttsAbort.abort();
       ws.close();
     }
-    server.close(() => process.exit(0));
+    server.close(() => {
+      clearTimeout(forceExit);
+      process.exit(0);
+    });
   };
 
   process.on('SIGTERM', shutdown);

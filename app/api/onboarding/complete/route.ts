@@ -3,6 +3,7 @@ import { access, readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { updateSettings, getSettings } from '@/lib/db/settings';
 import { errorResponse } from '@/lib/errors';
+import type { VoiceConfig } from '@/lib/voice/voiceTypes';
 
 interface ApiKeys {
   mongodbUri: string;
@@ -13,8 +14,6 @@ interface ApiKeys {
   tavilyApiKey: string;
   adminSecret: string;
 }
-
-import type { VoiceConfig } from '@/lib/voice/voiceTypes';
 
 function maskSecret(value: string | undefined): string {
   if (!value || value.length <= 4) return '****';

@@ -22,6 +22,7 @@ import {
 import { toast, Toaster } from 'sonner';
 import { Check, X, Shield, Loader2, Palette, ImageUp, Smile, Upload } from 'lucide-react';
 import { ColorPicker } from '@/components/ui/color-picker';
+import type { VoiceConfig } from '@/lib/voice/voiceTypes';
 
 interface BrandData {
   universityName: string;
@@ -79,8 +80,6 @@ interface ApiKeys {
   tavilyApiKey: string;
   adminSecret: string;
 }
-
-import type { VoiceConfig } from '@/lib/voice/voiceTypes';
 
 const VOICE_OPTIONS = [
   { value: 'nova', label: 'Nova (Female)' },
