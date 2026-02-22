@@ -1,5 +1,6 @@
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import type { ListenLiveClient } from '@deepgram/sdk';
+import { env } from '@/lib/env';
 
 interface DeepgramCallbacks {
   onSpeechStart: () => void;
@@ -49,8 +50,8 @@ function createDeepgramConnection(options: {
     sample_rate: sampleRate,
     channels: 1,
     interim_results: true,
-    endpointing: 300,
-    utterance_end_ms: 1200,
+    endpointing: env.VOICE_ENDPOINTING_MS,
+    utterance_end_ms: env.VOICE_UTTERANCE_END_MS,
   });
 
   connection.on(LiveTranscriptionEvents.Open, () => {

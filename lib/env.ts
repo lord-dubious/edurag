@@ -41,6 +41,8 @@ const envSchema = z.object({
   VOICE_TTS_BASE_URL: z.string().url().default('https://api.openai.com/v1'),
   VOICE_TTS_MODEL: z.string().default('tts-1'),
   VOICE_TTS_VOICE: z.string().default('nova'),
+  VOICE_ENDPOINTING_MS: z.coerce.number().default(300),
+  VOICE_UTTERANCE_END_MS: z.coerce.number().default(1200),
   VOICE_ENCOURAGEMENT_MS: z.coerce.number().default(2500),
   VOICE_IDLE_TIMEOUT_MS: z.coerce.number().default(8000),
 

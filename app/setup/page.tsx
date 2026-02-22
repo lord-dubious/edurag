@@ -266,8 +266,8 @@ export default function SetupPage() {
           excludePaths,
           externalUrls: externalUrls.map((e) => e.url),
           fileTypeRules,
-          apiKeys: {
-            ...apiKeys,
+          apiKeys,
+          voiceConfig: {
             deepgramApiKey: voiceConfig.deepgramApiKey,
             voiceTtsApiKey: voiceConfig.voiceTtsApiKey,
             voiceTtsBaseUrl: voiceConfig.voiceTtsBaseUrl,

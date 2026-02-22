@@ -19,3 +19,14 @@ export const DEFAULT_VOICE_CONFIG: Required<Omit<VoiceSessionConfig, 'deepgramAp
   language: 'en-US',
   sampleRate: 16000,
 };
+
+export interface AgentChunk {
+  type: 'agent_chunk';
+  text: string;
+}
+
+export interface AgentDone {
+  type: 'agent_done';
+}
+
+export type AgentOutput = AgentChunk | AgentDone;

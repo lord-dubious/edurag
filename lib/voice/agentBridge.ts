@@ -1,18 +1,8 @@
-import type { UIMessage } from 'ai';
 import { getHistory, appendMessage } from '@/lib/conversation';
-import type { Message } from '@/lib/conversation';
 import { runAgent } from '@/lib/agent';
-
-interface AgentChunk {
-  type: 'agent_chunk';
-  text: string;
-}
-
-interface AgentDone {
-  type: 'agent_done';
-}
-
-type AgentOutput = AgentChunk | AgentDone;
+import type { UIMessage } from 'ai';
+import type { Message } from '@/lib/conversation';
+import type { AgentChunk, AgentDone, AgentOutput } from './voiceTypes';
 
 async function* runVoiceAgent(
   input: string,

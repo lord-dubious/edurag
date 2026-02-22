@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { WebSocket } from 'ws';
 import { env } from '@/lib/env';
+import type { AgentOutput } from './voiceTypes';
 
 const SENTENCE_RE = /[.!?]\s/;
 const MAX_BUFFER = 120;
@@ -35,12 +36,12 @@ function getTTSClient(): OpenAI {
   return _ttsClient;
 }
 
-export type AgentChunk = { type: 'agent_chunk'; text: string } | { type: 'agent_done' };
+export type { AgentOutput as AgentChunk } from './voiceTypes';
 
 export function createChunkIterator(
-  chunks: AgentChunk[],
+  chunks: AgentOutput[],
   signal: AbortSignal
-): AsyncIterable<AgentChunk> {
+): AsyncIterable<AgentOutput> {
   return {
     [Symbol.asyncIterator]() {
       let i = 0;

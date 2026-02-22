@@ -7,8 +7,8 @@ import { nanoid } from 'nanoid';
 import { env } from '@/lib/env';
 import createDeepgramConnection from './lib/voice/deepgramSTT';
 import runVoiceAgent from './lib/voice/agentBridge';
-import { streamTTS } from './lib/voice/ttsStream';
-import type { AgentState, VoiceEvent } from './lib/voice/voiceTypes';
+import { streamTTS, createChunkIterator } from './lib/voice/ttsStream';
+import type { AgentOutput, AgentState, VoiceEvent } from './lib/voice/voiceTypes';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -33,7 +33,7 @@ interface VoiceSession {
   agentState: AgentState;
   idleTimer: ReturnType<typeof setTimeout> | null;
   encouragementTimer: ReturnType<typeof setTimeout> | null;
-  agentChunks: Array<{ type: 'agent_chunk'; text: string } | { type: 'agent_done' }>;
+  agentChunks: AgentOutput[];
 }
 
 const sessions = new Map<WebSocket, VoiceSession>();
@@ -101,7 +101,7 @@ async function processNextTurn(session: VoiceSession): Promise<void> {
           session.ttsAbort = new AbortController();
           setAgentState(session, 'speaking');
           clearTimers(session);
-          void streamTTS(session.agentChunks, session.ttsAbort.signal, session.ws);
+          void streamTTS(createChunkIterator(session.agentChunks, session.ttsAbort.signal), session.ttsAbort.signal, session.ws);
         }
       } else if (chunk.type === 'agent_done') {
         session.agentChunks.push({ type: 'agent_done' });
@@ -192,6 +192,10 @@ async function main() {
         setAgentState(session, 'listening');
         sendEvent(ws, { type: 'transcript', text: "Hi! How can I help you today?", isFinal: true });
         startIdleTimer(session);
+      },
+      onClose: () => {
+        sendEvent(ws, { type: 'error', message: 'Speech recognition connection lost' });
+        ws.close();
       },
     });
 
