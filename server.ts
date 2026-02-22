@@ -11,7 +11,7 @@ import { streamTTS, createChunkIterator } from './lib/voice/ttsStream';
 import type { AgentOutput, AgentState, VoiceEvent } from './lib/voice/voiceTypes';
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const hostname = process.env.HOST || process.env.HOSTNAME || '0.0.0.0';
 const port = parseInt(process.env.PORT || '3000', 10);
 
 const app = next({ dev, hostname, port });
@@ -29,11 +29,13 @@ interface VoiceSession {
   pendingTurns: PendingTurn[];
   interimTranscript: string;
   ttsAbort: AbortController | null;
+  agentAbort: AbortController | null;
   threadId: string;
   agentState: AgentState;
   idleTimer: ReturnType<typeof setTimeout> | null;
   encouragementTimer: ReturnType<typeof setTimeout> | null;
   agentChunks: AgentOutput[];
+  agentChunksDone: { value: boolean };
 }
 
 const sessions = new Map<WebSocket, VoiceSession>();
@@ -84,15 +86,15 @@ async function processNextTurn(session: VoiceSession): Promise<void> {
   const turn = session.pendingTurns.shift()!;
   session.processingLock = true;
   session.ttsAbort = null;
+  session.agentAbort = new AbortController();
   session.agentChunks = [];
+  session.agentChunksDone = { value: false };
 
   setAgentState(session, 'thinking');
   startEncouragementTimer(session);
 
   try {
-    const agentAbort = new AbortController();
-    
-    for await (const chunk of runVoiceAgent(turn.text, session.threadId, agentAbort.signal)) {
+    for await (const chunk of runVoiceAgent(turn.text, session.threadId, session.agentAbort.signal)) {
       if (chunk.type === 'agent_chunk') {
         session.agentChunks.push({ type: 'agent_chunk', text: chunk.text });
         sendEvent(session.ws, { type: 'transcript', text: chunk.text, isFinal: false });
@@ -101,11 +103,19 @@ async function processNextTurn(session: VoiceSession): Promise<void> {
           session.ttsAbort = new AbortController();
           setAgentState(session, 'speaking');
           clearTimers(session);
-          void streamTTS(createChunkIterator(session.agentChunks, session.ttsAbort.signal), session.ttsAbort.signal, session.ws);
         }
       } else if (chunk.type === 'agent_done') {
         session.agentChunks.push({ type: 'agent_done' });
+        session.agentChunksDone.value = true;
       }
+    }
+    
+    if (session.ttsAbort) {
+      await streamTTS(
+        createChunkIterator(session.agentChunks, session.ttsAbort.signal, session.agentChunksDone),
+        session.ttsAbort.signal,
+        session.ws
+      );
     }
   } catch (err) {
     if ((err as Error).name !== 'AbortError') {
@@ -113,20 +123,27 @@ async function processNextTurn(session: VoiceSession): Promise<void> {
     }
   } finally {
     session.processingLock = false;
+    session.agentAbort = null;
     setAgentState(session, 'listening');
     startIdleTimer(session);
     
     if (session.pendingTurns.length > 0) {
-      processNextTurn(session);
+      await processNextTurn(session);
     }
   }
 }
 
 function handleBargeIn(session: VoiceSession): void {
+  if (session.agentAbort) {
+    session.agentAbort.abort();
+    session.agentAbort = null;
+  }
   if (session.ttsAbort) {
     session.ttsAbort.abort();
     session.ttsAbort = null;
   }
+  session.agentChunks = [];
+  session.agentChunksDone = { value: false };
 }
 
 async function main() {
@@ -144,8 +161,6 @@ async function main() {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, req);
       });
-    } else {
-      socket.destroy();
     }
   });
 
@@ -157,16 +172,24 @@ async function main() {
       pendingTurns: [],
       interimTranscript: '',
       ttsAbort: null,
+      agentAbort: null,
       threadId: nanoid(),
       agentState: 'idle',
       idleTimer: null,
       encouragementTimer: null,
       agentChunks: [],
+      agentChunksDone: { value: false },
     };
     sessions.set(ws, session);
 
+    if (!env.DEEPGRAM_API_KEY) {
+      sendEvent(ws, { type: 'error', message: 'DEEPGRAM_API_KEY is not configured' });
+      ws.close();
+      return;
+    }
+
     const dg = createDeepgramConnection({
-      apiKey: env.DEEPGRAM_API_KEY!,
+      apiKey: env.DEEPGRAM_API_KEY,
       onSpeechStart: () => {
         clearTimers(session);
         handleBargeIn(session);
@@ -209,6 +232,7 @@ async function main() {
     ws.on('close', () => {
       dg.close();
       clearTimers(session);
+      if (session.agentAbort) session.agentAbort.abort();
       if (session.ttsAbort) session.ttsAbort.abort();
       sessions.delete(ws);
     });
@@ -217,6 +241,7 @@ async function main() {
   const shutdown = () => {
     for (const [ws, session] of sessions) {
       clearTimers(session);
+      if (session.agentAbort) session.agentAbort.abort();
       if (session.ttsAbort) session.ttsAbort.abort();
       ws.close();
     }

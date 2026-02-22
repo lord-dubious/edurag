@@ -267,12 +267,7 @@ export default function SetupPage() {
           externalUrls: externalUrls.map((e) => e.url),
           fileTypeRules,
           apiKeys,
-          voiceConfig: {
-            deepgramApiKey: voiceConfig.deepgramApiKey,
-            voiceTtsApiKey: voiceConfig.voiceTtsApiKey,
-            voiceTtsBaseUrl: voiceConfig.voiceTtsBaseUrl,
-            voiceTtsVoice: voiceConfig.voiceTtsVoice,
-          },
+          voiceConfig: { ...voiceConfig },
         }),
       });
 

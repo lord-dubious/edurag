@@ -40,7 +40,8 @@ export type { AgentOutput as AgentChunk } from './voiceTypes';
 
 export function createChunkIterator(
   chunks: AgentOutput[],
-  signal: AbortSignal
+  signal: AbortSignal,
+  doneFlag: { value: boolean }
 ): AsyncIterable<AgentOutput> {
   return {
     [Symbol.asyncIterator]() {
@@ -51,9 +52,11 @@ export function createChunkIterator(
           while (i < chunks.length) {
             return { done: false, value: chunks[i++] };
           }
-          await new Promise((r) => setTimeout(r, 50));
-          if (signal.aborted) return { done: true, value: undefined };
-          return { done: false, value: { type: 'agent_done' as const } };
+          if (doneFlag.value) {
+            return { done: false, value: { type: 'agent_done' as const } };
+          }
+          await new Promise((r) => setTimeout(r, 10));
+          return { done: true, value: undefined };
         },
       };
     },
@@ -106,12 +109,22 @@ export async function streamTTS(
       const reader = response.body?.getReader();
       if (!reader) continue;
 
-      while (!signal.aborted) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value && ws.readyState === 1) {
-          const base64 = Buffer.from(value).toString('base64');
-          ws.send(JSON.stringify({ type: 'agent_audio', audio: base64 }));
+      try {
+        while (!signal.aborted) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value && ws.readyState === 1) {
+            const base64 = Buffer.from(value).toString('base64');
+            ws.send(JSON.stringify({ type: 'agent_audio', audio: base64 }));
+          }
+        }
+      } finally {
+        if (signal.aborted) {
+          try {
+            await reader.cancel();
+          } catch {
+            // Ignore cancel errors
+          }
         }
       }
     } catch (err) {

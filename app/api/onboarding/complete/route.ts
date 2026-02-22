@@ -19,6 +19,7 @@ interface VoiceConfig {
   voiceTtsApiKey?: string;
   voiceTtsBaseUrl?: string;
   voiceTtsVoice?: string;
+  voiceTtsModel?: string;
 }
 
 function maskSecret(value: string | undefined): string {
@@ -84,6 +85,7 @@ async function writeEnvFile(apiKeys: ApiKeys, voiceConfig: VoiceConfig, settings
     VOICE_TTS_API_KEY: sanitizeEnvValue(voiceConfig.voiceTtsApiKey),
     VOICE_TTS_BASE_URL: sanitizeEnvValue(voiceConfig.voiceTtsBaseUrl),
     VOICE_TTS_VOICE: sanitizeEnvValue(voiceConfig.voiceTtsVoice),
+    VOICE_TTS_MODEL: sanitizeEnvValue(voiceConfig.voiceTtsModel),
     NEXT_PUBLIC_UNI_URL: sanitizeEnvValue(settings.uniUrl as string),
     BRAND_PRIMARY: sanitizeEnvValue(settings.brandPrimary as string),
     BRAND_SECONDARY: sanitizeEnvValue(settings.brandSecondary as string),
@@ -136,8 +138,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       return errorResponse('FORBIDDEN', 'Onboarding already completed', 403);
     }
 
-    const body = await request.json();
-const {
+const body = await request.json();
+    const {
       universityUrl,
       brandPrimary,
       brandSecondary,

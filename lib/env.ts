@@ -43,6 +43,7 @@ const envSchema = z.object({
   VOICE_TTS_VOICE: z.string().default('nova'),
   VOICE_ENDPOINTING_MS: z.coerce.number().default(300),
   VOICE_UTTERANCE_END_MS: z.coerce.number().default(1200),
+  VOICE_KEEPALIVE_MS: z.coerce.number().default(8000),
   VOICE_ENCOURAGEMENT_MS: z.coerce.number().default(2500),
   VOICE_IDLE_TIMEOUT_MS: z.coerce.number().default(8000),
 

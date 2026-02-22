@@ -21,7 +21,7 @@ export async function runAgent({
     }));
 
   if (voiceMode) {
-    system += '\n' + VOICE_SYSTEM_PROMPT_SUFFIX;
+    system += '\n\n' + VOICE_SYSTEM_PROMPT_SUFFIX;
   }
 
   console.log('[agent] Running agent with', messages.length, 'messages, maxSteps:', maxSteps, 'voiceMode:', voiceMode);

@@ -50,6 +50,7 @@ function createDeepgramConnection(options: {
     sample_rate: sampleRate,
     channels: 1,
     interim_results: true,
+    vad_events: true,
     endpointing: env.VOICE_ENDPOINTING_MS,
     utterance_end_ms: env.VOICE_UTTERANCE_END_MS,
   });
@@ -61,7 +62,7 @@ function createDeepgramConnection(options: {
       } catch {
         if (keepaliveInterval) clearInterval(keepaliveInterval);
       }
-    }, 8000);
+    }, env.VOICE_KEEPALIVE_MS);
     onReady();
   });
 
