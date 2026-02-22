@@ -14,6 +14,11 @@ interface ApiKeys {
   adminSecret: string;
 }
 
+function sanitizeEnvValue(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return value.replace(/[\n\r]/g, '');
+}
+
 function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>) {
   const envPath = path.join(process.cwd(), '.env.local');
   
@@ -36,19 +41,19 @@ function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>) {
   }
 
   const updates: Record<string, string | undefined> = {
-    MONGODB_URI: apiKeys.mongodbUri,
-    CHAT_API_KEY: apiKeys.chatApiKey,
-    CHAT_BASE_URL: apiKeys.chatBaseUrl,
-    CHAT_MODEL: apiKeys.chatModel,
-    EMBEDDING_API_KEY: apiKeys.embeddingApiKey,
-    TAVILY_API_KEY: apiKeys.tavilyApiKey,
-    ADMIN_TOKEN: apiKeys.adminSecret,
-    NEXT_PUBLIC_UNI_URL: settings.uniUrl as string,
-    BRAND_PRIMARY: settings.brandPrimary as string,
-    BRAND_SECONDARY: settings.brandSecondary as string,
-    BRAND_LOGO_URL: settings.brandLogoUrl as string,
-    BRAND_EMOJI: settings.emoji as string,
-    NEXT_PUBLIC_APP_NAME: settings.appName as string,
+    MONGODB_URI: sanitizeEnvValue(apiKeys.mongodbUri),
+    CHAT_API_KEY: sanitizeEnvValue(apiKeys.chatApiKey),
+    CHAT_BASE_URL: sanitizeEnvValue(apiKeys.chatBaseUrl),
+    CHAT_MODEL: sanitizeEnvValue(apiKeys.chatModel),
+    EMBEDDING_API_KEY: sanitizeEnvValue(apiKeys.embeddingApiKey),
+    TAVILY_API_KEY: sanitizeEnvValue(apiKeys.tavilyApiKey),
+    ADMIN_TOKEN: sanitizeEnvValue(apiKeys.adminSecret),
+    NEXT_PUBLIC_UNI_URL: sanitizeEnvValue(settings.uniUrl as string),
+    BRAND_PRIMARY: sanitizeEnvValue(settings.brandPrimary as string),
+    BRAND_SECONDARY: sanitizeEnvValue(settings.brandSecondary as string),
+    BRAND_LOGO_URL: sanitizeEnvValue(settings.brandLogoUrl as string),
+    BRAND_EMOJI: sanitizeEnvValue(settings.emoji as string),
+    NEXT_PUBLIC_APP_NAME: sanitizeEnvValue(settings.appName as string),
   };
 
   for (const [key, value] of Object.entries(updates)) {
@@ -66,6 +71,11 @@ function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>) {
 
 export async function POST(request: NextRequest) {
   try {
+    const existingSettings = await getSettings();
+    if (existingSettings?.onboarded) {
+      return errorResponse('VALIDATION_ERROR', 'Onboarding already completed', 400);
+    }
+
     const body = await request.json();
     const {
       universityUrl,
@@ -135,19 +145,19 @@ export async function POST(request: NextRequest) {
     await completeOnboarding();
 
     const envPreview = [
-      `MONGODB_URI=${apiKeys.mongodbUri}`,
-      `CHAT_API_KEY=${apiKeys.chatApiKey}`,
-      apiKeys.chatBaseUrl ? `CHAT_BASE_URL=${apiKeys.chatBaseUrl}` : null,
-      `CHAT_MODEL=${apiKeys.chatModel || 'llama-3.3-70b'}`,
-      `EMBEDDING_API_KEY=${apiKeys.embeddingApiKey}`,
-      `TAVILY_API_KEY=${apiKeys.tavilyApiKey}`,
-      `ADMIN_TOKEN=${apiKeys.adminSecret}`,
-      `NEXT_PUBLIC_UNI_URL=${universityUrl}`,
-      `BRAND_PRIMARY=${brandPrimary}`,
-      brandSecondary ? `BRAND_SECONDARY=${brandSecondary}` : null,
-      logoUrl ? `BRAND_LOGO_URL=${logoUrl}` : null,
-      emoji ? `BRAND_EMOJI=${emoji}` : null,
-      `NEXT_PUBLIC_APP_NAME=${universityName}`,
+      `MONGODB_URI=${sanitizeEnvValue(apiKeys.mongodbUri) || ''}`,
+      `CHAT_API_KEY=${sanitizeEnvValue(apiKeys.chatApiKey) || ''}`,
+      sanitizeEnvValue(apiKeys.chatBaseUrl) ? `CHAT_BASE_URL=${sanitizeEnvValue(apiKeys.chatBaseUrl)}` : null,
+      `CHAT_MODEL=${sanitizeEnvValue(apiKeys.chatModel) || process.env.CHAT_MODEL || 'llama-3.3-70b'}`,
+      `EMBEDDING_API_KEY=${sanitizeEnvValue(apiKeys.embeddingApiKey) || ''}`,
+      `TAVILY_API_KEY=${sanitizeEnvValue(apiKeys.tavilyApiKey) || ''}`,
+      `ADMIN_TOKEN=${sanitizeEnvValue(apiKeys.adminSecret) || ''}`,
+      `NEXT_PUBLIC_UNI_URL=${sanitizeEnvValue(universityUrl) || ''}`,
+      `BRAND_PRIMARY=${sanitizeEnvValue(brandPrimary) || ''}`,
+      sanitizeEnvValue(brandSecondary) ? `BRAND_SECONDARY=${sanitizeEnvValue(brandSecondary)}` : null,
+      sanitizeEnvValue(logoUrl) ? `BRAND_LOGO_URL=${sanitizeEnvValue(logoUrl)}` : null,
+      sanitizeEnvValue(emoji) ? `BRAND_EMOJI=${sanitizeEnvValue(emoji)}` : null,
+      `NEXT_PUBLIC_APP_NAME=${sanitizeEnvValue(universityName) || ''}`,
     ].filter(Boolean).join('\n');
 
     const response = NextResponse.json({ 

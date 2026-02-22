@@ -481,7 +481,7 @@ export default function SetupPage() {
                         <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
                           <input
                             type="file"
-                            accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                            accept="image/png,image/jpeg,image/jpg,image/webp"
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
@@ -533,7 +533,7 @@ export default function SetupPage() {
                               <div className="flex flex-col items-center gap-2">
                                 <Upload className="w-10 h-10 text-muted-foreground" />
                                 <p className="text-sm font-medium">Click to upload</p>
-                                <p className="text-xs text-muted-foreground">PNG, JPEG, SVG, WebP (max 5MB)</p>
+                                <p className="text-xs text-muted-foreground">PNG, JPEG, WebP (max 5MB)</p>
                               </div>
                             )}
                           </label>

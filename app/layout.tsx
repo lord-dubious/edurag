@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { BrandProvider } from "@/components/providers/BrandProvider";
+import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -36,10 +37,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <BrandProvider>
-            {children}
-            <Toaster position="bottom-right" />
-          </BrandProvider>
+          <ErrorBoundary>
+            <BrandProvider>
+              {children}
+              <Toaster position="bottom-right" />
+            </BrandProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </body>
     </html>
