@@ -22,7 +22,7 @@ interface CrawlOptions {
   onProgress?: (page: number, total: number) => void;
 }
 
-function cleanContent(raw: string | null | undefined): string {
+export function cleanContent(raw: string | null | undefined): string {
   if (!raw || typeof raw !== 'string') return '';
   try {
     return raw
@@ -48,7 +48,7 @@ function cleanContent(raw: string | null | undefined): string {
   }
 }
 
-function extractTitle(rawContent: string | null | undefined, url: string): string {
+export function extractTitle(rawContent: string | null | undefined, url: string): string {
   if (!rawContent) {
     try {
       const urlObj = new URL(url);

@@ -22,15 +22,15 @@ interface Props {
 function getDateGroup(timestamp: number, todayDateString: string): string {
   const sessionDate = new Date(timestamp);
   const sessionDateString = sessionDate.toDateString();
-  
+
   if (sessionDateString === todayDateString) return 'Today';
-  
+
   const now = new Date();
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
-  
+
   if (sessionDateString === yesterday.toDateString()) return 'Yesterday';
-  
+
   const sessionNoon = new Date(
     sessionDate.getFullYear(),
     sessionDate.getMonth(),
@@ -43,7 +43,7 @@ function getDateGroup(timestamp: number, todayDateString: string): string {
     now.getDate(),
     12, 0, 0, 0
   );
-  
+
   const dayMs = 24 * 60 * 60 * 1000;
   const diff = Math.round((nowNoon.getTime() - sessionNoon.getTime()) / dayMs);
 
@@ -64,13 +64,13 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
     const now = new Date();
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const msUntilMidnight = tomorrow.getTime() - now.getTime();
-    
+
     const timeout = setTimeout(() => {
       updateDateKey();
       const interval = setInterval(updateDateKey, 24 * 60 * 60 * 1000);
       return () => clearInterval(interval);
     }, msUntilMidnight);
-    
+
     return () => clearTimeout(timeout);
   }, []);
 
@@ -103,7 +103,7 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
     }
   };
 
-const groupedSessions = useMemo(() => {
+  const groupedSessions = useMemo(() => {
     const groups: Record<string, Session[]> = {};
     sessions.forEach((session) => {
       const group = getDateGroup(session.createdAt, todayDateString);
@@ -117,16 +117,15 @@ const groupedSessions = useMemo(() => {
 
   return (
     <aside
-      className={`border-r bg-background flex flex-col transition-all duration-200 overflow-hidden ${
-        collapsed ? 'w-0 opacity-0 pointer-events-none' : 'w-64'
-      }`}
+      className={`border-r bg-background flex flex-col transition-all duration-200 overflow-hidden ${collapsed ? 'w-0 opacity-0 pointer-events-none' : 'w-64'
+        }`}
     >
       <div className="p-3 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2">
-              <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
-              <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+              <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+              <path d="M6 12v5c3 3 9 3 12 0v-5" />
             </svg>
           </div>
           <span className="font-medium text-sm">EduRAG</span>
@@ -155,28 +154,25 @@ const groupedSessions = useMemo(() => {
                   <div
                     key={session.id}
                     onClick={() => onSelectSession(session.id)}
-                    className={`group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors ${
-                      session.id === currentThreadId
+                    className={`group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors ${session.id === currentThreadId
                         ? 'bg-primary/10'
                         : 'hover:bg-muted'
-                    }`}
+                      }`}
                   >
-                    <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 ${
-                      session.id === currentThreadId ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
-                    }`}>
+                    <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 ${session.id === currentThreadId ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+                      }`}>
                       <MessageSquareIcon className="w-3.5 h-3.5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className={`text-sm truncate ${
-                        session.id === currentThreadId ? 'text-primary font-medium' : ''
-                      }`}>
+                      <div className={`text-sm truncate ${session.id === currentThreadId ? 'text-primary font-medium' : ''
+                        }`}>
                         {session.title}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
                         {formatTime(session.createdAt)}
                       </div>
                     </div>
-<button
+                    <button
                       onClick={(e) => handleDelete(e, session.id)}
                       className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
                       title="Delete"
@@ -189,7 +185,7 @@ const groupedSessions = useMemo(() => {
             </div>
           );
         })}
-        
+
         {sessions.length === 0 && (
           <div className="text-center text-muted-foreground text-sm py-8">
             No conversations yet

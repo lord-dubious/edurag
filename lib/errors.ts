@@ -1,11 +1,14 @@
 export type AppErrorCode =
   | 'VALIDATION_ERROR'
   | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'AGENT_ERROR'
   | 'CRAWL_FAILED'
   | 'DB_ERROR'
-  | 'RATE_LIMITED';
+  | 'RATE_LIMITED'
+  | 'TIMEOUT'
+  | 'UPLOAD_FAILED';
 
 export interface AppError {
   error: string;

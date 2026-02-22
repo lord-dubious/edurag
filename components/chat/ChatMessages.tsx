@@ -184,7 +184,7 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
 
         return (
           <Fragment key={message.id}>
-            <Message from={message.role} className="animate-in fade-in slide-in-from-bottom-3 duration-300">
+            <Message from={message.role} className="animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-300">
               <MessageContent>
                 {message.parts.map((part, i) => {
                   if (part.type === 'text') {
@@ -233,7 +233,7 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
             )}
 
             {msgSources.length > 0 && message.role === 'assistant' && (
-              <div className="px-4 pb-2 space-y-3">
+              <div className="px-4 pb-2 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">
                 <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <FileTextIcon className="size-4" />
                   <span>Sources ({msgSources.length})</span>

@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { ThemeProvider } from 'next-themes';
+import { BrandProvider } from '@/components/providers/BrandProvider';
+import { Toaster } from '@/components/ui/sonner';
 
 export default async function AdminLayout({
   children,
@@ -21,12 +23,15 @@ export default async function AdminLayout({
       enableSystem
       disableTransitionOnChange
     >
-      <div className="min-h-screen bg-background">
-        <AdminSidebar />
-        <main className="ml-56 pt-14 min-h-screen">
-          <div className="p-6">{children}</div>
-        </main>
-      </div>
+      <BrandProvider>
+        <div className="min-h-screen bg-background">
+          <AdminSidebar />
+          <main className="ml-56 pt-14 min-h-screen">
+            <div className="p-6">{children}</div>
+          </main>
+        </div>
+        <Toaster position="bottom-right" />
+      </BrandProvider>
     </ThemeProvider>
   );
 }

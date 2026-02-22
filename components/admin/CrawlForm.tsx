@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
 import {
   Collapsible,
@@ -57,7 +57,7 @@ export function CrawlForm({ onSubmit, isLoading }: CrawlFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200 fill-mode-both">
       <div className="flex gap-4">
         <div className="flex-1">
           <div className="relative">
@@ -79,9 +79,9 @@ export function CrawlForm({ onSubmit, isLoading }: CrawlFormProps) {
 
       <Collapsible open={optionsOpen} onOpenChange={setOptionsOpen}>
         <CollapsibleTrigger asChild>
-          <Button 
-            type="button" 
-            variant="ghost" 
+          <Button
+            type="button"
+            variant="ghost"
             size="sm"
             className="text-muted-foreground"
           >
