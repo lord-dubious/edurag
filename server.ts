@@ -66,9 +66,9 @@ function startIdleTimer(session: VoiceSession): void {
   clearTimers(session);
   session.idleTimer = setTimeout(() => {
     if (session.agentState === 'listening') {
-      session.pendingTurns.push({ text: "Are you still there?", timestamp: Date.now() });
+      session.pendingTurns.push({ text: 'Are you still there?', timestamp: Date.now() });
       if (!session.processingLock && session.pendingTurns.length > 0) {
-        processNextTurn(session);
+        processNextTurn(session).catch((err) => console.error('processNextTurn error:', err));
       }
     }
   }, env.VOICE_IDLE_TIMEOUT_MS);
@@ -76,7 +76,7 @@ function startIdleTimer(session: VoiceSession): void {
 
 function startEncouragementTimer(session: VoiceSession): void {
   session.encouragementTimer = setTimeout(() => {
-    sendEvent(session.ws, { type: 'transcript', text: "Let me look that up...", isFinal: true });
+    sendEvent(session.ws, { type: 'transcript', text: 'Let me look that up...', isFinal: true });
   }, env.VOICE_ENCOURAGEMENT_MS);
 }
 
@@ -89,6 +89,7 @@ async function processNextTurn(session: VoiceSession): Promise<void> {
   session.agentAbort = new AbortController();
   session.agentChunks = [];
   session.agentChunksDone = { value: false };
+  let ttsPromise: Promise<void> | null = null;
 
   setAgentState(session, 'thinking');
   startEncouragementTimer(session);
@@ -103,6 +104,11 @@ async function processNextTurn(session: VoiceSession): Promise<void> {
           session.ttsAbort = new AbortController();
           setAgentState(session, 'speaking');
           clearTimers(session);
+          ttsPromise = streamTTS(
+            createChunkIterator(session.agentChunks, session.ttsAbort.signal, session.agentChunksDone),
+            session.ttsAbort.signal,
+            session.ws
+          );
         }
       } else if (chunk.type === 'agent_done') {
         session.agentChunks.push({ type: 'agent_done' });
@@ -110,12 +116,8 @@ async function processNextTurn(session: VoiceSession): Promise<void> {
       }
     }
     
-    if (session.ttsAbort) {
-      await streamTTS(
-        createChunkIterator(session.agentChunks, session.ttsAbort.signal, session.agentChunksDone),
-        session.ttsAbort.signal,
-        session.ws
-      );
+    if (ttsPromise) {
+      await ttsPromise;
     }
   } catch (err) {
     if ((err as Error).name !== 'AbortError') {
@@ -201,7 +203,7 @@ async function main() {
       onUtteranceEnd: (text) => {
         session.pendingTurns.push({ text, timestamp: Date.now() });
         if (!session.processingLock) {
-          processNextTurn(session);
+          processNextTurn(session).catch((err) => console.error('processNextTurn error:', err));
         }
       },
       onSpeechEnd: () => {
@@ -213,7 +215,7 @@ async function main() {
       onReady: () => {
         session.dgReady = true;
         setAgentState(session, 'listening');
-        sendEvent(ws, { type: 'transcript', text: "Hi! How can I help you today?", isFinal: true });
+        sendEvent(ws, { type: 'transcript', text: 'Hi! How can I help you today?', isFinal: true });
         startIdleTimer(session);
       },
       onClose: () => {

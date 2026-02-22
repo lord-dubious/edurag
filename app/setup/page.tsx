@@ -80,12 +80,7 @@ interface ApiKeys {
   adminSecret: string;
 }
 
-interface VoiceConfig {
-  deepgramApiKey: string;
-  voiceTtsApiKey: string;
-  voiceTtsBaseUrl: string;
-  voiceTtsVoice: string;
-}
+import type { VoiceConfig } from '@/lib/voice/voiceTypes';
 
 const VOICE_OPTIONS = [
   { value: 'nova', label: 'Nova (Female)' },
@@ -161,6 +156,7 @@ export default function SetupPage() {
     voiceTtsApiKey: '',
     voiceTtsBaseUrl: '',
     voiceTtsVoice: 'nova',
+    voiceTtsModel: '',
   });
   const [envPreview, setEnvPreview] = useState<string>('');
   const [isVercel, setIsVercel] = useState(false);

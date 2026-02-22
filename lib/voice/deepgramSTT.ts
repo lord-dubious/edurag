@@ -111,7 +111,10 @@ function createDeepgramConnection(options: {
       }
     },
     close: () => {
-      if (keepaliveInterval) clearInterval(keepaliveInterval);
+      if (keepaliveInterval) {
+        clearInterval(keepaliveInterval);
+        keepaliveInterval = null;
+      }
       connection.finish();
     },
     isSpeaking: () => speaking,

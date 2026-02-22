@@ -30,3 +30,11 @@ export interface AgentDone {
 }
 
 export type AgentOutput = AgentChunk | AgentDone;
+
+export interface VoiceConfig {
+  deepgramApiKey?: string;
+  voiceTtsApiKey?: string;
+  voiceTtsBaseUrl?: string;
+  voiceTtsVoice?: string;
+  voiceTtsModel?: string;
+}

@@ -14,13 +14,7 @@ interface ApiKeys {
   adminSecret: string;
 }
 
-interface VoiceConfig {
-  deepgramApiKey?: string;
-  voiceTtsApiKey?: string;
-  voiceTtsBaseUrl?: string;
-  voiceTtsVoice?: string;
-  voiceTtsModel?: string;
-}
+import type { VoiceConfig } from '@/lib/voice/voiceTypes';
 
 function maskSecret(value: string | undefined): string {
   if (!value || value.length <= 4) return '****';
@@ -138,7 +132,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       return errorResponse('FORBIDDEN', 'Onboarding already completed', 403);
     }
 
-const body = await request.json();
+    const body = await request.json();
     const {
       universityUrl,
       brandPrimary,
@@ -216,6 +210,7 @@ const body = await request.json();
       sanitizeEnvValue(voiceConfig?.voiceTtsApiKey) ? `VOICE_TTS_API_KEY=${maskSecret(voiceConfig.voiceTtsApiKey)}` : null,
       sanitizeEnvValue(voiceConfig?.voiceTtsBaseUrl) ? `VOICE_TTS_BASE_URL=${sanitizeEnvValue(voiceConfig.voiceTtsBaseUrl)}` : null,
       sanitizeEnvValue(voiceConfig?.voiceTtsVoice) ? `VOICE_TTS_VOICE=${sanitizeEnvValue(voiceConfig.voiceTtsVoice)}` : null,
+      sanitizeEnvValue(voiceConfig?.voiceTtsModel) ? `VOICE_TTS_MODEL=${sanitizeEnvValue(voiceConfig.voiceTtsModel)}` : null,
       `NEXT_PUBLIC_UNI_URL=${sanitizeEnvValue(universityUrl) || ''}`,
       `BRAND_PRIMARY=${sanitizeEnvValue(brandPrimary) || ''}`,
       sanitizeEnvValue(brandSecondary) ? `BRAND_SECONDARY=${sanitizeEnvValue(brandSecondary)}` : null,
