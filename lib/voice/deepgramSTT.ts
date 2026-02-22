@@ -1,5 +1,4 @@
-import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
-import type { ListenLiveClient } from '@deepgram/sdk';
+import { createClient, LiveTranscriptionEvents, type ListenLiveClient } from '@deepgram/sdk';
 import { env } from '@/lib/env';
 
 interface DeepgramCallbacks {
@@ -113,8 +112,12 @@ function createDeepgramConnection(options: {
 
   return {
     sendAudio: (audio: Buffer) => {
-      if (connection.isConnected()) {
-        connection.send(audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength));
+      try {
+        if (connection.isConnected()) {
+          connection.send(audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength));
+        }
+      } catch {
+        // Connection closed between check and send
       }
     },
     close: () => {

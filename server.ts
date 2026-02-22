@@ -1,17 +1,17 @@
 import 'dotenv/config';
+import next from 'next';
 import { createServer } from 'http';
 import { parse } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
-import next from 'next';
 import { nanoid } from 'nanoid';
 import { env } from '@/lib/env';
-import createDeepgramConnection from './lib/voice/deepgramSTT';
-import runVoiceAgent from './lib/voice/agentBridge';
-import { streamTTS, createChunkIterator } from './lib/voice/ttsStream';
-import type { AgentOutput, AgentState, VoiceEvent } from './lib/voice/voiceTypes';
+import createDeepgramConnection from '@/lib/voice/deepgramSTT';
+import runVoiceAgent from '@/lib/voice/agentBridge';
+import { streamTTS, createChunkIterator } from '@/lib/voice/ttsStream';
+import type { AgentOutput, AgentState, VoiceEvent } from '@/lib/voice/voiceTypes';
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = process.env.HOST || process.env.HOSTNAME || '0.0.0.0';
+const hostname = process.env.HOST || '0.0.0.0';
 const port = parseInt(process.env.PORT || '3000', 10);
 
 const app = next({ dev, hostname, port });
@@ -115,15 +115,20 @@ async function consumeTurn(session: VoiceSession, turn: { text: string; timestam
         session.agentChunksDone.value = true;
       }
     }
-    
-    if (ttsPromise) {
-      await ttsPromise;
-    }
   } catch (err) {
     if ((err as Error).name !== 'AbortError') {
       sendEvent(session.ws, { type: 'error', message: 'Agent error' });
     }
   } finally {
+    if (ttsPromise) {
+      try {
+        await ttsPromise;
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          console.error('TTS error:', err);
+        }
+      }
+    }
     session.agentAbort = null;
     setAgentState(session, 'listening');
     startIdleTimer(session);
@@ -206,11 +211,11 @@ async function main() {
         clearTimers(session);
         handleBargeIn(session);
       },
-      onInterim: (text) => {
+      onInterim: (text: string) => {
         session.interimTranscript = text;
         sendEvent(ws, { type: 'transcript', text, isFinal: false });
       },
-      onUtteranceEnd: (text) => {
+      onUtteranceEnd: (text: string) => {
         session.pendingTurns.push({ text, timestamp: Date.now() });
         if (!session.processingLock) {
           processNextTurn(session).catch((err) => console.error('processNextTurn error:', err));
@@ -219,7 +224,7 @@ async function main() {
       onSpeechEnd: () => {
         startIdleTimer(session);
       },
-      onError: (msg) => {
+      onError: (msg: string) => {
         sendEvent(ws, { type: 'error', message: msg });
       },
       onReady: () => {
