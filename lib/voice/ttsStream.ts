@@ -1,12 +1,14 @@
 import OpenAI from 'openai';
 import type { WebSocket } from 'ws';
 import { env } from '@/lib/env';
+import { createClient, LiveTTSEvents } from '@deepgram/sdk';
+import { getTTSConfig } from './ttsProvider';
 import type { AgentOutput } from './voiceTypes';
 
 const SENTENCE_RE = /[.!?]\s/;
 const MAX_BUFFER = 120;
 
-function cleanForSpeech(text: string): string {
+export function cleanForSpeech(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/\*(.+?)\*/g, '$1')
@@ -18,22 +20,6 @@ function cleanForSpeech(text: string): string {
     .replace(/\n+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-let _ttsClient: OpenAI | undefined;
-
-function getTTSClient(): OpenAI {
-  if (!_ttsClient) {
-    const apiKey = env.VOICE_TTS_API_KEY;
-    if (!apiKey) {
-      throw new Error('VOICE_TTS_API_KEY is not set');
-    }
-    _ttsClient = new OpenAI({
-      apiKey,
-      baseURL: env.VOICE_TTS_BASE_URL,
-    });
-  }
-  return _ttsClient;
 }
 
 export type { AgentOutput as AgentChunk } from './voiceTypes';
@@ -63,7 +49,7 @@ export function createChunkIterator(
   };
 }
 
-async function* chunkSentences(
+export async function* chunkSentences(
   source: AsyncIterable<{ type: 'agent_chunk'; text: string } | { type: 'agent_done' }>
 ): AsyncGenerator<string> {
   let buffer = '';
@@ -87,50 +73,139 @@ async function* chunkSentences(
   }
 }
 
+async function* streamDeepgramTTS(
+  textSource: AsyncIterable<string>,
+  model: string,
+  apiKey: string,
+  signal: AbortSignal
+): AsyncGenerator<Buffer> {
+  const dg = createClient(apiKey);
+  const pendingChunks: Buffer[] = [];
+  let resolveChunk: ((value: IteratorResult<Buffer>) => void) | null = null;
+  let done = false;
+
+  const connection = dg.speak.live({
+    model,
+    encoding: 'linear16',
+    sample_rate: 24000,
+  });
+
+  connection.on(LiveTTSEvents.Open, () => {
+    // Connection ready
+  });
+
+  connection.on(LiveTTSEvents.Audio, (data: Buffer) => {
+    if (resolveChunk) {
+      resolveChunk({ done: false, value: data });
+      resolveChunk = null;
+    } else {
+      pendingChunks.push(data);
+    }
+  });
+
+  connection.on(LiveTTSEvents.Error, (err: Error) => {
+    done = true;
+    if (resolveChunk) {
+      resolveChunk({ done: true, value: undefined });
+    }
+  });
+
+  connection.on(LiveTTSEvents.Close, () => {
+    done = true;
+    if (resolveChunk) {
+      resolveChunk({ done: true, value: undefined });
+    }
+  });
+
+  // Send text chunks
+  (async () => {
+    for await (const text of textSource) {
+      if (signal.aborted) break;
+      connection.sendText(text);
+    }
+    if (!signal.aborted) {
+      connection.flush();
+    }
+  })().catch(() => {});
+
+  // Yield audio chunks
+  while (!done && !signal.aborted) {
+    if (pendingChunks.length > 0) {
+      yield pendingChunks.shift()!;
+    } else {
+      await new Promise<void>((resolve) => {
+        resolveChunk = () => resolve();
+        setTimeout(() => resolve(), 100);
+      });
+    }
+  }
+
+  connection.requestClose();
+}
+
 export async function streamTTS(
   source: AsyncIterable<{ type: 'agent_chunk'; text: string } | { type: 'agent_done' }>,
   signal: AbortSignal,
   ws: WebSocket
 ): Promise<void> {
-  const client = getTTSClient();
+  const config = getTTSConfig();
+  if (!config) {
+    ws.send(JSON.stringify({ type: 'error', message: 'No TTS provider configured' }));
+    return;
+  }
 
-  for await (const sentence of chunkSentences(source)) {
-    if (signal.aborted) return;
-    if (!sentence) continue;
+  const sentenceStream = chunkSentences(source);
 
-    try {
-      const response = await client.audio.speech.create({
-        model: env.VOICE_TTS_MODEL,
-        voice: env.VOICE_TTS_VOICE,
-        input: sentence,
-        response_format: 'pcm',
-      });
+  if (config.provider === 'deepgram') {
+    // Deepgram streaming
+    for await (const chunk of streamDeepgramTTS(sentenceStream, config.model, config.apiKey, signal)) {
+      if (signal.aborted) return;
+      if (ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'agent_audio', audio: chunk.toString('base64') }));
+      }
+    }
+  } else {
+    // OpenAI-compatible
+    const client = new OpenAI({ apiKey: config.apiKey, baseURL: config.baseUrl });
 
-      const reader = response.body?.getReader();
-      if (!reader) continue;
+    for await (const sentence of sentenceStream) {
+      if (signal.aborted) return;
+      if (!sentence) continue;
 
       try {
-        while (!signal.aborted) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (value && ws.readyState === 1) {
-            const base64 = Buffer.from(value).toString('base64');
-            ws.send(JSON.stringify({ type: 'agent_audio', audio: base64 }));
+        const response = await client.audio.speech.create({
+          model: config.model,
+          voice: env.VOICE_TTS_VOICE || 'nova',
+          input: sentence,
+          response_format: 'pcm',
+        });
+
+        const reader = response.body?.getReader();
+        if (!reader) continue;
+
+        try {
+          while (!signal.aborted) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value && ws.readyState === 1) {
+              const base64 = Buffer.from(value).toString('base64');
+              ws.send(JSON.stringify({ type: 'agent_audio', audio: base64 }));
+            }
+          }
+        } finally {
+          if (signal.aborted) {
+            try {
+              await reader.cancel();
+            } catch {
+              // Ignore cancel errors
+            }
           }
         }
-      } finally {
-        if (signal.aborted) {
-          try {
-            await reader.cancel();
-          } catch {
-            // Ignore cancel errors
-          }
-        }
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        console.error('TTS error:', err);
+        ws.send(JSON.stringify({ type: 'error', message: 'TTS service temporarily unavailable' }));
       }
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-      console.error('TTS error:', err);
-      ws.send(JSON.stringify({ type: 'error', message: 'TTS service temporarily unavailable' }));
     }
   }
 }

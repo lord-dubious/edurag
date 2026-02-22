@@ -33,6 +33,7 @@ export type AgentOutput = AgentChunk | AgentDone;
 
 export interface VoiceConfig {
   deepgramApiKey?: string;
+  ttsProvider?: 'deepgram' | 'openai';
   voiceTtsApiKey?: string;
   voiceTtsBaseUrl?: string;
   voiceTtsVoice?: string;

@@ -82,15 +82,6 @@ interface ApiKeys {
   adminSecret: string;
 }
 
-const VOICE_OPTIONS = [
-  { value: 'nova', label: 'Nova (Female)' },
-  { value: 'alloy', label: 'Alloy (Neutral)' },
-  { value: 'echo', label: 'Echo (Male)' },
-  { value: 'fable', label: 'Fable (British)' },
-  { value: 'onyx', label: 'Onyx (Deep Male)' },
-  { value: 'shimmer', label: 'Shimmer (Female)' },
-] as const;
-
 const PRESET_COLORS = [
   { name: 'Blue', primary: '#2563eb', secondary: '#1e40af' },
   { name: 'Green', primary: '#16a34a', secondary: '#15803d' },
@@ -151,11 +142,14 @@ export default function SetupPage() {
   });
   const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>({
     deepgramApiKey: '',
+    ttsProvider: 'deepgram',
     voiceTtsApiKey: '',
     voiceTtsBaseUrl: '',
-    voiceTtsVoice: 'nova',
+    voiceTtsVoice: 'aura-2-andromeda-en',
     voiceTtsModel: '',
   });
+  const [voiceModels, setVoiceModels] = useState<{ name: string; description: string }[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [envPreview, setEnvPreview] = useState<string>('');
   const [isVercel, setIsVercel] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
@@ -166,6 +160,31 @@ export default function SetupPage() {
     document.documentElement.style.setProperty('--accent-mid', brandData.primaryColor + '80');
     document.documentElement.style.setProperty('--accent-glow', brandData.primaryColor + '40');
   }, [brandData.primaryColor]);
+
+  useEffect(() => {
+    async function fetchModels() {
+      if (!voiceConfig.deepgramApiKey) {
+        setVoiceModels([]);
+        return;
+      }
+      setLoadingModels(true);
+      try {
+        const res = await fetch('/api/voice/models', {
+          headers: {
+            'X-Deepgram-Key': voiceConfig.deepgramApiKey,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setVoiceModels(data.models || []);
+        }
+      } catch {
+        // Silently fail, use defaults
+      }
+      setLoadingModels(false);
+    }
+    fetchModels();
+  }, [voiceConfig.deepgramApiKey]);
 
   const startCrawl = useCallback(async () => {
     setLoading(true);
@@ -1117,17 +1136,21 @@ export default function SetupPage() {
                     <Label htmlFor="voiceTtsVoice">Voice</Label>
                     <Select
                       value={voiceConfig.voiceTtsVoice}
-                      onValueChange={(v) => setVoiceConfig((prev) => ({ ...prev, voiceTtsVoice: v }))}
+                      onValueChange={(value) => setVoiceConfig(prev => ({ ...prev, voiceTtsVoice: value }))}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue placeholder={loadingModels ? "Loading voices..." : "Select voice"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {VOICE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
+                        {voiceModels.length > 0 ? (
+                          voiceModels.map(model => (
+                            <SelectItem key={model.name} value={model.name}>
+                              {model.name.replace('aura-2-', '').replace('-en', '')}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="aura-2-andromeda-en">andromeda</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">Select the voice for AI responses</p>

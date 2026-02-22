@@ -37,6 +37,7 @@ const envSchema = z.object({
   CRAWL_FORMAT: z.enum(['markdown', 'text']).default('markdown'),
 
   DEEPGRAM_API_KEY: z.string().min(1).optional(),
+  VOICE_TTS_PROVIDER: z.enum(['deepgram', 'openai']).default('deepgram'),
   VOICE_TTS_API_KEY: z.string().min(1).optional(),
   VOICE_TTS_BASE_URL: z.string().url().default('https://api.openai.com/v1'),
   VOICE_TTS_MODEL: z.string().default('tts-1'),
