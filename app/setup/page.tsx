@@ -65,6 +65,7 @@ const STEPS = [
   { label: 'Branding', short: 'Brand' },
   { label: 'Crawl Scope', short: 'Scope' },
   { label: 'API Keys', short: 'Keys' },
+  { label: 'Voice', short: 'Voice' },
   { label: 'Crawling', short: 'Crawl' },
   { label: 'Review', short: 'Review' },
 ] as const;
@@ -78,6 +79,22 @@ interface ApiKeys {
   tavilyApiKey: string;
   adminSecret: string;
 }
+
+interface VoiceConfig {
+  deepgramApiKey: string;
+  voiceTtsApiKey: string;
+  voiceTtsBaseUrl: string;
+  voiceTtsVoice: string;
+}
+
+const VOICE_OPTIONS = [
+  { value: 'nova', label: 'Nova (Female)' },
+  { value: 'alloy', label: 'Alloy (Neutral)' },
+  { value: 'echo', label: 'Echo (Male)' },
+  { value: 'fable', label: 'Fable (British)' },
+  { value: 'onyx', label: 'Onyx (Deep Male)' },
+  { value: 'shimmer', label: 'Shimmer (Female)' },
+] as const;
 
 const PRESET_COLORS = [
   { name: 'Blue', primary: '#2563eb', secondary: '#1e40af' },
@@ -139,6 +156,12 @@ export default function SetupPage() {
     tavilyApiKey: '',
     adminSecret: '',
   });
+  const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>({
+    deepgramApiKey: '',
+    voiceTtsApiKey: '',
+    voiceTtsBaseUrl: '',
+    voiceTtsVoice: 'nova',
+  });
   const [envPreview, setEnvPreview] = useState<string>('');
   const [isVercel, setIsVercel] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
@@ -160,7 +183,7 @@ export default function SetupPage() {
       chunksCreated: 0,
       docsStored: 0,
     });
-    setStep(4);
+    setStep(5);
 
     try {
       const res = await fetch('/api/onboarding/crawl', {
@@ -204,7 +227,7 @@ export default function SetupPage() {
               const data: CrawlProgress = JSON.parse(line.slice(6));
               setCrawlProgress(data);
               if (data.phase === 'complete') {
-                setStep(5);
+                setStep(6);
               }
             } catch {
               // Skip invalid JSON
@@ -243,7 +266,13 @@ export default function SetupPage() {
           excludePaths,
           externalUrls: externalUrls.map((e) => e.url),
           fileTypeRules,
-          apiKeys,
+          apiKeys: {
+            ...apiKeys,
+            deepgramApiKey: voiceConfig.deepgramApiKey,
+            voiceTtsApiKey: voiceConfig.voiceTtsApiKey,
+            voiceTtsBaseUrl: voiceConfig.voiceTtsBaseUrl,
+            voiceTtsVoice: voiceConfig.voiceTtsVoice,
+          },
         }),
       });
 
@@ -263,7 +292,7 @@ export default function SetupPage() {
     } finally {
       setLoading(false);
     }
-  }, [universityUrl, brandData, router, crawlConfig, excludePaths, externalUrls, fileTypeRules, apiKeys]);
+  }, [universityUrl, brandData, router, crawlConfig, excludePaths, externalUrls, fileTypeRules, apiKeys, voiceConfig]);
 
   const addExternalUrl = () => {
     if (newExternalUrl && !externalUrls.some((e) => e.url === newExternalUrl)) {
@@ -1022,8 +1051,116 @@ export default function SetupPage() {
                   Back
                 </Button>
                 <Button
+                  onClick={() => setStep(4)}
+                  disabled={!apiKeys.mongodbUri || !apiKeys.chatApiKey || !apiKeys.embeddingApiKey || !apiKeys.tavilyApiKey || !apiKeys.adminSecret}
+                  style={{ backgroundColor: brandData.primaryColor }}
+                  className="text-white"
+                >
+                  Continue
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div>
+                <h2 className="text-2xl font-semibold">Voice Configuration</h2>
+                <p className="text-muted-foreground mt-1">
+                  Configure voice agent settings (optional)
+                </p>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Speech Recognition</CardTitle>
+                  <CardDescription>
+                    Deepgram API for real-time speech-to-text
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="deepgramApiKey">Deepgram API Key</Label>
+                    <Input
+                      id="deepgramApiKey"
+                      type="password"
+                      placeholder="your-deepgram-api-key"
+                      value={voiceConfig.deepgramApiKey}
+                      onChange={(e) => setVoiceConfig((prev) => ({ ...prev, deepgramApiKey: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Get your API key from console.deepgram.com</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Text-to-Speech</CardTitle>
+                  <CardDescription>
+                    Configure the TTS provider for AI voice responses
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="voiceTtsApiKey">TTS API Key</Label>
+                    <Input
+                      id="voiceTtsApiKey"
+                      type="password"
+                      placeholder="your-tts-api-key"
+                      value={voiceConfig.voiceTtsApiKey}
+                      onChange={(e) => setVoiceConfig((prev) => ({ ...prev, voiceTtsApiKey: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">OpenAI or compatible TTS API key</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="voiceTtsBaseUrl">TTS Base URL (Optional)</Label>
+                    <Input
+                      id="voiceTtsBaseUrl"
+                      placeholder="https://api.openai.com/v1"
+                      value={voiceConfig.voiceTtsBaseUrl}
+                      onChange={(e) => setVoiceConfig((prev) => ({ ...prev, voiceTtsBaseUrl: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Custom endpoint for TTS API (defaults to OpenAI)</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="voiceTtsVoice">Voice</Label>
+                    <Select
+                      value={voiceConfig.voiceTtsVoice}
+                      onValueChange={(v) => setVoiceConfig((prev) => ({ ...prev, voiceTtsVoice: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VOICE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Select the voice for AI responses</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Alert>
+                <Shield className="w-4 h-4" />
+                <AlertTitle>Optional Feature</AlertTitle>
+                <AlertDescription>
+                  Voice configuration is optional. You can skip this step if you don&apos;t need voice capabilities.
+                </AlertDescription>
+              </Alert>
+
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(3)}>
+                  Back
+                </Button>
+                <Button
                   onClick={startCrawl}
-                  disabled={loading || !apiKeys.mongodbUri || !apiKeys.chatApiKey || !apiKeys.embeddingApiKey || !apiKeys.tavilyApiKey || !apiKeys.adminSecret}
+                  disabled={loading}
                   style={{ backgroundColor: brandData.primaryColor }}
                   className="text-white"
                 >
@@ -1040,7 +1177,7 @@ export default function SetupPage() {
             </div>
           )}
 
-          {step === 4 && crawlProgress && (
+          {step === 5 && crawlProgress && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div>
                 <h1 className="text-2xl font-semibold">Crawling & Indexing</h1>
@@ -1104,7 +1241,7 @@ export default function SetupPage() {
             </div>
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div>
                 <h1 className="text-2xl font-semibold">Setup Complete!</h1>

@@ -1,36 +1,42 @@
 import 'dotenv/config';
 import { createServer } from 'http';
 import { parse } from 'url';
-import next from 'next';
 import { WebSocketServer, WebSocket } from 'ws';
-import { CreateDeepgramConnection } from './lib/voice/deepgramSTT';
+import next from 'next';
+import { nanoid } from 'nanoid';
+import { env } from '@/lib/env';
+import createDeepgramConnection from './lib/voice/deepgramSTT';
 import runVoiceAgent from './lib/voice/agentBridge';
 import { streamTTS } from './lib/voice/ttsStream';
-import type { VoiceEvent, AgentState } from './lib/voice/voiceTypes';
-import { env } from './lib/env';
+import type { AgentState, VoiceEvent } from './lib/voice/voiceTypes';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = parseInt(process.env.PORT || '3000', 10);
 
 const app = next({ dev, hostname, port });
-const handle = app.getRequestHandler();
+const handler = app.getRequestHandler();
 
 interface PendingTurn {
   text: string;
+  timestamp: number;
 }
 
 interface VoiceSession {
   ws: WebSocket;
-  deepgram: ReturnType<typeof CreateDeepgramConnection>;
+  dgReady: boolean;
   processingLock: boolean;
   pendingTurns: PendingTurn[];
   interimTranscript: string;
-  abortController: AbortController | null;
-  audioBuffer: Buffer[];
-  audioBufferSize: number;
+  ttsAbort: AbortController | null;
+  threadId: string;
   agentState: AgentState;
+  idleTimer: ReturnType<typeof setTimeout> | null;
+  encouragementTimer: ReturnType<typeof setTimeout> | null;
+  agentChunks: Array<{ type: 'agent_chunk'; text: string } | { type: 'agent_done' }>;
 }
+
+const sessions = new Map<WebSocket, VoiceSession>();
 
 function sendEvent(ws: WebSocket, event: VoiceEvent): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -43,272 +49,174 @@ function setAgentState(session: VoiceSession, state: AgentState): void {
   sendEvent(session.ws, { type: 'agent_state', state });
 }
 
-function splitIntoSentences(text: string): string[] {
-  const sentences: string[] = [];
-  let current = '';
-  let i = 0;
-
-  while (i < text.length) {
-    current += text[i];
-    const char = text[i];
-    
-    if (char === '.' || char === '!' || char === '?') {
-      if (i + 1 < text.length && text[i + 1] === ' ') {
-        sentences.push(current.trim());
-        current = '';
-        i++;
-      } else if (i + 1 >= text.length) {
-        sentences.push(current.trim());
-        current = '';
-      }
-    }
-    i++;
+function clearTimers(session: VoiceSession): void {
+  if (session.idleTimer) {
+    clearTimeout(session.idleTimer);
+    session.idleTimer = null;
   }
-
-  if (current.trim().length > 0) {
-    sentences.push(current.trim());
+  if (session.encouragementTimer) {
+    clearTimeout(session.encouragementTimer);
+    session.encouragementTimer = null;
   }
-
-  return sentences.filter(s => s.length > 0);
 }
 
-async function processTurn(session: VoiceSession, text: string): Promise<void> {
-  session.processingLock = true;
-  session.abortController = new AbortController();
-  session.audioBuffer = [];
-  session.audioBufferSize = 0;
-
-  setAgentState(session, 'thinking');
-
-  let fullText = '';
-
-  try {
-    await runVoiceAgent(
-      text,
-      async (chunk: string) => {
-        if (session.abortController?.signal.aborted) {
-          return;
-        }
-        fullText += chunk;
-
-        const sentences = splitIntoSentences(fullText);
-        if (sentences.length > 1) {
-          const sentenceToSpeak = sentences[0];
-          fullText = sentences.slice(1).join('. ') + (sentences.length > 1 ? '.' : '');
-
-          try {
-            setAgentState(session, 'speaking');
-            
-            for await (const audioChunk of streamTTS(sentenceToSpeak, session.abortController?.signal)) {
-              if (session.abortController?.signal.aborted) {
-                return;
-              }
-
-              if (session.audioBufferSize + audioChunk.length > 32768) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-              }
-
-              session.audioBuffer.push(audioChunk);
-              session.audioBufferSize += audioChunk.length;
-              sendEvent(session.ws, { type: 'agent_audio', audio: audioChunk.toString('base64') });
-            }
-          } catch {
-            // TTS error, continue
-          }
-        }
-      },
-      session.abortController.signal
-    );
-
-    if (fullText.trim().length > 0 && !session.abortController.signal.aborted) {
-      sendEvent(session.ws, { type: 'agent_state', state: 'speaking' as AgentState });
-      
-      for await (const audioChunk of streamTTS(fullText.trim(), session.abortController?.signal)) {
-        if (session.abortController?.signal.aborted) {
-          return;
-        }
-
-        if (session.audioBufferSize + audioChunk.length > 32768) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        session.audioBuffer.push(audioChunk);
-        session.audioBufferSize += audioChunk.length;
-        sendEvent(session.ws, { type: 'agent_audio', audio: audioChunk.toString('base64') });
+function startIdleTimer(session: VoiceSession): void {
+  clearTimers(session);
+  session.idleTimer = setTimeout(() => {
+    if (session.agentState === 'listening') {
+      session.pendingTurns.push({ text: "Are you still there?", timestamp: Date.now() });
+      if (!session.processingLock && session.pendingTurns.length > 0) {
+        processNextTurn(session);
       }
     }
+  }, env.VOICE_IDLE_TIMEOUT_MS);
+}
 
-    setAgentState(session, 'idle');
-  } catch (error) {
-    if (error instanceof Error && error.name !== 'AbortError') {
-      sendEvent(session.ws, { type: 'error', message: error.message });
+function startEncouragementTimer(session: VoiceSession): void {
+  session.encouragementTimer = setTimeout(() => {
+    sendEvent(session.ws, { type: 'transcript', text: "Let me look that up...", isFinal: true });
+  }, env.VOICE_ENCOURAGEMENT_MS);
+}
+
+async function processNextTurn(session: VoiceSession): Promise<void> {
+  if (session.processingLock || session.pendingTurns.length === 0) return;
+
+  const turn = session.pendingTurns.shift()!;
+  session.processingLock = true;
+  session.ttsAbort = null;
+  session.agentChunks = [];
+
+  setAgentState(session, 'thinking');
+  startEncouragementTimer(session);
+
+  try {
+    const agentAbort = new AbortController();
+    
+    for await (const chunk of runVoiceAgent(turn.text, session.threadId, agentAbort.signal)) {
+      if (chunk.type === 'agent_chunk') {
+        session.agentChunks.push({ type: 'agent_chunk', text: chunk.text });
+        sendEvent(session.ws, { type: 'transcript', text: chunk.text, isFinal: false });
+        
+        if (!session.ttsAbort && session.agentChunks.length > 0) {
+          session.ttsAbort = new AbortController();
+          setAgentState(session, 'speaking');
+          clearTimers(session);
+          void streamTTS(session.agentChunks, session.ttsAbort.signal, session.ws);
+        }
+      } else if (chunk.type === 'agent_done') {
+        session.agentChunks.push({ type: 'agent_done' });
+      }
+    }
+  } catch (err) {
+    if ((err as Error).name !== 'AbortError') {
+      sendEvent(session.ws, { type: 'error', message: 'Agent error' });
     }
   } finally {
     session.processingLock = false;
-    session.abortController = null;
-
+    setAgentState(session, 'listening');
+    startIdleTimer(session);
+    
     if (session.pendingTurns.length > 0) {
-      const nextTurn = session.pendingTurns.shift();
-      if (nextTurn) {
-        processTurn(session, nextTurn.text);
-      }
+      processNextTurn(session);
     }
   }
 }
 
 function handleBargeIn(session: VoiceSession): void {
-  if (session.abortController) {
-    session.abortController.abort();
-    session.abortController = null;
+  if (session.ttsAbort) {
+    session.ttsAbort.abort();
+    session.ttsAbort = null;
   }
-  session.audioBuffer = [];
-  session.audioBufferSize = 0;
 }
 
-function handleWebSocketConnection(ws: WebSocket): void {
-  const deepgramApiKey = env.DEEPGRAM_API_KEY;
-
-  if (!deepgramApiKey) {
-    sendEvent(ws, { type: 'error', message: 'DEEPGRAM_API_KEY is not configured' });
-    ws.close();
-    return;
-  }
-
-  const session: VoiceSession = {
-    ws,
-    deepgram: null as unknown as VoiceSession['deepgram'],
-    processingLock: false,
-    pendingTurns: [],
-    interimTranscript: '',
-    abortController: null,
-    audioBuffer: [],
-    audioBufferSize: 0,
-    agentState: 'idle',
-  };
-
-  session.deepgram = CreateDeepgramConnection({
-    apiKey: deepgramApiKey,
-    onTranscript: (result) => {
-      sendEvent(ws, { type: 'transcript', text: result.text, isFinal: result.isFinal });
-
-      if (result.isFinal) {
-        handleBargeIn(session);
-
-        const text = result.text.trim();
-        if (text.length > 0) {
-          if (session.processingLock) {
-            session.pendingTurns.push({ text });
-          } else {
-            processTurn(session, text);
-          }
-        }
-      } else {
-        session.interimTranscript = result.text;
-      }
-    },
-    onError: (message) => {
-      sendEvent(ws, { type: 'error', message });
-    },
-  });
-
-  setAgentState(session, 'listening');
-
-  ws.on('message', (data: Buffer, isBinary: boolean) => {
-    if (!isBinary || data.length < 1) {
-      return;
-    }
-
-    const messageType = data[0];
-    const payload = data.slice(1);
-
-    switch (messageType) {
-      case 0x01: {
-        try {
-          const json = JSON.parse(payload.toString());
-          if (json.type === 'audio' && typeof json.data === 'string') {
-            if (session.agentState !== 'speaking') {
-              const audioBuffer = Buffer.from(json.data, 'base64');
-              session.deepgram.sendAudio(audioBuffer);
-            }
-          }
-        } catch {
-          // Invalid message format
-        }
-        break;
-      }
-      case 0x02: {
-        session.interimTranscript = '';
-        break;
-      }
-    }
-  });
-
-  ws.on('close', () => {
-    handleBargeIn(session);
-    session.deepgram.close();
-  });
-
-  ws.on('error', () => {
-    handleBargeIn(session);
-    session.deepgram.close();
-  });
-}
-
-async function main(): Promise<void> {
+async function main() {
   await app.prepare();
-
   const server = createServer(async (req, res) => {
-    const parsedUrl = parse(req.url || '', true);
-    await handle(req, res, parsedUrl);
+    const parsedUrl = parse(req.url!, true);
+    await handler(req, res, parsedUrl);
   });
 
   const wss = new WebSocketServer({ noServer: true });
 
-  server.on('upgrade', (request, socket, head) => {
-    const { pathname } = parse(request.url || '', true);
-
-    if (pathname === '/api/voice' && request.method === 'GET') {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
+  server.on('upgrade', (req, socket, head) => {
+    const { pathname } = parse(req.url!, true);
+    if (pathname === '/api/voice') {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, req);
       });
     } else {
       socket.destroy();
     }
   });
 
-  wss.on('connection', (ws, request) => {
-    if (request.url?.startsWith('/api/voice')) {
-      handleWebSocketConnection(ws);
-    } else {
+  wss.on('connection', (ws) => {
+    const session: VoiceSession = {
+      ws,
+      dgReady: false,
+      processingLock: false,
+      pendingTurns: [],
+      interimTranscript: '',
+      ttsAbort: null,
+      threadId: nanoid(),
+      agentState: 'idle',
+      idleTimer: null,
+      encouragementTimer: null,
+      agentChunks: [],
+    };
+    sessions.set(ws, session);
+
+    const dg = createDeepgramConnection({
+      apiKey: env.DEEPGRAM_API_KEY!,
+      onSpeechStart: () => {
+        clearTimers(session);
+        handleBargeIn(session);
+      },
+      onInterim: (text) => {
+        session.interimTranscript = text;
+        sendEvent(ws, { type: 'transcript', text, isFinal: false });
+      },
+      onUtteranceEnd: (text) => {
+        session.pendingTurns.push({ text, timestamp: Date.now() });
+        if (!session.processingLock) {
+          processNextTurn(session);
+        }
+      },
+      onSpeechEnd: () => {
+        startIdleTimer(session);
+      },
+      onError: (msg) => {
+        sendEvent(ws, { type: 'error', message: msg });
+      },
+      onReady: () => {
+        session.dgReady = true;
+        setAgentState(session, 'listening');
+        sendEvent(ws, { type: 'transcript', text: "Hi! How can I help you today?", isFinal: true });
+        startIdleTimer(session);
+      },
+    });
+
+    ws.on('message', (data) => {
+      if (!session.dgReady || session.agentState === 'speaking') return;
+      if (Buffer.isBuffer(data)) {
+        dg.sendAudio(data);
+      }
+    });
+
+    ws.on('close', () => {
+      dg.close();
+      clearTimers(session);
+      if (session.ttsAbort) session.ttsAbort.abort();
+      sessions.delete(ws);
+    });
+  });
+
+  const shutdown = () => {
+    for (const [ws, session] of sessions) {
+      clearTimers(session);
+      if (session.ttsAbort) session.ttsAbort.abort();
       ws.close();
     }
-  });
-
-  const activeConnections = new Set<WebSocket>();
-
-  wss.on('connection', (ws) => {
-    activeConnections.add(ws);
-    ws.on('close', () => {
-      activeConnections.delete(ws);
-    });
-  });
-
-  const shutdown = (): void => {
-    console.log('Shutting down...');
-
-    activeConnections.forEach((ws) => {
-      ws.close(1001, 'Server shutting down');
-    });
-
-    wss.close(() => {
-      server.close(() => {
-        process.exit(0);
-      });
-    });
-
-    setTimeout(() => {
-      process.exit(1);
-    }, 10000);
+    server.close(() => process.exit(0));
   };
 
   process.on('SIGTERM', shutdown);
@@ -319,7 +227,7 @@ async function main(): Promise<void> {
   });
 }
 
-main().catch((error) => {
-  console.error('Failed to start server:', error);
+main().catch((err) => {
+  console.error(err);
   process.exit(1);
 });

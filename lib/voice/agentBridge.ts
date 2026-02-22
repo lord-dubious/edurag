@@ -1,11 +1,22 @@
 import { runAgent } from '@/lib/agent';
 import type { UIMessage } from 'ai';
 
-async function runVoiceAgent(
+interface AgentChunk {
+  type: 'agent_chunk';
+  text: string;
+}
+
+interface AgentDone {
+  type: 'agent_done';
+}
+
+type AgentOutput = AgentChunk | AgentDone;
+
+async function* runVoiceAgent(
   input: string,
-  onTextChunk: (text: string) => void,
+  threadId: string,
   signal?: AbortSignal
-): Promise<void> {
+): AsyncGenerator<AgentOutput> {
   const messages: UIMessage[] = [
     {
       id: crypto.randomUUID(),
@@ -16,16 +27,21 @@ async function runVoiceAgent(
 
   const result = await runAgent({
     messages,
-    threadId: undefined as unknown as string,
+    threadId,
     voiceMode: true,
   });
 
-  for await (const textPart of result.textStream) {
+  for await (const delta of result.textStream) {
     if (signal?.aborted) {
+      yield { type: 'agent_done' };
       return;
     }
-    onTextChunk(textPart);
+    if (delta) {
+      yield { type: 'agent_chunk', text: delta };
+    }
   }
+
+  yield { type: 'agent_done' };
 }
 
 export default runVoiceAgent;

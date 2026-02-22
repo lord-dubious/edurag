@@ -1,45 +1,41 @@
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
-import type { LiveTranscriptionEvent, ListenLiveClient } from '@deepgram/sdk';
-import { env } from '@/lib/env';
-import type { DEFAULT_VOICE_CONFIG } from './voiceTypes';
+import type { ListenLiveClient } from '@deepgram/sdk';
 
-export interface TranscriptResult {
-  text: string;
-  isFinal: boolean;
+interface DeepgramCallbacks {
+  onSpeechStart: () => void;
+  onInterim: (text: string) => void;
+  onUtteranceEnd: (text: string) => void;
+  onSpeechEnd: () => void;
+  onError: (message: string) => void;
+  onReady: () => void;
 }
 
-export interface DeepgramConnection {
+interface DeepgramConnection {
   sendAudio: (audio: Buffer) => void;
   close: () => void;
   isSpeaking: () => boolean;
 }
 
-export type OnTranscriptCallback = (result: TranscriptResult) => void;
-export type OnErrorCallback = (message: string) => void;
-
-export interface CreateDeepgramParams {
+function createDeepgramConnection(options: {
   apiKey: string;
-  onTranscript: OnTranscriptCallback;
-  onError: OnErrorCallback;
-  model?: typeof DEFAULT_VOICE_CONFIG.model;
+  model?: string;
   sampleRate?: number;
-  language?: typeof DEFAULT_VOICE_CONFIG.language;
-}
-
-export function CreateDeepgramConnection(params: CreateDeepgramParams): DeepgramConnection {
+  language?: string;
+} & DeepgramCallbacks): DeepgramConnection {
   const {
     apiKey,
-    onTranscript,
-    onError,
     model = 'nova-3',
     sampleRate = 16000,
     language = 'en-US',
-  } = params;
+    onSpeechStart,
+    onInterim,
+    onUtteranceEnd,
+    onSpeechEnd,
+    onError,
+    onReady,
+  } = options;
 
   const deepgram = createClient(apiKey);
-  const vadMs = env.VOICE_VAD_MS;
-  const keepaliveMs = env.VOICE_KEEPALIVE_MS;
-
   let speaking = false;
   let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
   let connection: ListenLiveClient;
@@ -51,87 +47,64 @@ export function CreateDeepgramConnection(params: CreateDeepgramParams): Deepgram
     sample_rate: sampleRate,
     channels: 1,
     interim_results: true,
-    endpointing: vadMs,
+    endpointing: 300,
+    utterance_end_ms: 1200,
   });
-
-  keepaliveInterval = setInterval(() => {
-    try {
-      if (connection.isConnected()) {
-        connection.keepAlive();
-      }
-    } catch {
-      if (keepaliveInterval) {
-        clearInterval(keepaliveInterval);
-        keepaliveInterval = null;
-      }
-    }
-  }, keepaliveMs);
 
   connection.on(LiveTranscriptionEvents.Open, () => {
-    speaking = true;
+    keepaliveInterval = setInterval(() => {
+      try {
+        connection.keepAlive();
+      } catch {
+        if (keepaliveInterval) clearInterval(keepaliveInterval);
+      }
+    }, 8000);
+    onReady();
   });
 
-  connection.on(LiveTranscriptionEvents.Transcript, (data: LiveTranscriptionEvent) => {
-    const transcript = data.channel?.alternatives?.[0]?.transcript;
-    const isFinal = data.is_final ?? false;
+  connection.on(LiveTranscriptionEvents.SpeechStarted, () => {
+    speaking = true;
+    onSpeechStart();
+  });
 
-    if (transcript && transcript.trim().length > 0) {
-      onTranscript({
-        text: transcript,
-        isFinal,
-      });
+  connection.on(LiveTranscriptionEvents.Transcript, (data: unknown) => {
+    const event = data as { type: string; channel?: { alternatives: Array<{ transcript: string }> }; is_final?: boolean };
+    const transcript = event.channel?.alternatives?.[0]?.transcript ?? '';
+    if (transcript) {
+      if (event.is_final) {
+        speaking = false;
+        onUtteranceEnd(transcript);
+        onSpeechEnd();
+      } else {
+        onInterim(transcript);
+      }
     }
+  });
+
+  connection.on(LiveTranscriptionEvents.Error, (err: unknown) => {
+    const message = err instanceof Error ? err.message : 'Deepgram error';
+    onError(message);
   });
 
   connection.on(LiveTranscriptionEvents.Close, () => {
+    if (keepaliveInterval) clearInterval(keepaliveInterval);
     speaking = false;
-    if (keepaliveInterval) {
-      clearInterval(keepaliveInterval);
-      keepaliveInterval = null;
-    }
-    onError('Deepgram connection closed');
-  });
-
-  connection.on(LiveTranscriptionEvents.Error, (error: unknown) => {
-    speaking = false;
-    if (keepaliveInterval) {
-      clearInterval(keepaliveInterval);
-      keepaliveInterval = null;
-    }
-    let message: string;
-    if (typeof error === 'string') {
-      message = error;
-    } else if (error instanceof Error) {
-      message = error.message;
-    } else if (typeof error === 'object' && error !== null && 'message' in error) {
-      message = String((error as { message: unknown }).message);
-    } else {
-      message = 'Unknown Deepgram error';
-    }
-    onError(message);
   });
 
   return {
     sendAudio: (audio: Buffer) => {
-      try {
+      if (connection.isConnected()) {
         connection.send(audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength));
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to send audio';
-        onError(message);
       }
     },
     close: () => {
-      speaking = false;
-      if (keepaliveInterval) {
-        clearInterval(keepaliveInterval);
-        keepaliveInterval = null;
-      }
-      try {
-        connection.requestClose();
-      } catch {
-        // Connection may already be closed
-      }
+      if (keepaliveInterval) clearInterval(keepaliveInterval);
+      connection.finish();
     },
     isSpeaking: () => speaking,
   };
 }
+
+export default createDeepgramConnection;
+
+export type { DeepgramCallbacks, DeepgramConnection };

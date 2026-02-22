@@ -12,6 +12,10 @@ interface ApiKeys {
   embeddingApiKey: string;
   tavilyApiKey: string;
   adminSecret: string;
+  deepgramApiKey?: string;
+  voiceTtsApiKey?: string;
+  voiceTtsBaseUrl?: string;
+  voiceTtsVoice?: string;
 }
 
 function maskSecret(value: string | undefined): string {
@@ -73,6 +77,10 @@ async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>)
     EMBEDDING_API_KEY: sanitizeEnvValue(apiKeys.embeddingApiKey),
     TAVILY_API_KEY: sanitizeEnvValue(apiKeys.tavilyApiKey),
     ADMIN_TOKEN: sanitizeEnvValue(apiKeys.adminSecret),
+    DEEPGRAM_API_KEY: sanitizeEnvValue(apiKeys.deepgramApiKey),
+    VOICE_TTS_API_KEY: sanitizeEnvValue(apiKeys.voiceTtsApiKey),
+    VOICE_TTS_BASE_URL: sanitizeEnvValue(apiKeys.voiceTtsBaseUrl),
+    VOICE_TTS_VOICE: sanitizeEnvValue(apiKeys.voiceTtsVoice),
     NEXT_PUBLIC_UNI_URL: sanitizeEnvValue(settings.uniUrl as string),
     BRAND_PRIMARY: sanitizeEnvValue(settings.brandPrimary as string),
     BRAND_SECONDARY: sanitizeEnvValue(settings.brandSecondary as string),
@@ -198,6 +206,10 @@ export async function POST(request: NextRequest): Promise<Response> {
       `EMBEDDING_API_KEY=${maskSecret(apiKeys.embeddingApiKey)}`,
       `TAVILY_API_KEY=${maskSecret(apiKeys.tavilyApiKey)}`,
       `ADMIN_TOKEN=${maskSecret(apiKeys.adminSecret)}`,
+      sanitizeEnvValue(apiKeys.deepgramApiKey) ? `DEEPGRAM_API_KEY=${maskSecret(apiKeys.deepgramApiKey)}` : null,
+      sanitizeEnvValue(apiKeys.voiceTtsApiKey) ? `VOICE_TTS_API_KEY=${maskSecret(apiKeys.voiceTtsApiKey)}` : null,
+      sanitizeEnvValue(apiKeys.voiceTtsBaseUrl) ? `VOICE_TTS_BASE_URL=${sanitizeEnvValue(apiKeys.voiceTtsBaseUrl)}` : null,
+      sanitizeEnvValue(apiKeys.voiceTtsVoice) ? `VOICE_TTS_VOICE=${sanitizeEnvValue(apiKeys.voiceTtsVoice)}` : null,
       `NEXT_PUBLIC_UNI_URL=${sanitizeEnvValue(universityUrl) || ''}`,
       `BRAND_PRIMARY=${sanitizeEnvValue(brandPrimary) || ''}`,
       sanitizeEnvValue(brandSecondary) ? `BRAND_SECONDARY=${sanitizeEnvValue(brandSecondary)}` : null,
