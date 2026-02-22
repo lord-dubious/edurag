@@ -36,6 +36,16 @@ const envSchema = z.object({
   CRAWL_ALLOW_EXTERNAL: z.coerce.boolean().default(false),
   CRAWL_FORMAT: z.enum(['markdown', 'text']).default('markdown'),
 
+  DEEPGRAM_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  VOICE_TTS_PROVIDER: z.string().default('openai'),
+  VOICE_TTS_MODEL: z.string().default('tts-1'),
+  VOICE_TTS_VOICE: z.string().default('alloy'),
+  VOICE_TTS_SPEED: z.coerce.number().optional(),
+  VOICE_VAD_MS: z.coerce.number().default(500),
+  VOICE_KEEPALIVE_MS: z.coerce.number().default(8000),
+  VOICE_MAX_TURN_MS: z.coerce.number().default(30000),
+
   ADMIN_SECRET: z.string().min(16).optional(),
   NEXT_PUBLIC_APP_NAME: z.string().default('University Knowledge Base'),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),

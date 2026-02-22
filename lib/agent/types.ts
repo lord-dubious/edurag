@@ -6,6 +6,7 @@ export interface AgentOptions {
   universityName?: string;
   extraTools?: Record<string, unknown>;
   maxSteps?: number;
+  voiceMode?: boolean;
 }
 
 export interface Source {

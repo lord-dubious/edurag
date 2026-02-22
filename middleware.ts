@@ -4,6 +4,10 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  if (pathname.startsWith('/api/voice')) {
+    return NextResponse.next();
+  }
+
   const onboardedCookie = request.cookies.get('edurag_onboarded')?.value;
   const hasEnvUrl = !!process.env.NEXT_PUBLIC_UNI_URL;
   const isOnboarded = onboardedCookie === 'true' || hasEnvUrl;

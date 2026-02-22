@@ -82,3 +82,5 @@ Do not make up specific figures or dates — speak in general terms if you lack 
 Question: {QUESTION}`;
 
 export const DEFAULT_CRAWL_INSTRUCTIONS = `Focus on academic programs, admissions, tuition, scholarships, student services, and campus information. Prioritize official pages over news or event listings. Skip login pages, admin sections, and internal search results.`;
+
+export const VOICE_SYSTEM_PROMPT_SUFFIX = `When responding, speak naturally as if in a phone conversation. Use plain prose without markdown formatting, bullet points, or numbered lists. Avoid citations or references in brackets. Keep responses concise and conversational. If you need to list items, speak them naturally with connecting words like "first", "secondly", "and finally".`;
