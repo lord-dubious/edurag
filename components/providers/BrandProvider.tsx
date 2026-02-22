@@ -23,7 +23,7 @@ const BrandContext = createContext<BrandContextType>({
   loading: true,
 });
 
-export function useBrand() {
+export function useBrand(): BrandContextType {
   return useContext(BrandContext);
 }
 
@@ -38,7 +38,12 @@ const DEFAULT_BRAND: BrandSettings = {
   onboarded: false,
 };
 
-function hexToOkLCH(hex: string): string {
+/**
+ * Approximates OKLCH color space from hex.
+ * This is a lightweight approximation, not a true OKLCH conversion.
+ * For accurate OKLCH, use a library like culori or colorjs.io.
+ */
+function hexToApproxOklch(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;
@@ -77,12 +82,25 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [brand, setBrand] = useState<BrandSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
+interface OnboardingStatusResponse {
+  isOnboarded: boolean;
+  settings?: {
+    appName?: string;
+    brandPrimary?: string;
+    brandSecondary?: string;
+    brandLogoUrl?: string;
+    emoji?: string;
+    iconType?: 'logo' | 'emoji' | 'upload';
+    showTitle?: boolean;
+  };
+}
+
   useEffect(() => {
     async function fetchBrand() {
       try {
         const res = await fetch('/api/onboarding/status');
         if (res.ok) {
-          const data = await res.json();
+          const data: OnboardingStatusResponse = await res.json();
           if (data.isOnboarded && data.settings) {
             const settings = data.settings;
             const brandSettings: BrandSettings = {
@@ -120,14 +138,14 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function applyBrandColors(brand: BrandSettings) {
+function applyBrandColors(brand: BrandSettings): void {
   const root = document.documentElement;
-  const primaryOkLCH = hexToOkLCH(brand.primaryColor);
-  const secondaryOkLCH = hexToOkLCH(brand.secondaryColor);
+  const primaryOkLCH = hexToApproxOklch(brand.primaryColor);
+  const secondaryOkLCH = hexToApproxOklch(brand.secondaryColor);
 
   root.style.setProperty('--primary', primaryOkLCH);
+  root.style.setProperty('--secondary', secondaryOkLCH);
   root.style.setProperty('--accent', primaryOkLCH);
-  root.style.setProperty('--accent-light', primaryOkLCH);
   root.style.setProperty('--accent-glow', primaryOkLCH);
   root.style.setProperty('--sidebar-primary', primaryOkLCH);
 

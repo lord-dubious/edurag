@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { errorResponse } from '@/lib/errors';
@@ -40,11 +39,17 @@ function detectMimeType(buffer: Buffer): string | null {
 export async function POST(request: NextRequest): Promise<Response> {
   try {
     const formData = await request.formData();
-    const file = formData.get('file') as File | null;
+    const rawFile = formData.get('file');
 
-    if (!file) {
+    if (!rawFile) {
       return errorResponse('VALIDATION_ERROR', 'No file provided', 400);
     }
+
+    if (!(rawFile instanceof File)) {
+      return errorResponse('VALIDATION_ERROR', 'Invalid file type', 400);
+    }
+
+    const file = rawFile;
 
     const ext = path.extname(file.name).toLowerCase();
     const allowedExtensions = Object.values(ALLOWED_TYPES).flat();
@@ -69,12 +74,10 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    await mkdir(uploadDir, { recursive: true });
 
     const uuid = randomUUID();
-    const extension = Object.entries(ALLOWED_TYPES).find(([_, exts]) => exts.includes(ext))?.[0]?.split('/')[1] || 'png';
+    const extension = detectedType.split('/')[1] || 'png';
     const fileName = `logo-${uuid}.${extension}`;
     const filePath = path.join(uploadDir, fileName);
 

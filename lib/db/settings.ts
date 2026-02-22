@@ -1,4 +1,4 @@
-import { getMongoCollection } from '../vectorstore';
+import { getMongoCollection } from '@/lib/vectorstore';
 
 export interface OnboardingSettings {
   _id: string;

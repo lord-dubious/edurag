@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateSettings, getSettings, completeOnboarding } from '@/lib/db/settings';
-import { errorResponse } from '@/lib/errors';
-import { writeFileSync, existsSync, readFileSync } from 'fs';
+import { access, readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import { updateSettings, getSettings } from '@/lib/db/settings';
+import { errorResponse } from '@/lib/errors';
 
 interface ApiKeys {
   mongodbUri: string;
@@ -14,19 +14,32 @@ interface ApiKeys {
   adminSecret: string;
 }
 
+function maskSecret(value: string | undefined): string {
+  if (!value || value.length <= 4) return '****';
+  return '*'.repeat(value.length - 4) + value.slice(-4);
+}
+
 function sanitizeEnvValue(value: string | undefined): string | undefined {
   if (!value) return undefined;
   return value.replace(/[\n\r]/g, '');
 }
 
-type EnvEntry = { type: 'comment'; text: string } | { type: 'kv'; key: string; value: string };
+type EnvEntry = { type: 'comment'; text: string } | { type: 'kv'; key: string; value: string } | { type: 'blank' };
 
-function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>) {
+async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>): Promise<{ success: boolean; skipped: boolean; error?: string }> {
+  const isVercel = process.env.VERCEL === '1';
+  if (isVercel) {
+    return { success: false, skipped: true };
+  }
+
   const envPath = path.join(process.cwd(), '.env.local');
   
   let existingEnv = '';
-  if (existsSync(envPath)) {
-    existingEnv = readFileSync(envPath, 'utf-8');
+  try {
+    await access(envPath);
+    existingEnv = await readFile(envPath, 'utf-8');
+  } catch {
+    // File doesn't exist, that's fine
   }
 
   const lines = existingEnv.split('\n');
@@ -36,6 +49,7 @@ function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) {
+      entries.push({ type: 'blank' });
       continue;
     }
     if (trimmed.startsWith('#')) {
@@ -86,19 +100,29 @@ function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>) {
       if (entry.type === 'comment') {
         return entry.text;
       }
+      if (entry.type === 'blank') {
+        return '';
+      }
       const updatedValue = envMap.get(entry.key);
       return `${entry.key}=${updatedValue ?? entry.value}`;
     })
     .join('\n');
 
-  writeFileSync(envPath, newContent + '\n');
+  try {
+    const envDir = path.dirname(envPath);
+    await mkdir(envDir, { recursive: true });
+    await writeFile(envPath, newContent + '\n');
+    return { success: true, skipped: false };
+  } catch (err) {
+    return { success: false, skipped: false, error: String(err) };
+  }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<Response> {
   try {
     const existingSettings = await getSettings();
     if (existingSettings?.onboarded) {
-      return errorResponse('VALIDATION_ERROR', 'Onboarding already completed', 400);
+      return errorResponse('FORBIDDEN', 'Onboarding already completed', 403);
     }
 
     const body = await request.json();
@@ -161,22 +185,19 @@ export async function POST(request: NextRequest) {
 
     await updateSettings(settings);
 
-    try {
-      writeEnvFile(apiKeys, settings);
-    } catch (writeError) {
-      console.error('Failed to write .env.local:', writeError);
+    const writeResult = await writeEnvFile(apiKeys, settings);
+    if (!writeResult.success && !writeResult.skipped) {
+      console.error('Failed to write .env.local:', writeResult.error);
     }
 
-    await completeOnboarding();
-
     const envPreview = [
-      `MONGODB_URI=${sanitizeEnvValue(apiKeys.mongodbUri) || ''}`,
-      `CHAT_API_KEY=${sanitizeEnvValue(apiKeys.chatApiKey) || ''}`,
+      `MONGODB_URI=${maskSecret(apiKeys.mongodbUri)}`,
+      `CHAT_API_KEY=${maskSecret(apiKeys.chatApiKey)}`,
       sanitizeEnvValue(apiKeys.chatBaseUrl) ? `CHAT_BASE_URL=${sanitizeEnvValue(apiKeys.chatBaseUrl)}` : null,
       `CHAT_MODEL=${sanitizeEnvValue(apiKeys.chatModel) || process.env.CHAT_MODEL || 'llama-3.3-70b'}`,
-      `EMBEDDING_API_KEY=${sanitizeEnvValue(apiKeys.embeddingApiKey) || ''}`,
-      `TAVILY_API_KEY=${sanitizeEnvValue(apiKeys.tavilyApiKey) || ''}`,
-      `ADMIN_TOKEN=${sanitizeEnvValue(apiKeys.adminSecret) || ''}`,
+      `EMBEDDING_API_KEY=${maskSecret(apiKeys.embeddingApiKey)}`,
+      `TAVILY_API_KEY=${maskSecret(apiKeys.tavilyApiKey)}`,
+      `ADMIN_TOKEN=${maskSecret(apiKeys.adminSecret)}`,
       `NEXT_PUBLIC_UNI_URL=${sanitizeEnvValue(universityUrl) || ''}`,
       `BRAND_PRIMARY=${sanitizeEnvValue(brandPrimary) || ''}`,
       sanitizeEnvValue(brandSecondary) ? `BRAND_SECONDARY=${sanitizeEnvValue(brandSecondary)}` : null,
@@ -189,6 +210,7 @@ export async function POST(request: NextRequest) {
       success: true,
       envPreview,
       isVercel: process.env.VERCEL === '1',
+      envWritten: writeResult.success,
     });
     response.cookies.set('edurag_onboarded', 'true', {
       httpOnly: true,
@@ -203,7 +225,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(): Promise<Response> {
   try {
     const settings = await getSettings();
     return NextResponse.json({

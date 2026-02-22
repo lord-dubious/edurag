@@ -1,9 +1,10 @@
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { tavily } from '@tavily/core';
 import { env } from '@/lib/env';
 import { getMongoCollection } from '@/lib/vectorstore';
 import { getEmbeddings } from '@/lib/providers';
 import { cleanContent, extractTitle } from '@/lib/crawl';
+import { errorResponse } from '@/lib/errors';
 
 interface CrawlProgress {
   phase: 'preparing' | 'crawling' | 'chunking' | 'embedding' | 'storing' | 'complete' | 'error';
@@ -22,22 +23,20 @@ interface FileTypeRules {
   csv: 'index' | 'skip';
 }
 
-function sendProgress(controller: ReadableStreamDefaultController, data: CrawlProgress) {
+function sendProgress(controller: ReadableStreamDefaultController, data: CrawlProgress): void {
   const encoder = new TextEncoder();
   controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
 }
 
 function chunkText(text: string, chunkSize: number, overlap: number): string[] {
-  if (overlap >= chunkSize) {
-    overlap = Math.floor(chunkSize / 4);
-  }
+  const effectiveOverlap = overlap >= chunkSize ? Math.floor(chunkSize / 4) : overlap;
   const chunks: string[] = [];
   let start = 0;
   while (start < text.length) {
     const end = Math.min(start + chunkSize, text.length);
     chunks.push(text.slice(start, end));
     if (end === text.length) break;
-    start = end - overlap;
+    start = end - effectiveOverlap;
   }
   return chunks;
 }
@@ -50,14 +49,25 @@ function shouldSkipFile(url: string, fileTypeRules: FileTypeRules): boolean {
   return false;
 }
 
-export async function POST(request: NextRequest) {
-  const body = await request.json();
+interface CrawlRequestBody {
+  universityUrl: string;
+  externalUrls?: string[];
+  excludePaths?: string[];
+  crawlConfig?: { maxDepth?: number; limit?: number };
+  fileTypeRules?: FileTypeRules;
+  crawlerInstructions?: string;
+}
+
+export async function POST(request: NextRequest): Promise<Response> {
+  const rawBody = await request.json();
+  const body: CrawlRequestBody = typeof rawBody === 'object' && rawBody !== null ? rawBody : {};
+  
   const { 
     universityUrl, 
-    externalUrls = [] as string[], 
-    excludePaths = [] as string[],
-    crawlConfig = { maxDepth: 3, limit: 300 } as { maxDepth?: number; limit?: number },
-    fileTypeRules = { pdf: 'index', docx: 'index', csv: 'skip' } as FileTypeRules,
+    externalUrls = [], 
+    excludePaths = [],
+    crawlConfig = { maxDepth: 3, limit: 300 },
+    fileTypeRules = { pdf: 'index', docx: 'index', csv: 'skip' },
     crawlerInstructions = '',
   } = body;
 
@@ -65,10 +75,7 @@ export async function POST(request: NextRequest) {
   const limit = crawlConfig.limit || 300;
 
   if (!universityUrl) {
-    return new Response(JSON.stringify({ error: 'University URL is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('VALIDATION_ERROR', 'University URL is required', 400);
   }
 
   const stream = new ReadableStream({
@@ -116,7 +123,7 @@ export async function POST(request: NextRequest) {
                 maxDepth: isExternal ? 1 : maxDepth,
                 limit: isExternal ? 50 : limit,
                 extractDepth: 'basic',
-                query: crawlerInstructions || 'university academic programs courses admissions research faculty',
+                instructions: crawlerInstructions || 'university academic programs courses admissions research faculty',
                 excludePaths: excludePatterns.length > 0 ? excludePatterns : undefined,
               }
             );
@@ -161,18 +168,17 @@ export async function POST(request: NextRequest) {
               });
 
               const documents = [];
+              const embeddingsArray = await embeddings.embedDocuments(chunks);
+              
               for (let j = 0; j < chunks.length; j++) {
-                const chunk = chunks[j];
-                const embedding = await embeddings.embedDocuments([chunk]);
-                
                 documents.push({
-                  content: chunk,
+                  content: chunks[j],
                   url: page.url,
                   title,
                   sourceType: isExternal ? 'external' : 'university',
                   chunkIndex: j,
                   totalChunks: chunks.length,
-                  embedding: embedding[0],
+                  embedding: embeddingsArray[j],
                   crawledAt: new Date(),
                   updatedAt: new Date(),
                 });

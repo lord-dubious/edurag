@@ -1,17 +1,19 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+import { Image as ImageIcon } from 'lucide-react';
 import { ThemeToggle } from '@/components/providers/theme-toggle';
 import { useBrand } from '@/components/providers/BrandProvider';
-import { Image as ImageIcon } from 'lucide-react';
 
-export function Header() {
+export function Header(): React.JSX.Element {
   const { brand, loading } = useBrand();
 
   const name = brand?.appName || 'Knowledge Base';
   const showTitle = brand?.showTitle !== false;
 
-  const renderLogo = () => {
+  const renderLogo = (): React.JSX.Element => {
     if (loading) {
       return <div className="w-8 h-8 rounded bg-muted animate-pulse" />;
     }
@@ -19,11 +21,13 @@ export function Header() {
     if ((brand?.iconType === 'logo' || brand?.iconType === 'upload') && brand.logoUrl) {
       return (
         <div className="relative h-8 w-auto max-w-[120px] flex items-center justify-center">
-          <img 
+          <Image 
             src={brand.logoUrl} 
             alt={name}
+            width={120}
+            height={32}
             className="h-full w-auto max-h-8 max-w-[120px] object-contain"
-            style={{ objectFit: 'contain' }}
+            unoptimized
           />
         </div>
       );

@@ -4,7 +4,6 @@ import { NextRequest } from 'next/server';
 vi.mock('@/lib/db/settings', () => ({
   updateSettings: vi.fn(),
   getSettings: vi.fn(),
-  completeOnboarding: vi.fn(),
   isOnboarded: vi.fn(),
 }));
 
@@ -22,11 +21,10 @@ vi.mock('@/lib/vectorstore', () => ({
   }),
 }));
 
-import { updateSettings, getSettings, completeOnboarding, isOnboarded } from '@/lib/db/settings';
+import { updateSettings, getSettings, isOnboarded } from '@/lib/db/settings';
 
 const mockUpdateSettings = vi.mocked(updateSettings);
 const mockGetSettings = vi.mocked(getSettings);
-const mockCompleteOnboarding = vi.mocked(completeOnboarding);
 const mockIsOnboarded = vi.mocked(isOnboarded);
 
 function createRequest(body: Record<string, unknown>): NextRequest {
@@ -85,7 +83,7 @@ describe('POST /api/onboarding/complete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpdateSettings.mockResolvedValue(undefined);
-    mockCompleteOnboarding.mockResolvedValue(undefined);
+    mockUpdateSettings.mockResolvedValue(undefined);
   });
 
   it('saves onboarding settings', async () => {
@@ -114,7 +112,6 @@ describe('POST /api/onboarding/complete', () => {
 
     expect(response.status).toBe(200);
     expect(mockUpdateSettings).toHaveBeenCalled();
-    expect(mockCompleteOnboarding).toHaveBeenCalled();
   });
 
   it('returns 400 for missing mongodbUri', async () => {

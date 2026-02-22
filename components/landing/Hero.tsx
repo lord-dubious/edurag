@@ -1,22 +1,23 @@
 'use client';
 
+import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { Image as ImageIcon } from 'lucide-react';
 import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputFooter, PromptInputSubmit } from '@/components/ai-elements/prompt-input';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import type { ChatStatus } from 'ai';
 import { useBrand } from '@/components/providers/BrandProvider';
-import { Image as ImageIcon } from 'lucide-react';
 
-export function Hero() {
+export function Hero(): React.JSX.Element {
   const router = useRouter();
   const { brand, loading } = useBrand();
 
   const name = brand?.appName || 'University Knowledge Base';
 
-  const handleSubmit = (message: PromptInputMessage) => {
+  const handleSubmit = useCallback((message: PromptInputMessage) => {
     const encodedQuery = encodeURIComponent(message.text);
     router.push(`/chat?q=${encodedQuery}`);
-  };
+  }, [router]);
 
   const renderLogo = () => {
     if (loading) {
