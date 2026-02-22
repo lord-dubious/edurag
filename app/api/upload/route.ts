@@ -37,7 +37,7 @@ function detectMimeType(buffer: Buffer): string | null {
   return null;
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<Response> {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;

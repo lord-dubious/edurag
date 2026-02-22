@@ -19,6 +19,8 @@ function sanitizeEnvValue(value: string | undefined): string | undefined {
   return value.replace(/[\n\r]/g, '');
 }
 
+type EnvEntry = { type: 'comment'; text: string } | { type: 'kv'; key: string; value: string };
+
 function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>) {
   const envPath = path.join(process.cwd(), '.env.local');
   
@@ -28,14 +30,23 @@ function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>) {
   }
 
   const lines = existingEnv.split('\n');
+  const entries: EnvEntry[] = [];
   const envMap = new Map<string, string>();
   
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith('#')) {
+    if (!trimmed) {
+      continue;
+    }
+    if (trimmed.startsWith('#')) {
+      entries.push({ type: 'comment', text: line });
+    } else {
       const [key, ...valueParts] = trimmed.split('=');
       if (key && valueParts.length > 0) {
-        envMap.set(key.trim(), valueParts.join('=').trim());
+        const k = key.trim();
+        const v = valueParts.join('=').trim();
+        entries.push({ type: 'kv', key: k, value: v });
+        envMap.set(k, v);
       }
     }
   }
@@ -62,8 +73,22 @@ function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>) {
     }
   }
 
-  const newContent = Array.from(envMap.entries())
-    .map(([key, value]) => `${key}=${value}`)
+  const existingKeys = new Set(entries.filter(e => e.type === 'kv').map(e => e.key));
+  for (const [key, value] of Object.entries(updates)) {
+    if (value && !existingKeys.has(key)) {
+      entries.push({ type: 'kv', key, value });
+      existingKeys.add(key);
+    }
+  }
+
+  const newContent = entries
+    .map(entry => {
+      if (entry.type === 'comment') {
+        return entry.text;
+      }
+      const updatedValue = envMap.get(entry.key);
+      return `${entry.key}=${updatedValue ?? entry.value}`;
+    })
     .join('\n');
 
   writeFileSync(envPath, newContent + '\n');
