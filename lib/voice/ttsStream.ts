@@ -11,6 +11,9 @@ function cleanForSpeech(text: string): string {
     .replace(/\*(.+?)\*/g, '$1')
     .replace(/\[(.+?)\]\(.+?\)/g, '$1')
     .replace(/【\d+†[^\]]+】/g, '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
     .replace(/\n+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -30,6 +33,30 @@ function getTTSClient(): OpenAI {
     });
   }
   return _ttsClient;
+}
+
+export type AgentChunk = { type: 'agent_chunk'; text: string } | { type: 'agent_done' };
+
+export function createChunkIterator(
+  chunks: AgentChunk[],
+  signal: AbortSignal
+): AsyncIterable<AgentChunk> {
+  return {
+    [Symbol.asyncIterator]() {
+      let i = 0;
+      return {
+        async next() {
+          if (signal.aborted) return { done: true, value: undefined };
+          while (i < chunks.length) {
+            return { done: false, value: chunks[i++] };
+          }
+          await new Promise((r) => setTimeout(r, 50));
+          if (signal.aborted) return { done: true, value: undefined };
+          return { done: false, value: { type: 'agent_done' as const } };
+        },
+      };
+    },
+  };
 }
 
 async function* chunkSentences(
@@ -57,29 +84,13 @@ async function* chunkSentences(
 }
 
 export async function streamTTS(
-  chunks: Array<{ type: 'agent_chunk'; text: string } | { type: 'agent_done' }>,
+  source: AsyncIterable<{ type: 'agent_chunk'; text: string } | { type: 'agent_done' }>,
   signal: AbortSignal,
   ws: WebSocket
 ): Promise<void> {
   const client = getTTSClient();
-  const chunkIterator: AsyncIterable<{ type: 'agent_chunk'; text: string } | { type: 'agent_done' }> = {
-    [Symbol.asyncIterator]() {
-      let i = 0;
-      return {
-        async next() {
-          if (signal.aborted) return { done: true, value: undefined };
-          while (i < chunks.length) {
-            return { done: false, value: chunks[i++] };
-          }
-          await new Promise((r) => setTimeout(r, 50));
-          if (signal.aborted) return { done: true, value: undefined };
-          return { done: false, value: { type: 'agent_done' as const } };
-        },
-      };
-    },
-  };
 
-  for await (const sentence of chunkSentences(chunkIterator)) {
+  for await (const sentence of chunkSentences(source)) {
     if (signal.aborted) return;
     if (!sentence) continue;
 
@@ -105,6 +116,7 @@ export async function streamTTS(
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       console.error('TTS error:', err);
+      ws.send(JSON.stringify({ type: 'error', message: 'TTS service temporarily unavailable' }));
     }
   }
 }

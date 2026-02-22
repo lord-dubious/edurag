@@ -23,8 +23,6 @@ export interface OnboardingSettings {
     docx: 'index' | 'skip';
     csv: 'index' | 'skip';
   };
-  deepgramApiKey?: string;
-  voiceTtsApiKey?: string;
   voiceTtsBaseUrl?: string;
   voiceTtsVoice?: string;
   createdAt?: Date;

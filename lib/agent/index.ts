@@ -12,6 +12,7 @@ export async function runAgent({
   extraTools = {},
   maxSteps = 5,
   voiceMode = false,
+  abortSignal,
 }: AgentOptions) {
   let system = AGENT_SYSTEM_PROMPT
     .replace('{UNIVERSITY_NAME}', universityName)
@@ -38,5 +39,6 @@ export async function runAgent({
     },
     stopWhen: stepCountIs(maxSteps),
     experimental_telemetry: { isEnabled: false },
+    abortSignal,
   });
 }

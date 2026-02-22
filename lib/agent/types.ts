@@ -7,6 +7,7 @@ export interface AgentOptions {
   extraTools?: Record<string, unknown>;
   maxSteps?: number;
   voiceMode?: boolean;
+  abortSignal?: AbortSignal;
 }
 
 export interface Source {

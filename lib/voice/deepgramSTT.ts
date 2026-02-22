@@ -8,6 +8,7 @@ interface DeepgramCallbacks {
   onSpeechEnd: () => void;
   onError: (message: string) => void;
   onReady: () => void;
+  onClose?: (reason?: string) => void;
 }
 
 interface DeepgramConnection {
@@ -33,14 +34,15 @@ function createDeepgramConnection(options: {
     onSpeechEnd,
     onError,
     onReady,
+    onClose,
   } = options;
 
   const deepgram = createClient(apiKey);
   let speaking = false;
   let keepaliveInterval: ReturnType<typeof setInterval> | null = null;
-  let connection: ListenLiveClient;
+  let pendingFinals: string[] = [];
 
-  connection = deepgram.listen.live({
+  const connection: ListenLiveClient = deepgram.listen.live({
     model,
     language,
     encoding: 'linear16',
@@ -72,12 +74,20 @@ function createDeepgramConnection(options: {
     const transcript = event.channel?.alternatives?.[0]?.transcript ?? '';
     if (transcript) {
       if (event.is_final) {
-        speaking = false;
-        onUtteranceEnd(transcript);
-        onSpeechEnd();
+        pendingFinals.push(transcript);
       } else {
         onInterim(transcript);
       }
+    }
+  });
+
+  connection.on(LiveTranscriptionEvents.UtteranceEnd, () => {
+    if (pendingFinals.length > 0) {
+      const text = pendingFinals.join(' ');
+      pendingFinals = [];
+      speaking = false;
+      onUtteranceEnd(text);
+      onSpeechEnd();
     }
   });
 
@@ -89,6 +99,7 @@ function createDeepgramConnection(options: {
   connection.on(LiveTranscriptionEvents.Close, () => {
     if (keepaliveInterval) clearInterval(keepaliveInterval);
     speaking = false;
+    onClose?.();
   });
 
   return {

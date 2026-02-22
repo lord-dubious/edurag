@@ -1159,6 +1159,39 @@ export default function SetupPage() {
                   Back
                 </Button>
                 <Button
+                  onClick={() => setStep(5)}
+                  style={{ backgroundColor: brandData.primaryColor }}
+                  className="text-white"
+                >
+                  Continue
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 5 && !crawlProgress && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div>
+                <h1 className="text-2xl font-semibold">Crawling & Indexing</h1>
+                <p className="text-muted-foreground">
+                  Start crawling your university website to build the knowledge base.
+                </p>
+              </div>
+
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <p className="text-muted-foreground">
+                    This process will crawl and index all pages from your university domain. 
+                    The crawling may take several minutes depending on the size of your website.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(4)}>
+                  Back
+                </Button>
+                <Button
                   onClick={startCrawl}
                   disabled={loading}
                   style={{ backgroundColor: brandData.primaryColor }}
