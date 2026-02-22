@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/popover';
 import { Paintbrush } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 interface ColorPickerProps {
   value: string;
@@ -30,7 +31,7 @@ export function ColorPicker({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className={`justify-start text-left font-normal ${className}`}
+          className={cn('justify-start text-left font-normal', className)}
         >
           <div className="w-full flex items-center gap-2">
             <div
