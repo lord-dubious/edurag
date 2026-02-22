@@ -64,11 +64,13 @@ export function AdminSidebar() {
 
     if ((brand?.iconType === 'logo' || brand?.iconType === 'upload') && brand.logoUrl) {
       return (
-        <img 
-          src={brand.logoUrl} 
-          alt={name}
-          className="h-5 w-auto object-contain"
-        />
+        <div className="relative h-5 w-auto max-w-[100px] flex items-center justify-center">
+          <img 
+            src={brand.logoUrl} 
+            alt={name}
+            className="h-full w-auto max-h-5 max-w-[100px] object-contain"
+          />
+        </div>
       );
     }
 
@@ -84,12 +86,14 @@ export function AdminSidebar() {
     );
   };
 
+  const showTitle = brand?.showTitle !== false;
+
   return (
     <>
       <header className="fixed top-0 left-0 right-0 h-14 bg-background border-b z-50 flex items-center px-4">
         <div className="flex items-center gap-2">
           {renderLogo()}
-          <span className="font-semibold">{name}</span>
+          {showTitle && <span className="font-semibold">{name}</span>}
           <span 
             className="text-xs px-2 py-0.5 rounded-full font-medium"
             style={{ 

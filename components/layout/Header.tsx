@@ -9,32 +9,43 @@ export function Header() {
   const { brand, loading } = useBrand();
 
   const name = brand?.appName || 'Knowledge Base';
+  const showTitle = brand?.showTitle !== false;
 
   const renderLogo = () => {
     if (loading) {
-      return <div className="w-6 h-6 rounded bg-muted animate-pulse" />;
+      return <div className="w-8 h-8 rounded bg-muted animate-pulse" />;
     }
 
     if ((brand?.iconType === 'logo' || brand?.iconType === 'upload') && brand.logoUrl) {
       return (
-        <img 
-          src={brand.logoUrl} 
-          alt={name}
-          className="h-6 w-auto object-contain"
-        />
+        <div className="relative h-8 w-auto max-w-[120px] flex items-center justify-center">
+          <img 
+            src={brand.logoUrl} 
+            alt={name}
+            className="h-full w-auto max-h-8 max-w-[120px] object-contain"
+            style={{ objectFit: 'contain' }}
+          />
+        </div>
       );
     }
 
     if (brand?.emoji) {
-      return <span className="text-xl">{brand.emoji}</span>;
+      return (
+        <div 
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-xl"
+          style={{ backgroundColor: brand?.primaryColor ? `${brand.primaryColor}20` : undefined }}
+        >
+          {brand.emoji}
+        </div>
+      );
     }
 
     return (
       <div 
-        className="w-6 h-6 rounded flex items-center justify-center"
+        className="w-8 h-8 rounded-lg flex items-center justify-center"
         style={{ backgroundColor: brand?.primaryColor || '#2563eb' }}
       >
-        <ImageIcon className="w-3 h-3 text-white" />
+        <ImageIcon className="w-4 h-4 text-white" />
       </div>
     );
   };
@@ -42,9 +53,13 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 shadow-sm transition-all">
       <div className="container mx-auto px-4 flex h-14 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-3 group">
           {renderLogo()}
-          <span className="font-semibold text-lg">{name}</span>
+          {showTitle && (
+            <span className="font-semibold text-lg group-hover:text-primary transition-colors">
+              {name}
+            </span>
+          )}
         </Link>
         <div className="flex items-center gap-4">
           <ThemeToggle />

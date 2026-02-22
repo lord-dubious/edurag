@@ -21,34 +21,26 @@ export function Hero() {
   const renderLogo = () => {
     if (loading) {
       return (
-        <div className="w-12 h-12 rounded-xl bg-muted animate-pulse" />
+        <div className="w-16 h-16 rounded-xl bg-muted animate-pulse" />
       );
     }
 
-    if (brand?.iconType === 'logo' && brand.logoUrl) {
+    if ((brand?.iconType === 'logo' || brand?.iconType === 'upload') && brand.logoUrl) {
       return (
-        <img 
-          src={brand.logoUrl} 
-          alt={name}
-          className="h-12 w-auto object-contain"
-        />
-      );
-    }
-
-    if (brand?.iconType === 'upload' && brand.logoUrl) {
-      return (
-        <img 
-          src={brand.logoUrl} 
-          alt={name}
-          className="h-12 w-auto object-contain"
-        />
+        <div className="relative h-16 w-auto max-w-[200px] flex items-center justify-center">
+          <img 
+            src={brand.logoUrl} 
+            alt={name}
+            className="h-full w-auto max-h-16 max-w-[200px] object-contain"
+          />
+        </div>
       );
     }
 
     if (brand?.emoji) {
       return (
         <div 
-          className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+          className="w-16 h-16 rounded-xl flex items-center justify-center text-3xl"
           style={{ backgroundColor: brand.primaryColor ? `${brand.primaryColor}20` : undefined }}
         >
           {brand.emoji}
@@ -58,10 +50,10 @@ export function Hero() {
 
     return (
       <div 
-        className="w-12 h-12 rounded-xl flex items-center justify-center"
+        className="w-16 h-16 rounded-xl flex items-center justify-center"
         style={{ backgroundColor: brand?.primaryColor || '#2563eb' }}
       >
-        <ImageIcon className="w-6 h-6 text-white" />
+        <ImageIcon className="w-8 h-8 text-white" />
       </div>
     );
   };

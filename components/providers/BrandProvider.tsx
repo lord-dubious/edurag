@@ -9,6 +9,7 @@ interface BrandSettings {
   logoUrl: string | null;
   emoji: string | null;
   iconType: 'logo' | 'emoji' | 'upload';
+  showTitle: boolean;
   onboarded: boolean;
 }
 
@@ -33,6 +34,7 @@ const DEFAULT_BRAND: BrandSettings = {
   logoUrl: null,
   emoji: '🎓',
   iconType: 'emoji',
+  showTitle: true,
   onboarded: false,
 };
 
@@ -90,6 +92,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
               logoUrl: settings.brandLogoUrl || null,
               emoji: settings.emoji || null,
               iconType: settings.iconType || 'emoji',
+              showTitle: settings.showTitle !== false,
               onboarded: true,
             };
             setBrand(brandSettings);

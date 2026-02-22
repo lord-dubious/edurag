@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
       logoUrl,
       emoji,
       iconType,
+      showTitle,
       universityName,
       externalUrls,
       excludePaths,
@@ -116,6 +117,7 @@ export async function POST(request: NextRequest) {
       brandLogoUrl: logoUrl,
       emoji: emoji,
       iconType: iconType || 'emoji',
+      showTitle: showTitle !== false,
       externalUrls: externalUrls || [],
       excludePaths: excludePaths || [],
       crawlConfig: crawlConfig || { maxDepth: 3, limit: 300 },
@@ -177,6 +179,7 @@ export async function GET() {
       logoUrl: settings?.brandLogoUrl,
       emoji: settings?.emoji,
       iconType: settings?.iconType,
+      showTitle: settings?.showTitle,
       appName: settings?.appName,
     });
   } catch (error) {

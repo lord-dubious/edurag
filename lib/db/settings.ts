@@ -10,6 +10,7 @@ export interface OnboardingSettings {
   brandLogoUrl?: string;
   emoji?: string;
   iconType?: 'logo' | 'emoji' | 'upload';
+  showTitle?: boolean;
   externalUrls?: string[];
   excludePaths?: string[];
   crawlConfig?: {

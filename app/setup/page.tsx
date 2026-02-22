@@ -32,6 +32,7 @@ interface BrandData {
   iconType: 'logo' | 'emoji' | 'upload';
   emoji: string;
   uploadedFileName?: string;
+  showTitle: boolean;
 }
 
 type CrawlPhase = 'preparing' | 'crawling' | 'chunking' | 'embedding' | 'storing' | 'complete' | 'error';
@@ -109,6 +110,7 @@ export default function SetupPage() {
     secondaryColor: '#1e40af',
     iconType: 'emoji',
     emoji: '🎓',
+    showTitle: true,
   });
   const [externalUrls, setExternalUrls] = useState<Array<{ url: string; label: string }>>([]);
   const [excludePaths, setExcludePaths] = useState<string[]>([]);
@@ -236,6 +238,7 @@ export default function SetupPage() {
           logoUrl: brandData.logoUrl,
           emoji: brandData.emoji,
           iconType: brandData.iconType,
+          showTitle: brandData.showTitle,
           crawlConfig,
           excludePaths,
           externalUrls: externalUrls.map((e) => e.url),
@@ -623,11 +626,37 @@ export default function SetupPage() {
                       >
                         {brandData.iconType === 'emoji' ? brandData.emoji : '🎓'}
                       </div>
-                      <div className="flex-1">
-                        <div className="h-3 w-32 rounded mb-1" style={{ backgroundColor: brandData.primaryColor }} />
-                        <div className="h-2 w-24 rounded" style={{ backgroundColor: brandData.secondaryColor }} />
-                      </div>
+                      {brandData.showTitle && (
+                        <div className="flex-1">
+                          <div className="h-3 w-32 rounded mb-1" style={{ backgroundColor: brandData.primaryColor }} />
+                          <div className="h-2 w-24 rounded" style={{ backgroundColor: brandData.secondaryColor }} />
+                        </div>
+                      )}
                     </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 rounded-lg border">
+                    <div>
+                      <Label>Show Title in Header</Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Display the university name next to the icon in the header
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={brandData.showTitle}
+                      onClick={() => setBrandData(prev => ({ ...prev, showTitle: !prev.showTitle }))}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        brandData.showTitle ? 'bg-primary' : 'bg-muted'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          brandData.showTitle ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
                   </div>
                 </CardContent>
               </Card>
