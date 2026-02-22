@@ -65,29 +65,43 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Overview of your knowledge base
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Overview of your knowledge base performance and system status
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button asChild>
+            <Link href="/admin/domains">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Domain
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <Link key={stat.title} href={stat.href}>
-            <Card className="hover:bg-accent/50 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <Card className="relative overflow-hidden hover:bg-accent/50 transition-all hover:shadow-lg hover:-translate-y-1 cursor-pointer border-t-4" style={{ borderTopColor: stat.bg.split(' ')[0].replace('bg-', 'var(--').replace('-100', ')') }}>
+              <div
+                className={`absolute inset-0 opacity-[0.03] pointer-events-none ${stat.bg}`}
+                style={{ backgroundImage: `radial-gradient(circle at right top, currentcolor 10%, transparent 60%)` }}
+              />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
                 <CardTitle className="text-sm font-medium">
                   {stat.title}
                 </CardTitle>
-                <div className={`p-2 rounded-lg ${stat.bg}`}>
+                <div className={`p-2.5 rounded-xl ${stat.bg}`}>
                   <stat.icon className={`h-4 w-4 ${stat.color}`} />
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value.toLocaleString()}</div>
+              <CardContent className="relative z-10">
+                <div className="text-3xl font-bold tracking-tight">{stat.value.toLocaleString()}</div>
                 {stat.badge && (
-                  <Badge variant="secondary" className="mt-2">
+                  <Badge variant="secondary" className="mt-3">
                     {stat.badge}
                   </Badge>
                 )}
@@ -121,27 +135,14 @@ export default async function AdminDashboard() {
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">System Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Vector Index</span>
-                <Badge variant="default" className="bg-green-600">Active</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Chat API</span>
-                <Badge variant="default" className="bg-green-600">Online</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Crawl Service</span>
-                <Badge variant="default" className="bg-green-600">Ready</Badge>
-              </div>
+            <div className="pt-6 mt-6 border-t">
+              <p className="text-sm text-muted-foreground mb-4">Need help configuring EduRAG?</p>
+              <Button asChild variant="secondary" className="w-full">
+                <Link href="/setup">
+                  Re-run Setup Wizard
+                </Link>
+              </Button>
             </div>
           </CardContent>
         </Card>

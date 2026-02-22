@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -63,9 +63,20 @@ const STEPS = [
   { label: 'University URL', short: 'URL' },
   { label: 'Branding', short: 'Brand' },
   { label: 'Crawl Scope', short: 'Scope' },
+  { label: 'API Keys', short: 'Keys' },
   { label: 'Crawling', short: 'Crawl' },
   { label: 'Review', short: 'Review' },
 ] as const;
+
+interface ApiKeys {
+  mongodbUri: string;
+  chatApiKey: string;
+  chatBaseUrl: string;
+  chatModel: string;
+  embeddingApiKey: string;
+  tavilyApiKey: string;
+  adminSecret: string;
+}
 
 const PRESET_COLORS = [
   { name: 'Blue', primary: '#2563eb', secondary: '#1e40af' },
@@ -80,7 +91,9 @@ const PRESET_COLORS = [
   { name: 'Slate', primary: '#475569', secondary: '#334155' },
 ];
 
-import EmojiPicker from 'emoji-picker-react';
+import dynamic from 'next/dynamic';
+
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 
 export default function SetupPage() {
   const router = useRouter();
@@ -115,6 +128,18 @@ export default function SetupPage() {
   const [newExternalLabel, setNewExternalLabel] = useState('');
   const [newExcludePath, setNewExcludePath] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [apiKeys, setApiKeys] = useState<ApiKeys>({
+    mongodbUri: '',
+    chatApiKey: '',
+    chatBaseUrl: '',
+    chatModel: 'llama-3.3-70b',
+    embeddingApiKey: '',
+    tavilyApiKey: '',
+    adminSecret: '',
+  });
+  const [envPreview, setEnvPreview] = useState<string>('');
+  const [isVercel, setIsVercel] = useState(false);
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', brandData.primaryColor);
@@ -133,7 +158,7 @@ export default function SetupPage() {
       chunksCreated: 0,
       docsStored: 0,
     });
-    setStep(3);
+    setStep(4);
 
     try {
       const res = await fetch('/api/onboarding/crawl', {
@@ -177,7 +202,7 @@ export default function SetupPage() {
               const data: CrawlProgress = JSON.parse(line.slice(6));
               setCrawlProgress(data);
               if (data.phase === 'complete') {
-                setStep(4);
+                setStep(5);
               }
             } catch {
               // Skip invalid JSON
@@ -210,15 +235,23 @@ export default function SetupPage() {
           brandSecondary: brandData.secondaryColor,
           logoUrl: brandData.logoUrl,
           emoji: brandData.emoji,
+          iconType: brandData.iconType,
           crawlConfig,
           excludePaths,
+          externalUrls: externalUrls.map((e) => e.url),
+          fileTypeRules,
+          apiKeys,
         }),
       });
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Failed to complete onboarding');
+        throw new Error(data.message || 'Failed to complete onboarding');
       }
+
+      const data = await res.json();
+      setEnvPreview(data.envPreview || '');
+      setIsVercel(data.isVercel || false);
 
       toast.success('Onboarding complete!');
       router.push('/');
@@ -227,7 +260,7 @@ export default function SetupPage() {
     } finally {
       setLoading(false);
     }
-  }, [universityUrl, brandData, router, crawlConfig, excludePaths]);
+  }, [universityUrl, brandData, router, crawlConfig, excludePaths, externalUrls, fileTypeRules, apiKeys]);
 
   const addExternalUrl = () => {
     if (newExternalUrl && !externalUrls.some((e) => e.url === newExternalUrl)) {
@@ -834,8 +867,134 @@ export default function SetupPage() {
                   Back
                 </Button>
                 <Button
+                  onClick={() => setStep(3)}
+                  style={{ backgroundColor: brandData.primaryColor }}
+                  className="text-white"
+                >
+                  Continue
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div>
+                <h2 className="text-2xl font-semibold">API Configuration</h2>
+                <p className="text-muted-foreground mt-1">
+                  Configure the API keys required for EduRAG to function
+                </p>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
+                    Required API Keys
+                  </CardTitle>
+                  <CardDescription>
+                    These keys are stored securely and used to power the AI features
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="mongodbUri">MongoDB Connection String *</Label>
+                    <Input
+                      id="mongodbUri"
+                      type="password"
+                      placeholder="mongodb+srv://..."
+                      value={apiKeys.mongodbUri}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, mongodbUri: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">MongoDB Atlas connection string with vector search</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="chatApiKey">Chat API Key *</Label>
+                    <Input
+                      id="chatApiKey"
+                      type="password"
+                      placeholder="sk-..."
+                      value={apiKeys.chatApiKey}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, chatApiKey: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Cerebras or OpenAI API key for chat</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="chatBaseUrl">Chat API Base URL</Label>
+                    <Input
+                      id="chatBaseUrl"
+                      placeholder="https://api.cerebras.ai/v1"
+                      value={apiKeys.chatBaseUrl}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, chatBaseUrl: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Optional: Custom API endpoint</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="chatModel">Chat Model</Label>
+                    <Input
+                      id="chatModel"
+                      placeholder="llama-3.3-70b"
+                      value={apiKeys.chatModel}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, chatModel: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="embeddingApiKey">Embedding API Key *</Label>
+                    <Input
+                      id="embeddingApiKey"
+                      type="password"
+                      placeholder="pa-..."
+                      value={apiKeys.embeddingApiKey}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, embeddingApiKey: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Voyage AI key for embeddings</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="tavilyApiKey">Tavily API Key *</Label>
+                    <Input
+                      id="tavilyApiKey"
+                      type="password"
+                      placeholder="tvly-..."
+                      value={apiKeys.tavilyApiKey}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, tavilyApiKey: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Tavily key for web crawling</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="adminSecret">Admin Secret *</Label>
+                    <Input
+                      id="adminSecret"
+                      type="password"
+                      placeholder="your-secure-admin-token"
+                      value={apiKeys.adminSecret}
+                      onChange={(e) => setApiKeys((prev) => ({ ...prev, adminSecret: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Bearer token for admin access</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Alert>
+                <Shield className="w-4 h-4" />
+                <AlertTitle>Security Note</AlertTitle>
+                <AlertDescription>
+                  API keys are written to <code className="text-xs bg-muted px-1 rounded">.env.local</code> and never stored in the database.
+                </AlertDescription>
+              </Alert>
+
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(2)}>
+                  Back
+                </Button>
+                <Button
                   onClick={startCrawl}
-                  disabled={loading}
+                  disabled={loading || !apiKeys.mongodbUri || !apiKeys.chatApiKey || !apiKeys.embeddingApiKey || !apiKeys.tavilyApiKey || !apiKeys.adminSecret}
                   style={{ backgroundColor: brandData.primaryColor }}
                   className="text-white"
                 >
@@ -852,7 +1011,7 @@ export default function SetupPage() {
             </div>
           )}
 
-          {step === 3 && crawlProgress && (
+          {step === 4 && crawlProgress && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div>
                 <h1 className="text-2xl font-semibold">Crawling & Indexing</h1>
@@ -916,7 +1075,7 @@ export default function SetupPage() {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div>
                 <h1 className="text-2xl font-semibold">Setup Complete!</h1>

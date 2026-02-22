@@ -10,8 +10,16 @@ interface CrawlProgress {
   message: string;
   pagesFound: number;
   pagesProcessed: number;
+  chunksCreated: number;
+  docsStored: number;
   currentUrl?: string;
   error?: string;
+}
+
+interface FileTypeRules {
+  pdf: 'index' | 'skip';
+  docx: 'index' | 'skip';
+  csv: 'index' | 'skip';
 }
 
 function sendProgress(controller: ReadableStreamDefaultController, data: CrawlProgress) {
@@ -30,15 +38,26 @@ function chunkText(text: string, chunkSize: number, overlap: number): string[] {
   return chunks;
 }
 
+function shouldSkipFile(url: string, fileTypeRules: FileTypeRules): boolean {
+  const lowerUrl = url.toLowerCase();
+  if (lowerUrl.endsWith('.pdf') && fileTypeRules.pdf === 'skip') return true;
+  if ((lowerUrl.endsWith('.docx') || lowerUrl.endsWith('.doc')) && fileTypeRules.docx === 'skip') return true;
+  if (lowerUrl.endsWith('.csv') && fileTypeRules.csv === 'skip') return true;
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { 
     universityUrl, 
     externalUrls = [] as string[], 
     excludePaths = [] as string[],
-    maxDepth = 3,
-    limit = 300,
+    crawlConfig = { maxDepth: 3, limit: 300 } as { maxDepth?: number; limit?: number },
+    fileTypeRules = { pdf: 'index', docx: 'index', csv: 'skip' } as FileTypeRules,
   } = body;
+
+  const maxDepth = crawlConfig.maxDepth || 3;
+  const limit = crawlConfig.limit || 300;
 
   if (!universityUrl) {
     return new Response(JSON.stringify({ error: 'University URL is required' }), {
@@ -52,7 +71,8 @@ export async function POST(request: NextRequest) {
       const tvly = tavily({ apiKey: env.TAVILY_API_KEY });
       const embeddings = getEmbeddings();
       
-      let totalIndexed = 0;
+      let totalChunks = 0;
+      let totalDocs = 0;
       let totalPages = 0;
       const allUrls = [universityUrl, ...externalUrls];
 
@@ -62,6 +82,8 @@ export async function POST(request: NextRequest) {
           message: 'Starting crawl...',
           pagesFound: allUrls.length,
           pagesProcessed: 0,
+          chunksCreated: 0,
+          docsStored: 0,
         });
 
         for (let i = 0; i < allUrls.length; i++) {
@@ -73,6 +95,8 @@ export async function POST(request: NextRequest) {
             message: `Crawling ${isExternal ? 'external source' : 'university site'}...`,
             pagesFound: allUrls.length,
             pagesProcessed: i,
+            chunksCreated: totalChunks,
+            docsStored: totalDocs,
             currentUrl: baseUrl,
           });
 
@@ -98,6 +122,8 @@ export async function POST(request: NextRequest) {
                 message: 'No pages found',
                 pagesFound: allUrls.length,
                 pagesProcessed: i,
+                chunksCreated: totalChunks,
+                docsStored: totalDocs,
                 currentUrl: baseUrl,
               });
               continue;
@@ -107,18 +133,25 @@ export async function POST(request: NextRequest) {
             
             for (const page of crawlResult.results) {
               if (!page.url || !page.rawContent) continue;
+              
+              if (shouldSkipFile(page.url, fileTypeRules)) {
+                continue;
+              }
 
               const cleaned = cleanContent(page.rawContent);
               if (cleaned.length < 100) continue;
 
               const title = extractTitle(page.rawContent, page.url) || page.url.split('/').pop() || 'Untitled';
               const chunks = chunkText(cleaned, 1500, 300);
+              totalChunks += chunks.length;
 
               sendProgress(controller, {
                 phase: 'embedding',
                 message: `Embedding ${chunks.length} chunks...`,
                 pagesFound: allUrls.length,
                 pagesProcessed: i,
+                chunksCreated: totalChunks,
+                docsStored: totalDocs,
                 currentUrl: page.url,
               });
 
@@ -142,14 +175,16 @@ export async function POST(request: NextRequest) {
 
               if (documents.length > 0) {
                 await collection.insertMany(documents);
-                totalIndexed += documents.length;
+                totalDocs += documents.length;
                 totalPages++;
 
                 sendProgress(controller, {
                   phase: 'storing',
-                  message: `Stored ${documents.length} chunks`,
+                  message: `Stored ${documents.length} chunks from ${title}`,
                   pagesFound: allUrls.length,
                   pagesProcessed: i,
+                  chunksCreated: totalChunks,
+                  docsStored: totalDocs,
                   currentUrl: page.url,
                 });
               }
@@ -158,9 +193,11 @@ export async function POST(request: NextRequest) {
             console.error(`Error crawling ${baseUrl}:`, crawlError);
             sendProgress(controller, {
               phase: 'error',
-              message: 'Crawl failed',
+              message: 'Crawl failed for this source',
               pagesFound: allUrls.length,
               pagesProcessed: i,
+              chunksCreated: totalChunks,
+              docsStored: totalDocs,
               currentUrl: baseUrl,
               error: crawlError instanceof Error ? crawlError.message : 'Crawl failed',
             });
@@ -169,9 +206,11 @@ export async function POST(request: NextRequest) {
 
         sendProgress(controller, {
           phase: 'complete',
-          message: `Crawl complete! Indexed ${totalIndexed} chunks from ${totalPages} pages.`,
+          message: `Crawl complete! Indexed ${totalDocs} chunks from ${totalPages} pages.`,
           pagesFound: totalPages,
           pagesProcessed: totalPages,
+          chunksCreated: totalChunks,
+          docsStored: totalDocs,
         });
 
         controller.close();
@@ -181,6 +220,8 @@ export async function POST(request: NextRequest) {
           message: 'Crawl failed',
           pagesFound: 0,
           pagesProcessed: 0,
+          chunksCreated: 0,
+          docsStored: 0,
           error: error instanceof Error ? error.message : 'Crawl failed',
         });
         controller.close();

@@ -11,9 +11,12 @@ import {
   LogOut,
   Database,
   Moon,
-  Sun
+  Sun,
+  Settings,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useBrand } from '@/components/providers/BrandProvider';
 
 const navSections = [
   {
@@ -34,24 +37,66 @@ const navSections = [
       { href: '/admin/faqs', label: 'FAQs', icon: HelpCircle },
     ],
   },
+  {
+    title: 'Configuration',
+    items: [
+      { href: '/admin/settings', label: 'Settings', icon: Settings },
+    ],
+  },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
+  const { brand, loading } = useBrand();
+
+  const name = brand?.appName || 'EduRAG';
 
   const handleLogout = () => {
     document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
     window.location.href = '/admin/login';
   };
 
+  const renderLogo = () => {
+    if (loading) {
+      return <div className="w-5 h-5 rounded bg-muted animate-pulse" />;
+    }
+
+    if ((brand?.iconType === 'logo' || brand?.iconType === 'upload') && brand.logoUrl) {
+      return (
+        <img 
+          src={brand.logoUrl} 
+          alt={name}
+          className="h-5 w-auto object-contain"
+        />
+      );
+    }
+
+    if (brand?.emoji) {
+      return <span className="text-lg">{brand.emoji}</span>;
+    }
+
+    return (
+      <Database 
+        className="h-5 w-5" 
+        style={{ color: brand?.primaryColor || 'hsl(var(--primary))' }}
+      />
+    );
+  };
+
   return (
     <>
       <header className="fixed top-0 left-0 right-0 h-14 bg-background border-b z-50 flex items-center px-4">
         <div className="flex items-center gap-2">
-          <Database className="h-5 w-5 text-primary" />
-          <span className="font-semibold">EduRAG</span>
-          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+          {renderLogo()}
+          <span className="font-semibold">{name}</span>
+          <span 
+            className="text-xs px-2 py-0.5 rounded-full font-medium"
+            style={{ 
+              backgroundColor: brand?.primaryColor ? `${brand.primaryColor}20` : 'hsl(var(--primary) / 0.1)',
+              color: brand?.primaryColor || 'hsl(var(--primary))'
+            }}
+          >
             Admin
           </span>
         </div>

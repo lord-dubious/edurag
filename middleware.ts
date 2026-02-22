@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const ONBOARDING_COMPLETE = process.env.NEXT_PUBLIC_ONBOARDING_COMPLETE === 'true';
-const isOnboarded = ONBOARDING_COMPLETE || !!process.env.NEXT_PUBLIC_UNI_URL;
-
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  if (!isOnboarded && pathname !== '/setup' && !pathname.startsWith('/api/onboarding')) {
+  const onboardedCookie = request.cookies.get('edurag_onboarded')?.value;
+  const hasEnvUrl = !!process.env.NEXT_PUBLIC_UNI_URL;
+  const isOnboarded = onboardedCookie === 'true' || hasEnvUrl;
+
+  if (!isOnboarded && pathname !== '/setup' && !pathname.startsWith('/api/onboarding') && !pathname.startsWith('/api/upload')) {
     return NextResponse.redirect(new URL('/setup', request.url));
   }
 

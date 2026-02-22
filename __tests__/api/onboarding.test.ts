@@ -99,12 +99,20 @@ describe('POST /api/onboarding/complete', () => {
       iconType: 'emoji',
       excludePaths: [],
       fileTypeRules: { pdf: 'index', docx: 'index', csv: 'skip' },
+      apiKeys: {
+        mongodbUri: 'mongodb+srv://test',
+        chatApiKey: 'test-key',
+        embeddingApiKey: 'test-key',
+        tavilyApiKey: 'test-key',
+        adminSecret: 'test-secret',
+      },
     });
 
     const response = await POST(req);
 
     expect(response.status).toBe(200);
     expect(mockUpdateSettings).toHaveBeenCalled();
+    expect(mockCompleteOnboarding).toHaveBeenCalled();
   });
 
   it('returns 400 for missing university URL', async () => {

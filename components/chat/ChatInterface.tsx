@@ -74,14 +74,14 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     initialSessionsRef.current = loadSessions();
   }
   const initialSessions = initialSessionsRef.current;
-  
+
   const initialThreadId = useMemo(() => {
     if (initialQuery) {
       return findSessionByQuery(initialQuery)?.id ?? nanoid();
     }
     return initialSessions.length > 0 ? initialSessions[0].id : nanoid();
   }, [initialQuery, initialSessions]);
-  
+
   const [threadId, setThreadId] = useState(initialThreadId);
   const [sources, setSources] = useState<Record<string, Source[]>>(() => {
     const session = initialSessions.find(s => s.id === initialThreadId);
@@ -165,7 +165,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
       isLoadingSessionRef.current = false;
       return;
     }
-    
+
     if (messages.length === 0) return;
     if (status === 'streaming') return;
     if (isLoadingSessionRef.current) return;
@@ -179,7 +179,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
       .join('')?.slice(0, 50) ?? 'New Chat';
 
     const existingSession = existingIndex >= 0 ? sessions[existingIndex] : null;
-    
+
     const updatedSession: StoredSession = {
       id: threadId,
       title,
@@ -206,7 +206,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     [sendMessage]
   );
 
-const handleNewChat = useCallback(() => {
+  const handleNewChat = useCallback(() => {
     const newId = nanoid();
     setThreadId(newId);
     setMessages([]);
