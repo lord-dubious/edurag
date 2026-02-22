@@ -102,6 +102,8 @@ describe('POST /api/onboarding/complete', () => {
       apiKeys: {
         mongodbUri: 'mongodb+srv://test',
         chatApiKey: 'test-key',
+        chatBaseUrl: 'https://api.cerebras.ai/v1',
+        chatModel: 'llama-3.3-70b',
         embeddingApiKey: 'test-key',
         tavilyApiKey: 'test-key',
         adminSecret: 'test-secret',
@@ -113,6 +115,44 @@ describe('POST /api/onboarding/complete', () => {
     expect(response.status).toBe(200);
     expect(mockUpdateSettings).toHaveBeenCalled();
     expect(mockCompleteOnboarding).toHaveBeenCalled();
+  });
+
+  it('returns 400 for missing mongodbUri', async () => {
+    const { POST } = await import('@/app/api/onboarding/complete/route');
+    const req = createRequest({
+      universityUrl: 'https://example.edu',
+      universityName: 'Example University',
+      brandPrimary: '#1e407c',
+      apiKeys: {
+        chatApiKey: 'test-key',
+        embeddingApiKey: 'test-key',
+        tavilyApiKey: 'test-key',
+        adminSecret: 'test-secret',
+      },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(400);
+  });
+
+  it('returns 400 for missing chatApiKey', async () => {
+    const { POST } = await import('@/app/api/onboarding/complete/route');
+    const req = createRequest({
+      universityUrl: 'https://example.edu',
+      universityName: 'Example University',
+      brandPrimary: '#1e407c',
+      apiKeys: {
+        mongodbUri: 'mongodb+srv://test',
+        embeddingApiKey: 'test-key',
+        tavilyApiKey: 'test-key',
+        adminSecret: 'test-secret',
+      },
+    });
+
+    const response = await POST(req);
+
+    expect(response.status).toBe(400);
   });
 
   it('returns 400 for missing university URL', async () => {

@@ -28,11 +28,15 @@ function sendProgress(controller: ReadableStreamDefaultController, data: CrawlPr
 }
 
 function chunkText(text: string, chunkSize: number, overlap: number): string[] {
+  if (overlap >= chunkSize) {
+    overlap = Math.floor(chunkSize / 4);
+  }
   const chunks: string[] = [];
   let start = 0;
   while (start < text.length) {
-    const end = start + chunkSize;
+    const end = Math.min(start + chunkSize, text.length);
     chunks.push(text.slice(start, end));
+    if (end === text.length) break;
     start = end - overlap;
   }
   return chunks;
@@ -54,6 +58,7 @@ export async function POST(request: NextRequest) {
     excludePaths = [] as string[],
     crawlConfig = { maxDepth: 3, limit: 300 } as { maxDepth?: number; limit?: number },
     fileTypeRules = { pdf: 'index', docx: 'index', csv: 'skip' } as FileTypeRules,
+    crawlerInstructions = '',
   } = body;
 
   const maxDepth = crawlConfig.maxDepth || 3;
@@ -111,7 +116,7 @@ export async function POST(request: NextRequest) {
                 maxDepth: isExternal ? 1 : maxDepth,
                 limit: isExternal ? 50 : limit,
                 extractDepth: 'basic',
-                query: 'university academic programs courses admissions research faculty',
+                query: crawlerInstructions || 'university academic programs courses admissions research faculty',
                 excludePaths: excludePatterns.length > 0 ? excludePatterns : undefined,
               }
             );
