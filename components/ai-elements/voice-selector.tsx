@@ -1,15 +1,15 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 import { CircleSmallIcon, MarsIcon, MarsStrokeIcon, NonBinaryIcon, PauseIcon, PlayIcon, TransgenderIcon, VenusAndMarsIcon, VenusIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import type { ComponentProps, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
+import type { ComponentProps, ReactNode } from 'react';
 
 function useControllableState<T>({
   prop,
@@ -144,7 +144,7 @@ export const VoiceSelector = ({
 
   const voiceSelectorContext = useMemo(
     () => ({ open, setOpen, setValue, value }),
-    [value, setValue, open, setOpen]
+    [value, setValue, open, setOpen,]
   );
 
   return (
@@ -158,7 +158,7 @@ export const VoiceSelector = ({
 
 export interface VoiceSelectorTriggerProps extends ComponentProps<typeof DialogTrigger> {}
 
-export const VoiceSelectorTrigger = (props: VoiceSelectorTriggerProps) => (
+export const VoiceSelectorTrigger = (props: VoiceSelectorTriggerProps): React.JSX.Element => (
   <DialogTrigger {...props} />
 );
 
@@ -171,7 +171,7 @@ export const VoiceSelectorContent = ({
   children,
   title = 'Voice Selector',
   ...props
-}: VoiceSelectorContentProps) => (
+}: VoiceSelectorContentProps): React.JSX.Element => (
   <DialogContent
     aria-describedby={undefined}
     className={cn('p-0', className)}

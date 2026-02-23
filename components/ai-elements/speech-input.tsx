@@ -171,6 +171,7 @@ export const SpeechInput = ({
     setIsRecognitionReady(true);
 
     return () => {
+      setIsListening(false);
       speechRecognition.removeEventListener('start', handleStart);
       speechRecognition.removeEventListener('end', handleEnd);
       speechRecognition.removeEventListener('result', handleResult);
@@ -218,8 +219,9 @@ export const SpeechInput = ({
         }
         streamRef.current = null;
 
+        const mimeType = mediaRecorder.mimeType || audioChunksRef.current[0]?.type || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, {
-          type: 'audio/webm',
+          type: mimeType,
         });
 
         if (audioBlob.size > 0 && onAudioRecordedRef.current) {
@@ -238,12 +240,14 @@ export const SpeechInput = ({
         }
       };
 
-      const handleError = () => {
+      const handleError = (event: Event) => {
+        const errorEvent = event as ErrorEvent;
         setIsListening(false);
         for (const track of stream.getTracks()) {
           track.stop();
         }
         streamRef.current = null;
+        onErrorRef.current?.(new Error(errorEvent.message || 'MediaRecorder error'));
       };
 
       mediaRecorder.addEventListener('dataavailable', handleDataAvailable);

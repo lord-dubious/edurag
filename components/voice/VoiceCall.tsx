@@ -103,30 +103,33 @@ function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: stri
 
     setPlayingId(voiceId);
 
+    let audioUrl: string | null = null;
     try {
       const res = await fetch(`/api/voice/preview?voice=${encodeURIComponent(voiceId)}`);
       if (!res.ok) {
         throw new Error('Failed to fetch preview');
       }
       const audioBlob = await res.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
+      audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       previewAudioRef.current = audio;
       
       audio.onended = () => {
         setPlayingId(null);
-        URL.revokeObjectURL(audioUrl);
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
       };
       
       audio.onerror = () => {
         setPlayingId(null);
-        URL.revokeObjectURL(audioUrl);
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
       };
 
       await audio.play();
+      audioUrl = null;
     } catch (err) {
       console.error('Preview playback failed:', err);
       setPlayingId(null);
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
     }
   }, []);
 

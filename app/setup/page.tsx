@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { useDropzone } from 'react-dropzone';
 import { toast, Toaster } from 'sonner';
 import { Check, X, Shield, Loader2, Palette, ImageUp, Smile, Upload } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   VoiceSelector,
   VoiceSelectorTrigger,
@@ -21,7 +22,6 @@ import {
   VoiceSelectorGender,
   useVoiceSelector,
 } from '@/components/ai-elements/voice-selector';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

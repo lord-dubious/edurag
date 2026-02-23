@@ -85,7 +85,7 @@ const getCurrentTheme = (): 'light' | 'dark' => {
   return 'light';
 };
 
-const useTheme = (enabled: boolean) => {
+const useTheme = (enabled: boolean): 'light' | 'dark' => {
   const [theme, setTheme] = useState<'light' | 'dark'>(getCurrentTheme);
 
   useEffect(() => {

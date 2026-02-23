@@ -44,7 +44,7 @@ const TranscriptionContext = createContext<TranscriptionContextValue | null>(
   null
 );
 
-const useTranscription = () => {
+const useTranscription = (): TranscriptionContextValue => {
   const context = useContext(TranscriptionContext);
   if (!context) {
     throw new Error(

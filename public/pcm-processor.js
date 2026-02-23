@@ -9,8 +9,8 @@ class PCMProcessor extends AudioWorkletProcessor {
   }
 
   lowPassFilter(sample) {
-    const alpha = 0.5;
-    this.filterState = alpha * sample + (1 - alpha) * this.filterState;
+    const ALPHA = 0.5;
+    this.filterState = ALPHA * sample + (1 - ALPHA) * this.filterState;
     return this.filterState;
   }
 

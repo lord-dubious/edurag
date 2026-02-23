@@ -1,5 +1,5 @@
-import 'dotenv/config';
 import next from 'next';
+import 'dotenv/config';
 import { createServer } from 'http';
 import { parse } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -10,12 +10,12 @@ import runVoiceAgent from '@/lib/voice/agentBridge';
 import { streamTTS, createChunkIterator } from '@/lib/voice/ttsStream';
 import type { AgentOutput, AgentState, VoiceEvent } from '@/lib/voice/voiceTypes';
 
-const dev = process.env.NODE_ENV !== 'production';
-const hostname = process.env.HOST || '0.0.0.0';
-const port = parseInt(process.env.PORT || '3000', 10);
+const DEV = process.env.NODE_ENV !== 'production';
+const HOSTNAME = process.env.HOST || '0.0.0.0';
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const MAX_WS_CONNECTIONS = 100;
 
-const app = next({ dev, hostname, port });
+const app = next({ dev: DEV, hostname: HOSTNAME, port: PORT });
 const handler = app.getRequestHandler();
 
 interface PendingTurn {
@@ -177,11 +177,11 @@ async function main() {
     const { pathname } = parse(req.url!, true);
     if (pathname === '/api/voice') {
       const origin = req.headers.origin;
-      const allowedOrigins = dev
+      const allowedOrigins = DEV
         ? ['http://localhost:3000', 'http://127.0.0.1:3000']
         : [process.env.NEXT_PUBLIC_APP_URL].filter(Boolean);
       
-      if (!dev && allowedOrigins.length === 0) {
+      if (!DEV && allowedOrigins.length === 0) {
         socket.destroy();
         return;
       }
@@ -297,8 +297,8 @@ async function main() {
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 
-  server.listen(port, () => {
-    console.log(`> Ready on http://${hostname}:${port}`);
+  server.listen(PORT, HOSTNAME, () => {
+    console.log(`> Ready on http://${HOSTNAME}:${PORT}`);
   });
 }
 

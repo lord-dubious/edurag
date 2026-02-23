@@ -128,7 +128,7 @@ export const MicSelector = ({
     if (open && !hasPermission && !loading) {
       loadDevices();
     }
-  }, [open, hasPermission, loading, loadDevices]);
+  }, [open, hasPermission, loadDevices]);
 
   const contextValue = useMemo(
     () => ({
