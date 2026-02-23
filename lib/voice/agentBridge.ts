@@ -1,6 +1,6 @@
+import type { UIMessage } from 'ai';
 import { getHistory, appendMessage } from '@/lib/conversation';
 import { runAgent } from '@/lib/agent';
-import type { UIMessage } from 'ai';
 import type { Message } from '@/lib/conversation';
 import type { AgentOutput } from './voiceTypes';
 

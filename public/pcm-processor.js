@@ -5,6 +5,13 @@ class PCMProcessor extends AudioWorkletProcessor {
     this.bufferSize = 4096;
     this.downsampleRatio = 3;
     this.sampleCounter = 0;
+    this.filterState = 0;
+  }
+
+  lowPassFilter(sample) {
+    const alpha = 0.5;
+    this.filterState = alpha * sample + (1 - alpha) * this.filterState;
+    return this.filterState;
   }
 
   process(inputs, outputs, params) {
@@ -22,7 +29,7 @@ class PCMProcessor extends AudioWorkletProcessor {
       if (this.sampleCounter >= this.downsampleRatio) {
         this.sampleCounter = 0;
 
-        let sample = channel[i];
+        let sample = this.lowPassFilter(channel[i]);
         sample = Math.max(-1, Math.min(1, sample));
         const int16 = Math.round(sample * 32767);
         const clamped = Math.max(-32768, Math.min(32767, int16));

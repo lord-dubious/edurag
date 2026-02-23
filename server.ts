@@ -13,6 +13,7 @@ import type { AgentOutput, AgentState, VoiceEvent } from '@/lib/voice/voiceTypes
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOST || '0.0.0.0';
 const port = parseInt(process.env.PORT || '3000', 10);
+const MAX_WS_CONNECTIONS = 100;
 
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
@@ -175,6 +176,21 @@ async function main() {
   server.on('upgrade', (req, socket, head) => {
     const { pathname } = parse(req.url!, true);
     if (pathname === '/api/voice') {
+      const origin = req.headers.origin;
+      const allowedOrigins = dev
+        ? ['http://localhost:3000', 'http://127.0.0.1:3000']
+        : [process.env.NEXT_PUBLIC_APP_URL].filter(Boolean);
+      
+      if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
+        socket.destroy();
+        return;
+      }
+      
+      if (wss.clients.size >= MAX_WS_CONNECTIONS) {
+        socket.destroy();
+        return;
+      }
+      
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, req);
       });

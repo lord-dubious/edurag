@@ -79,7 +79,7 @@ async function writeEnvFile(apiKeys: ApiKeys, voiceConfig: VoiceConfig, settings
     VOICE_TTS_BASE_URL: sanitizeEnvValue(voiceConfig.voiceTtsBaseUrl),
     VOICE_TTS_VOICE: sanitizeEnvValue(voiceConfig.voiceTtsVoice),
     VOICE_TTS_MODEL: sanitizeEnvValue(voiceConfig.voiceTtsModel),
-    VOICE_TTS_PROVIDER: sanitizeEnvValue(voiceConfig?.ttsProvider),
+    VOICE_TTS_PROVIDER: sanitizeEnvValue(voiceConfig.ttsProvider),
     NEXT_PUBLIC_UNI_URL: sanitizeEnvValue(settings.uniUrl as string),
     BRAND_PRIMARY: sanitizeEnvValue(settings.brandPrimary as string),
     BRAND_SECONDARY: sanitizeEnvValue(settings.brandSecondary as string),
