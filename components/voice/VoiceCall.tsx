@@ -194,7 +194,6 @@ export default function VoiceCall({ onEnd }: VoiceCallProps): React.JSX.Element 
   const [connectionState, setConnectionState] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [agentState, setAgentState] = useState<PersonaState>('idle');
   const [transcript, setTranscript] = useState('');
-  const [response, setResponse] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedMic, setSelectedMic] = useState<string | undefined>();
   const [selectedVoice, setSelectedVoice] = useState<string | undefined>();
@@ -287,7 +286,6 @@ export default function VoiceCall({ onEnd }: VoiceCallProps): React.JSX.Element 
     setConnectionState('connecting');
     setErrorMessage(null);
     setTranscript('');
-    setResponse('');
     setShowSetup(false);
     playbackCursorRef.current = 0;
 
@@ -376,40 +374,17 @@ export default function VoiceCall({ onEnd }: VoiceCallProps): React.JSX.Element 
       const currentWs = ws;
 
       ws.onerror = () => {
+        if (wsRef.current === currentWs) {
+          cleanup();
+          wsRef.current = null;
+        }
         setErrorMessage('WebSocket connection error');
         setConnectionState('error');
-        if (wsRef.current === currentWs) {
-          if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-            mediaStreamRef.current = null;
-          }
-          if (micAudioContextRef.current) {
-            micAudioContextRef.current.close().catch(() => {});
-            micAudioContextRef.current = null;
-          }
-          if (speakerAudioContextRef.current) {
-            speakerAudioContextRef.current.close().catch(() => {});
-            speakerAudioContextRef.current = null;
-          }
-          audioWorkletNodeRef.current = null;
-        }
       };
 
       ws.onclose = () => {
         if (wsRef.current === currentWs) {
-          if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-            mediaStreamRef.current = null;
-          }
-          if (micAudioContextRef.current) {
-            micAudioContextRef.current.close().catch(() => {});
-            micAudioContextRef.current = null;
-          }
-          if (speakerAudioContextRef.current) {
-            speakerAudioContextRef.current.close().catch(() => {});
-            speakerAudioContextRef.current = null;
-          }
-          audioWorkletNodeRef.current = null;
+          cleanup();
           wsRef.current = null;
         }
         setConnectionState('disconnected');
@@ -498,21 +473,13 @@ export default function VoiceCall({ onEnd }: VoiceCallProps): React.JSX.Element 
         </div>
       </div>
 
-      {(transcript || response) && (
+      {transcript && (
         <Card className="max-h-40 overflow-y-auto">
           <CardContent className="p-3 space-y-2">
-            {transcript && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">You:</p>
-                <p className="text-sm">{transcript}</p>
-              </div>
-            )}
-            {response && (
-              <div>
-                <p className="text-xs text-primary mb-1">Assistant:</p>
-                <p className="text-sm">{response}</p>
-              </div>
-            )}
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">You:</p>
+              <p className="text-sm">{transcript}</p>
+            </div>
           </CardContent>
         </Card>
       )}

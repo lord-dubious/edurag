@@ -181,6 +181,11 @@ async function main() {
         ? ['http://localhost:3000', 'http://127.0.0.1:3000']
         : [process.env.NEXT_PUBLIC_APP_URL].filter(Boolean);
       
+      if (!dev && allowedOrigins.length === 0) {
+        socket.destroy();
+        return;
+      }
+      
       if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
         socket.destroy();
         return;

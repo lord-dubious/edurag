@@ -221,10 +221,23 @@ export type VoiceSelectorItemProps = ComponentProps<typeof CommandItem>;
 
 export const VoiceSelectorItem = ({
   className,
+  value,
   ...props
-}: VoiceSelectorItemProps) => (
-  <CommandItem className={cn('px-4 py-2', className)} {...props} />
-);
+}: VoiceSelectorItemProps) => {
+  const { setValue, setOpen } = useVoiceSelector();
+
+  const handleSelect = useCallback(
+    () => {
+      setValue(value);
+      setOpen(false);
+    },
+    [setValue, setOpen, value]
+  );
+
+  return (
+    <CommandItem className={cn('px-4 py-2', className)} onSelect={handleSelect} {...props} />
+  );
+};
 
 export type VoiceSelectorShortcutProps = ComponentProps<typeof CommandShortcut>;
 

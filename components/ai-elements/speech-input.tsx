@@ -2,14 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ComponentProps } from 'react';
+import { MicIcon, SquareIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-
+import type { ComponentProps } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-
-import { MicIcon, SquareIcon } from 'lucide-react';
 
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
@@ -96,7 +94,7 @@ export const SpeechInput = ({
 }: SpeechInputProps) => {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [mode] = useState<SpeechInputMode>(detectSpeechInputMode);
+  const [mode, setMode] = useState<SpeechInputMode>('none');
   const [isRecognitionReady, setIsRecognitionReady] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -112,6 +110,10 @@ export const SpeechInput = ({
   onTranscriptionChangeRef.current = onTranscriptionChange;
   onAudioRecordedRef.current = onAudioRecorded;
   onErrorRef.current = onError;
+
+  useEffect(() => {
+    setMode(detectSpeechInputMode());
+  }, []);
 
   useEffect(() => {
     if (mode !== 'speech-recognition') {
@@ -154,8 +156,10 @@ export const SpeechInput = ({
       }
     };
 
-    const handleError = () => {
+    const handleError = (event: Event) => {
+      const speechError = event as SpeechRecognitionErrorEvent;
       setIsListening(false);
+      onErrorRef.current?.(new Error(speechError.error || 'Speech recognition error'));
     };
 
     speechRecognition.addEventListener('start', handleStart);

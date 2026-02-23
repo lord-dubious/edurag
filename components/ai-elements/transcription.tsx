@@ -140,6 +140,7 @@ export const TranscriptionSegment = ({
       data-index={index}
       data-slot="transcription-segment"
       onClick={handleClick}
+      tabIndex={onSeek ? undefined : -1}
       type="button"
       {...props}
     >

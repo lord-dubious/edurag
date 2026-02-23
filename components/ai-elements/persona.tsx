@@ -126,7 +126,7 @@ const useTheme = (enabled: boolean) => {
 interface PersonaWithModelProps {
   rive: ReturnType<typeof useRive>['rive'];
   source: (typeof SOURCES)[keyof typeof SOURCES];
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 const PersonaWithModel = memo(
@@ -228,17 +228,22 @@ export const Persona: FC<PersonaProps> = memo(
       []
     );
 
-    const { rive, RiveComponent } = useRive({
-      autoplay: true,
-      onLoad: stableCallbacks.onLoad,
-      onLoadError: stableCallbacks.onLoadError,
-      onPause: stableCallbacks.onPause,
-      onPlay: stableCallbacks.onPlay,
-      onRiveReady: stableCallbacks.onReady,
-      onStop: stableCallbacks.onStop,
-      src: source.source,
-      stateMachines: STATE_MACHINE,
-    });
+    const riveParams = useMemo(
+      () => ({
+        autoplay: true,
+        onLoad: stableCallbacks.onLoad,
+        onLoadError: stableCallbacks.onLoadError,
+        onPause: stableCallbacks.onPause,
+        onPlay: stableCallbacks.onPlay,
+        onRiveReady: stableCallbacks.onReady,
+        onStop: stableCallbacks.onStop,
+        src: source.source,
+        stateMachines: STATE_MACHINE,
+      }),
+      [source.source, stableCallbacks]
+    );
+
+    const { rive, RiveComponent } = useRive(riveParams);
 
     const listeningInput = useStateMachineInput(
       rive,

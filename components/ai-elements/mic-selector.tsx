@@ -10,9 +10,6 @@ import {
   useState,
 } from 'react';
 
-import type { ComponentProps, ReactNode } from 'react';
-
-import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import { ChevronsUpDownIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -29,8 +26,53 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import type { ComponentProps, ReactNode } from 'react';
 
 const DEVICE_ID_REGEX = /\(([\da-fA-F]{4}:[\da-fA-F]{4})\)$/;
+
+function useControllableState<T>({
+  prop,
+  defaultProp,
+  onChange,
+}: {
+  prop: T | undefined;
+  defaultProp: T;
+  onChange?: (value: T) => void;
+}): [T, (value: T) => void];
+function useControllableState<T>({
+  prop,
+  defaultProp,
+  onChange,
+}: {
+  prop: T | undefined;
+  defaultProp: T | undefined;
+  onChange?: (value: T | undefined) => void;
+}): [T | undefined, (value: T | undefined) => void];
+function useControllableState<T>({
+  prop,
+  defaultProp,
+  onChange,
+}: {
+  prop: T | undefined;
+  defaultProp: T | undefined;
+  onChange?: (value: T | undefined) => void;
+}): [T | undefined, (value: T | undefined) => void] {
+  const [uncontrolledProp, setUncontrolledProp] = useState<T | undefined>(defaultProp);
+  const isControlled = prop !== undefined;
+  const value = isControlled ? prop : uncontrolledProp;
+
+  const setValue = useCallback(
+    (nextValue: T | undefined) => {
+      if (!isControlled) {
+        setUncontrolledProp(nextValue);
+      }
+      (onChange as ((value: T | undefined) => void) | undefined)?.(nextValue);
+    },
+    [isControlled, onChange]
+  );
+
+  return [value, setValue];
+}
 
 interface MicSelectorContextType {
   data: MediaDeviceInfo[];
@@ -240,7 +282,7 @@ export const MicSelectorLabel = ({
   }
 
   const [, deviceId] = matches;
-  const name = device.label.replace(DEVICE_ID_REGEX, '');
+  const name = device.label.replace(DEVICE_ID_REGEX, '').trim();
 
   return (
     <span className={className} {...props}>
@@ -289,8 +331,11 @@ export const useAudioDevices = (): UseAudioDevicesResult => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState(false);
+  const loadingRef = useRef(false);
 
   const loadDevicesWithoutPermission = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       setLoading(true);
       setError(null);
@@ -309,14 +354,13 @@ export const useAudioDevices = (): UseAudioDevicesResult => {
       console.error('Error getting audio devices:', message);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, []);
 
   const loadDevicesWithPermission = useCallback(async () => {
-    if (loading) {
-      return;
-    }
-
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       setLoading(true);
       setError(null);
@@ -343,8 +387,9 @@ export const useAudioDevices = (): UseAudioDevicesResult => {
       console.error('Error getting audio devices:', message);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
-  }, [loading]);
+  }, []);
 
   useEffect(() => {
     loadDevicesWithoutPermission();
