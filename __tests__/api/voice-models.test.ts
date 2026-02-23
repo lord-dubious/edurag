@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET } from '@/app/api/voice/models/route';
+import { NextRequest } from 'next/server';
 
 vi.mock('@deepgram/sdk', () => ({
   createClient: vi.fn(() => ({
@@ -14,6 +15,12 @@ vi.mock('@/lib/env', () => ({
     DEEPGRAM_API_KEY: 'test-key',
   },
 }));
+
+function createRequest(headers: Record<string, string> = {}): NextRequest {
+  return new NextRequest('http://localhost/api/voice/models', {
+    headers: new Headers(headers),
+  });
+}
 
 describe('GET /api/voice/models', () => {
   beforeEach(() => {
@@ -31,11 +38,11 @@ describe('GET /api/voice/models', () => {
       },
       error: null,
     });
-    (createClient as any).mockReturnValue({
+    (createClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       models: { getAll: mockGetAll },
     });
 
-    const response = await GET();
+    const response = await GET(createRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -43,15 +50,30 @@ describe('GET /api/voice/models', () => {
     expect(data.models[0].name).toBe('aura-2-andromeda-en');
   });
 
-  it('returns 400 when DEEPGRAM_API_KEY is not set', async () => {
+  it('returns empty models when no API key is available', async () => {
     const { env } = await import('@/lib/env');
-    (env as any).DEEPGRAM_API_KEY = undefined;
+    (env as unknown as Record<string, unknown>).DEEPGRAM_API_KEY = undefined;
 
-    const response = await GET();
+    const response = await GET(createRequest());
     const data = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(data.error).toContain('DEEPGRAM_API_KEY');
+    expect(response.status).toBe(200);
+    expect(data.models).toEqual([]);
+  });
+
+  it('uses header API key when provided', async () => {
+    const { createClient } = await import('@deepgram/sdk');
+    const mockGetAll = vi.fn().mockResolvedValue({
+      result: { tts: [{ name: 'test-model', canonical_name: 'Test', languages: ['en'] }] },
+      error: null,
+    });
+    (createClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      models: { getAll: mockGetAll },
+    });
+
+    await GET(createRequest({ 'X-Deepgram-Key': 'header-key' }));
+
+    expect(createClient).toHaveBeenCalledWith('header-key');
   });
 
   it('handles Deepgram API errors gracefully', async () => {
@@ -60,14 +82,14 @@ describe('GET /api/voice/models', () => {
       result: null,
       error: { message: 'API error' },
     });
-    (createClient as any).mockReturnValue({
+    (createClient as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       models: { getAll: mockGetAll },
     });
 
     const { env } = await import('@/lib/env');
-    (env as any).DEEPGRAM_API_KEY = 'test-key';
+    (env as unknown as Record<string, unknown>).DEEPGRAM_API_KEY = 'test-key';
 
-    const response = await GET();
+    const response = await GET(createRequest());
 
     expect(response.status).toBe(500);
   });
