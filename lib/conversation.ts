@@ -1,5 +1,4 @@
 import { getMongoCollection } from './vectorstore';
-import { env } from './env';
 import { ObjectId, type Collection, type WithId, type Document } from 'mongodb';
 
 export interface Message {
@@ -24,8 +23,10 @@ export interface Conversation {
   updatedAt: Date;
 }
 
+const CONVERSATIONS_COLLECTION = 'conversations';
+
 export async function getConversationsCollection(): Promise<Collection<ConversationDocument>> {
-  return getMongoCollection<ConversationDocument>(env.CONVERSATIONS_COLLECTION);
+  return getMongoCollection<ConversationDocument>(CONVERSATIONS_COLLECTION);
 }
 
 export async function getHistory(threadId: string): Promise<Message[]> {

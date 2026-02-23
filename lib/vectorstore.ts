@@ -7,25 +7,30 @@ declare global {
   var mongoClient: MongoClient | undefined;
 }
 
-export async function getMongoClient(): Promise<MongoClient> {
-  if (globalThis.mongoClient) {
+export async function getMongoClient(customUri?: string): Promise<MongoClient> {
+  if (globalThis.mongoClient && !customUri) {
     return globalThis.mongoClient;
   }
   
-  if (!env.MONGODB_URI) {
+  const uri = customUri || env.MONGODB_URI;
+  if (!uri) {
     throw new Error('MONGODB_URI environment variable is required');
   }
   
-  const client = new MongoClient(env.MONGODB_URI);
+  const client = new MongoClient(uri);
   await client.connect();
-  globalThis.mongoClient = client;
+  
+  if (!customUri) {
+    globalThis.mongoClient = client;
+  }
   return client;
 }
 
 export async function getMongoCollection<TSchema extends MongoDocument = MongoDocument>(
-  collectionName: string
+  collectionName: string,
+  customUri?: string
 ) {
-  const client = await getMongoClient();
+  const client = await getMongoClient(customUri);
   return client.db(env.DB_NAME).collection<TSchema>(collectionName);
 }
 

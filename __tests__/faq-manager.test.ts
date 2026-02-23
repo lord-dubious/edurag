@@ -19,7 +19,7 @@ describe('FAQ Manager', () => {
   ];
 
   beforeAll(async () => {
-    client = new MongoClient(env.MONGODB_URI);
+    client = new MongoClient(env.MONGODB_URI!);
     await client.connect();
 
     const collection = await getMongoCollection(env.FAQ_COLLECTION);

@@ -5,7 +5,7 @@ const envSchema = z.object({
   CHAT_BASE_URL: z.string().url().optional().or(z.literal('')),
   CHAT_MODEL: z.string().default('gpt-oss-120b'),
   CHAT_MAX_TOKENS: z.coerce.number().default(32000),
-  CHAT_CONTEXT_LENGTH: z.coerce.number().default(65536),
+  CHAT_MAX_STEPS: z.coerce.number().min(1).max(20).default(5),
 
   EMBEDDING_API_KEY: z.string().min(1).optional(),
   EMBEDDING_BASE_URL: z.string().url().optional().or(z.literal('')),
@@ -19,7 +19,6 @@ const envSchema = z.object({
   COLLECTION3: z.string().default('checkpoint_writes_aio'),
   VECTOR_COLLECTION: z.string().default('crawled_index'),
   VECTOR_INDEX_NAME: z.string().default('index'),
-  CONVERSATIONS_COLLECTION: z.string().default('conversations'),
   FAQ_COLLECTION: z.string().default('faqs'),
   DOMAINS_COLLECTION: z.string().default('domains'),
 
@@ -37,8 +36,14 @@ const envSchema = z.object({
   CRAWL_FORMAT: z.enum(['markdown', 'text']).default('markdown'),
 
   ADMIN_SECRET: z.string().min(16).optional(),
-  NEXT_PUBLIC_APP_NAME: z.string().default('University Knowledge Base'),
-  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+  
+  UNIVERSITY_URL: z.string().url().optional().or(z.literal('')),
+  AUTO_CRAWL: z.coerce.boolean().default(false),
+  
+  UPLOADTHING_SECRET: z.string().min(1).optional(),
+  UPLOADTHING_APP_ID: z.string().min(1).optional(),
+  
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 
 let _env: z.infer<typeof envSchema> | undefined;
@@ -57,3 +62,13 @@ export const env = new Proxy({} as z.infer<typeof envSchema>, {
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+export function hasRequiredEnvVars(): boolean {
+  return !!(
+    process.env.MONGODB_URI &&
+    process.env.CHAT_API_KEY &&
+    process.env.EMBEDDING_API_KEY &&
+    process.env.TAVILY_API_KEY &&
+    process.env.ADMIN_SECRET
+  );
+}

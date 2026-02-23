@@ -5,6 +5,7 @@ import { getMongoCollection } from '@/lib/vectorstore';
 import { getEmbeddings } from '@/lib/providers';
 import { cleanContent, extractTitle } from '@/lib/crawl';
 import { errorResponse } from '@/lib/errors';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
 
 interface CrawlProgress {
   phase: 'preparing' | 'crawling' | 'chunking' | 'embedding' | 'storing' | 'complete' | 'error';
@@ -49,13 +50,34 @@ function shouldSkipFile(url: string, fileTypeRules: FileTypeRules): boolean {
   return false;
 }
 
+function isBinaryFile(url: string): boolean {
+  const lowerUrl = url.toLowerCase();
+  return lowerUrl.endsWith('.pdf') || 
+         lowerUrl.endsWith('.docx') || 
+         lowerUrl.endsWith('.doc') || 
+         lowerUrl.endsWith('.xlsx') || 
+         lowerUrl.endsWith('.xls') || 
+         lowerUrl.endsWith('.pptx') || 
+         lowerUrl.endsWith('.ppt') ||
+         lowerUrl.endsWith('.zip') ||
+         lowerUrl.endsWith('.exe') ||
+         lowerUrl.endsWith('.dmg');
+}
+
 interface CrawlRequestBody {
   universityUrl: string;
   externalUrls?: string[];
   excludePaths?: string[];
-  crawlConfig?: { maxDepth?: number; limit?: number };
+  crawlConfig?: { maxDepth?: number; maxBreadth?: number; limit?: number };
   fileTypeRules?: FileTypeRules;
   crawlerInstructions?: string;
+  apiKeys?: {
+    embeddingApiKey?: string;
+    embeddingModel?: string;
+    embeddingDimensions?: number;
+    tavilyApiKey?: string;
+    mongodbUri?: string;
+  };
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -69,10 +91,28 @@ export async function POST(request: NextRequest): Promise<Response> {
     crawlConfig = { maxDepth: 3, limit: 300 },
     fileTypeRules = { pdf: 'index', docx: 'index', csv: 'skip' },
     crawlerInstructions = '',
+    apiKeys = {},
   } = body;
 
-  const maxDepth = crawlConfig.maxDepth || 3;
-  const limit = crawlConfig.limit || 300;
+  const embeddingApiKey = apiKeys.embeddingApiKey || env.EMBEDDING_API_KEY;
+  const embeddingModel = apiKeys.embeddingModel || env.EMBEDDING_MODEL;
+  const embeddingDimensions = apiKeys.embeddingDimensions || env.EMBEDDING_DIMENSIONS;
+  const tavilyApiKey = apiKeys.tavilyApiKey || env.TAVILY_API_KEY;
+  const mongodbUri = apiKeys.mongodbUri || env.MONGODB_URI;
+
+  if (!embeddingApiKey) {
+    return errorResponse('VALIDATION_ERROR', 'Embedding API key is required', 400);
+  }
+  if (!tavilyApiKey) {
+    return errorResponse('VALIDATION_ERROR', 'Tavily API key is required', 400);
+  }
+  if (!mongodbUri) {
+    return errorResponse('VALIDATION_ERROR', 'MongoDB URI is required', 400);
+  }
+
+  const maxDepth = crawlConfig.maxDepth ?? 3;
+  const maxBreadth = crawlConfig.maxBreadth ?? 50;
+  const limit = crawlConfig.limit ?? 300;
 
   if (!universityUrl) {
     return errorResponse('VALIDATION_ERROR', 'University URL is required', 400);
@@ -80,8 +120,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const tvly = tavily({ apiKey: env.TAVILY_API_KEY });
-      const embeddings = getEmbeddings();
+      const tvly = tavily({ apiKey: tavilyApiKey });
       
       let totalChunks = 0;
       let totalDocs = 0;
@@ -121,9 +160,10 @@ export async function POST(request: NextRequest): Promise<Response> {
               baseUrl,
               {
                 maxDepth: isExternal ? 1 : maxDepth,
+                maxBreadth: isExternal ? 20 : maxBreadth,
                 limit: isExternal ? 50 : limit,
                 extractDepth: 'basic',
-                instructions: crawlerInstructions || 'university academic programs courses admissions research faculty',
+                instructions: crawlerInstructions || DEFAULT_CRAWL_INSTRUCTIONS,
                 excludePaths: excludePatterns.length > 0 ? excludePatterns : undefined,
               }
             );
@@ -141,10 +181,15 @@ export async function POST(request: NextRequest): Promise<Response> {
               continue;
             }
 
-            const collection = await getMongoCollection('crawled_index');
+            const collection = await getMongoCollection('crawled_index', mongodbUri);
             
             for (const page of crawlResult.results) {
               if (!page.url || !page.rawContent) continue;
+              
+              if (isBinaryFile(page.url)) {
+                console.log(`Skipping binary file: ${page.url}`);
+                continue;
+              }
               
               if (shouldSkipFile(page.url, fileTypeRules)) {
                 continue;
@@ -154,7 +199,14 @@ export async function POST(request: NextRequest): Promise<Response> {
               if (cleaned.length < 100) continue;
 
               const title = extractTitle(page.rawContent, page.url) || page.url.split('/').pop() || 'Untitled';
-              const chunks = chunkText(cleaned, 1500, 300);
+              const rawChunks = chunkText(cleaned, 1500, 300);
+              const chunks = rawChunks.filter(c => c.trim().length > 50);
+              
+              if (chunks.length === 0) {
+                console.log(`No valid chunks for ${page.url}`);
+                continue;
+              }
+              
               totalChunks += chunks.length;
 
               sendProgress(controller, {
@@ -168,7 +220,22 @@ export async function POST(request: NextRequest): Promise<Response> {
               });
 
               const documents = [];
-              const embeddingsArray = await embeddings.embedDocuments(chunks);
+              let embeddingsArray: number[][] | undefined;
+              try {
+                console.log(`Embedding ${chunks.length} chunks for ${page.url}, first chunk length: ${chunks[0]?.length ?? 0}`);
+                const embeddingsInstance = getEmbeddings(embeddingApiKey, embeddingModel, embeddingDimensions);
+                embeddingsArray = await embeddingsInstance.embedDocuments(chunks);
+                console.log(`Got ${embeddingsArray?.length ?? 0} embeddings`);
+              } catch (embedError) {
+                console.error(`Embedding failed for ${page.url}:`, embedError instanceof Error ? embedError.message : embedError);
+                console.error(`Chunks info: count=${chunks.length}, lengths=[${chunks.slice(0, 3).map(c => c.length).join(', ')}...]`);
+                continue;
+              }
+              
+              if (!embeddingsArray || embeddingsArray.length !== chunks.length) {
+                console.error(`Embedding mismatch for ${page.url}: got ${embeddingsArray?.length ?? 0} embeddings for ${chunks.length} chunks`);
+                continue;
+              }
               
               for (let j = 0; j < chunks.length; j++) {
                 documents.push({

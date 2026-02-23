@@ -3,6 +3,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { errorResponse } from '@/lib/errors';
+import { env } from '@/lib/env';
 
 const ALLOWED_TYPES: Record<string, string[]> = {
   'image/png': ['.png'],
@@ -37,6 +38,10 @@ function detectMimeType(buffer: Buffer): string | null {
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
+  if (env.UPLOADTHING_SECRET && env.UPLOADTHING_APP_ID) {
+    return errorResponse('VALIDATION_ERROR', 'Use /api/uploadthing for Uploadthing uploads', 400);
+  }
+
   try {
     const formData = await request.formData();
     const rawFile = formData.get('file');
@@ -73,7 +78,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       return errorResponse('VALIDATION_ERROR', 'Invalid file content. File signature does not match allowed types.', 400);
     }
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+    const uploadDir = path.join(process.cwd(), 'media');
     await mkdir(uploadDir, { recursive: true });
 
     const uuid = randomUUID();
@@ -83,14 +88,16 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await writeFile(filePath, buffer);
 
-    const publicUrl = `/uploads/${fileName}`;
+    const publicUrl = `/media/${fileName}`;
 
     return NextResponse.json({
-      success: true,
       url: publicUrl,
-      fileName,
+      fileName: file.name,
+      size: file.size,
+      mimeType: detectedType,
     });
   } catch (error) {
+    console.error('[Upload] Error:', error);
     return errorResponse('UPLOAD_FAILED', 'Failed to upload file', 500, error);
   }
 }

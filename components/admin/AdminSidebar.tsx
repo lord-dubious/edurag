@@ -14,6 +14,7 @@ import {
   Sun,
   Settings,
   Image as ImageIcon,
+  BookOpen,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useBrand } from '@/components/providers/BrandProvider';
@@ -28,6 +29,7 @@ const navSections = [
   {
     title: 'Knowledge Base',
     items: [
+      { href: '/admin/knowledge-base', label: 'Crawl Settings', icon: BookOpen },
       { href: '/admin/domains', label: 'Domains', icon: Globe },
     ],
   },

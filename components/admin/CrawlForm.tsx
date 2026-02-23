@@ -17,6 +17,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ChevronDown, Globe } from 'lucide-react';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
 
 interface CrawlFormData {
   url: string;
@@ -36,18 +37,16 @@ interface CrawlFormProps {
 }
 
 export function CrawlForm({ onSubmit, isLoading }: CrawlFormProps) {
-  const DEFAULT_INSTRUCTIONS = 'Focus on academic programs, admissions, tuition, campus life, and student services. Skip news articles, events, and administrative pages that students don\'t need.';
-
   const [formData, setFormData] = useState<CrawlFormData>({
     url: '',
     maxDepth: 2,
     maxBreadth: 20,
-    limit: 100,
+    limit: 300,
     extractDepth: 'advanced',
     format: 'markdown',
     selectPaths: '',
     excludePaths: '/admin/*,/login/*,/news/*,/events/*',
-    instructions: DEFAULT_INSTRUCTIONS,
+    instructions: DEFAULT_CRAWL_INSTRUCTIONS,
   });
   const [optionsOpen, setOptionsOpen] = useState(false);
 
@@ -183,7 +182,7 @@ export function CrawlForm({ onSubmit, isLoading }: CrawlFormProps) {
               <Textarea
                 value={formData.instructions}
                 onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
-                placeholder={DEFAULT_INSTRUCTIONS}
+                placeholder={DEFAULT_CRAWL_INSTRUCTIONS}
                 rows={2}
               />
               <p className="text-xs text-muted-foreground">

@@ -28,9 +28,9 @@ export function useBrand(): BrandContextType {
 }
 
 const DEFAULT_BRAND: BrandSettings = {
-  appName: 'EduRAG',
-  primaryColor: '#2563eb',
-  secondaryColor: '#1d4ed8',
+  appName: 'University Knowledge Base',
+  primaryColor: '#3b82f6',
+  secondaryColor: '#1e40af',
   logoUrl: null,
   emoji: '🎓',
   iconType: 'emoji',
@@ -38,11 +38,6 @@ const DEFAULT_BRAND: BrandSettings = {
   onboarded: false,
 };
 
-/**
- * Approximates OKLCH color space from hex.
- * This is a lightweight approximation, not a true OKLCH conversion.
- * For accurate OKLCH, use a library like culori or colorjs.io.
- */
 function hexToApproxOklch(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
@@ -82,42 +77,24 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [brand, setBrand] = useState<BrandSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
-interface OnboardingStatusResponse {
-  isOnboarded: boolean;
-  settings?: {
-    appName?: string;
-    brandPrimary?: string;
-    brandSecondary?: string;
-    brandLogoUrl?: string;
-    emoji?: string;
-    iconType?: 'logo' | 'emoji' | 'upload';
-    showTitle?: boolean;
-  };
-}
-
   useEffect(() => {
     async function fetchBrand() {
       try {
-        const res = await fetch('/api/onboarding/status');
+        const res = await fetch('/api/settings');
         if (res.ok) {
-          const data: OnboardingStatusResponse = await res.json();
-          if (data.isOnboarded && data.settings) {
-            const settings = data.settings;
-            const brandSettings: BrandSettings = {
-              appName: settings.appName || DEFAULT_BRAND.appName,
-              primaryColor: settings.brandPrimary || DEFAULT_BRAND.primaryColor,
-              secondaryColor: settings.brandSecondary || DEFAULT_BRAND.secondaryColor,
-              logoUrl: settings.brandLogoUrl || null,
-              emoji: settings.emoji || null,
-              iconType: settings.iconType || 'emoji',
-              showTitle: settings.showTitle !== false,
-              onboarded: true,
-            };
-            setBrand(brandSettings);
-            applyBrandColors(brandSettings);
-          } else {
-            setBrand(DEFAULT_BRAND);
-          }
+          const data = await res.json();
+          const brandSettings: BrandSettings = {
+            appName: data.appName || DEFAULT_BRAND.appName,
+            primaryColor: data.brandPrimary || DEFAULT_BRAND.primaryColor,
+            secondaryColor: data.brandSecondary || DEFAULT_BRAND.secondaryColor,
+            logoUrl: data.brandLogoUrl || null,
+            emoji: data.emoji || null,
+            iconType: data.iconType || 'emoji',
+            showTitle: data.showTitle !== false,
+            onboarded: data.onboarded ?? false,
+          };
+          setBrand(brandSettings);
+          applyBrandColors(brandSettings);
         } else {
           setBrand(DEFAULT_BRAND);
         }

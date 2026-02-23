@@ -1,5 +1,6 @@
 'use client';
 
+import { HexColorPicker, HexColorInput } from 'react-colorful';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -7,7 +8,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Paintbrush } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
@@ -44,8 +44,25 @@ export function ColorPicker({
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64">
+      <PopoverContent className="w-72">
         <div className="flex flex-col gap-4">
+          <div className="space-y-3">
+            <Label className="text-xs text-muted-foreground">Color Picker</Label>
+            <HexColorPicker
+              color={value}
+              onChange={onChange}
+              style={{ width: '100%', height: 150 }}
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">#</span>
+              <HexColorInput
+                color={value}
+                onChange={onChange}
+                prefixed
+                className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm font-mono"
+              />
+            </div>
+          </div>
           {presets && presets.length > 0 && (
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Presets</Label>
@@ -54,9 +71,8 @@ export function ColorPicker({
                   <button
                     key={p.primary}
                     type="button"
-                    className={`w-full aspect-square rounded-md cursor-pointer active:scale-95 transition-all ring-offset-background border ${
-                      value === p.primary ? 'ring-2 ring-ring ring-offset-2 border-transparent' : 'border-border hover:border-muted-foreground/30'
-                    }`}
+                    className={`w-full aspect-square rounded-md cursor-pointer active:scale-95 transition-all ring-offset-background border ${value === p.primary ? 'ring-2 ring-ring ring-offset-2 border-transparent' : 'border-border hover:border-muted-foreground/30'
+                      }`}
                     style={{ backgroundColor: p.primary }}
                     onClick={() => onChange(p.primary)}
                     title={p.name}
@@ -65,19 +81,6 @@ export function ColorPicker({
               </div>
             </div>
           )}
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Custom Hex</Label>
-            <div className="flex items-center gap-2">
-              <Paintbrush className="w-4 h-4 text-muted-foreground" />
-              <Input
-                id="custom"
-                value={value}
-                className="h-8 flex-1 font-mono text-xs"
-                onChange={(e) => onChange(e.currentTarget.value)}
-                placeholder="#000000"
-              />
-            </div>
-          </div>
         </div>
       </PopoverContent>
     </Popover>

@@ -3,12 +3,21 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-
+  
   const onboardedCookie = request.cookies.get('edurag_onboarded')?.value;
-  const hasEnvUrl = !!process.env.NEXT_PUBLIC_UNI_URL;
-  const isOnboarded = onboardedCookie === 'true' || hasEnvUrl;
+  const isOnboarded = onboardedCookie === 'true';
+  const hasRequiredEnv = !!(
+    process.env.MONGODB_URI &&
+    process.env.CHAT_API_KEY &&
+    process.env.EMBEDDING_API_KEY &&
+    process.env.TAVILY_API_KEY &&
+    process.env.ADMIN_SECRET
+  );
 
-  if (!isOnboarded && pathname !== '/setup' && !pathname.startsWith('/api/onboarding') && !pathname.startsWith('/api/upload')) {
+  if (!isOnboarded && !pathname.startsWith('/setup') && !pathname.startsWith('/api/onboarding') && !pathname.startsWith('/api/settings') && !pathname.startsWith('/api/upload') && !pathname.startsWith('/_next')) {
+    if (hasRequiredEnv) {
+      return NextResponse.next();
+    }
     return NextResponse.redirect(new URL('/setup', request.url));
   }
 
