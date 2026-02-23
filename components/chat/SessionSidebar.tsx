@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { PlusIcon, Trash2Icon, MessageSquareIcon } from 'lucide-react';
 import { SESSIONS_STORAGE_KEY } from '@/lib/constants';
+import { useBrand } from '@/components/providers/BrandProvider';
 
 interface Session {
   id: string;
@@ -56,8 +57,19 @@ function formatTime(timestamp: number): string {
 }
 
 export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, onDeleteSession, collapsed, sessionsVersion }: Props) {
+  const { brand } = useBrand();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [todayDateString, setTodayDateString] = useState(() => new Date().toDateString());
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const hasCalledSelectRef = useRef<string | null>(null);
+
+  const activeSessionId = pendingSessionId ?? currentThreadId;
+
+  useEffect(() => {
+    if (pendingSessionId && pendingSessionId === currentThreadId) {
+      setPendingSessionId(null);
+    }
+  }, [currentThreadId, pendingSessionId]);
 
   useEffect(() => {
     const updateDateKey = () => setTodayDateString(new Date().toDateString());
@@ -119,6 +131,7 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
     <aside
       className={`border-r bg-background flex flex-col transition-all duration-200 overflow-hidden ${collapsed ? 'w-0 opacity-0 pointer-events-none' : 'w-64'
         }`}
+      style={{ borderRightColor: brand?.primaryColor }}
     >
       <div className="p-3 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -150,37 +163,51 @@ export function SessionSidebar({ currentThreadId, onNewChat, onSelectSession, on
                 {group}
               </div>
               <div className="space-y-0.5">
-                {groupSessions.map((session) => (
-                  <div
-                    key={session.id}
-                    onClick={() => onSelectSession(session.id)}
-                    className={`group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors ${session.id === currentThreadId
+                {groupSessions.map((session) => {
+                  const isActive = session.id === activeSessionId;
+
+                  const handleSessionClick = () => {
+                    if (hasCalledSelectRef.current === session.id && session.id === currentThreadId) {
+                      return;
+                    }
+
+                    setPendingSessionId(session.id);
+                    hasCalledSelectRef.current = session.id;
+                    onSelectSession(session.id);
+                  };
+
+                  return (
+                    <div
+                      key={session.id}
+                      onClick={handleSessionClick}
+                      className={`group flex items-center gap-2 px-2 py-2 rounded-md cursor-pointer transition-colors ${isActive
                         ? 'bg-primary/10'
                         : 'hover:bg-muted'
                       }`}
-                  >
-                    <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 ${session.id === currentThreadId ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
-                      }`}>
-                      <MessageSquareIcon className="w-3.5 h-3.5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-sm truncate ${session.id === currentThreadId ? 'text-primary font-medium' : ''
-                        }`}>
-                        {session.title}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {formatTime(session.createdAt)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={(e) => handleDelete(e, session.id)}
-                      className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
-                      title="Delete"
                     >
-                      <Trash2Icon className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                      <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 ${isActive ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+                        }`}>
+                        <MessageSquareIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm truncate ${isActive ? 'text-primary font-medium' : ''
+                          }`}>
+                          {session.title}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {formatTime(session.createdAt)}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => handleDelete(e, session.id)}
+                        className="w-5 h-5 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                        title="Delete"
+                      >
+                        <Trash2Icon className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

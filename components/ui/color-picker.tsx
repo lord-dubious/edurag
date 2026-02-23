@@ -7,7 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Paintbrush } from 'lucide-react';
+import { Paintbrush, Pipette } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +26,19 @@ export function ColorPicker({
   className,
   label,
 }: ColorPickerProps) {
+  const pickColor = async () => {
+    if (typeof window === 'undefined' || !('EyeDropper' in window)) {
+      return;
+    }
+    try {
+      const eyeDropper = new (window as unknown as { EyeDropper: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper();
+      const result = await eyeDropper.open();
+      onChange(result.sRGBHex);
+    } catch {
+      // User cancelled or not supported
+    }
+  };
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -65,6 +78,26 @@ export function ColorPicker({
               </div>
             </div>
           )}
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Custom Color</Label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="w-10 h-10 rounded cursor-pointer border border-input"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={pickColor}
+                title="Pick color from screen"
+              >
+                <Pipette className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Custom Hex</Label>
             <div className="flex items-center gap-2">

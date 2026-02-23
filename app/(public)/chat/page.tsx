@@ -1,16 +1,10 @@
-import { ChatInterface } from '@/components/chat/ChatInterface';
 import { Suspense } from 'react';
+import { ChatInterface } from '@/components/chat/ChatInterface';
 
-async function ChatPageContent({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const params = await searchParams;
-  const initialQuery = params.q ? decodeURIComponent(params.q) : undefined;
-  return <ChatInterface initialQuery={initialQuery} />;
-}
-
-export default function ChatPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default function ChatPage() {
   return (
-    <Suspense fallback={<ChatInterface />}>
-      <ChatPageContent searchParams={searchParams} />
+    <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+      <ChatInterface />
     </Suspense>
   );
 }

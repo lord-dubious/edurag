@@ -4,12 +4,17 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { nanoid } from 'nanoid';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type UIMessage } from 'ai';
-import { PanelLeftIcon, MoonIcon, SunIcon } from 'lucide-react';
+import { PanelLeftIcon, MoonIcon, SunIcon, Phone, PhoneOff } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useSearchParams } from 'next/navigation';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { SessionSidebar } from './SessionSidebar';
 import { CitationPanel } from './CitationPanel';
+import VoiceCall from '@/components/voice/VoiceCall';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { SESSIONS_STORAGE_KEY } from '@/lib/constants';
 import type { Source } from '@/lib/agent/types';
 
@@ -91,8 +96,17 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sessionsVersion, setSessionsVersion] = useState(0);
   const [pendingInput, setPendingInput] = useState<string | null>(null);
+  const [voiceMode, setVoiceMode] = useState(false);
   const isLoadingSessionRef = useRef(false);
   const { theme, setTheme } = useTheme();
+  const searchParams = useSearchParams();
+  const startWithVoice = searchParams.get('voice') === 'true';
+
+  useEffect(() => {
+    if (startWithVoice) {
+      setVoiceMode(true);
+    }
+  }, [startWithVoice]);
 
   const transport = useMemo(() => new DefaultChatTransport({
     api: '/api/chat',
@@ -156,9 +170,11 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
       return;
     }
 
-    setPendingInput(initialQuery);
+    const decodedQuery = decodeURIComponent(initialQuery);
+    setPendingInput(null);
+    sendMessage({ text: decodedQuery });
     initialQuerySentRef.current = true;
-  }, [initialQuery, status, messages.length, setMessages]);
+  }, [initialQuery, status, messages.length, setMessages, sendMessage]);
 
   useEffect(() => {
     if (status === 'ready' && isLoadingSessionRef.current) {
@@ -262,6 +278,21 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
             {process.env.NEXT_PUBLIC_APP_NAME}
           </h1>
           <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setVoiceMode(!voiceMode)}
+                  className={cn(voiceMode && 'bg-primary/10 text-primary')}
+                >
+                  {voiceMode ? <PhoneOff className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {voiceMode ? 'End Voice Call' : 'Start Voice Call'}
+              </TooltipContent>
+            </Tooltip>
             {lastSources.length > 0 && (
               <button
                 onClick={() => setShowSources(!showSources)}
@@ -292,12 +323,16 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
           <main className="flex-1 flex flex-col min-w-0 relative">
             <div className="flex-1 overflow-y-auto">
               <div className="max-w-3xl mx-auto p-4 md:p-6 pb-48 md:pb-56">
-                <ChatMessages
-                  messages={messages}
-                  sources={sources}
-                  status={status}
-                  onRegenerate={regenerate}
-                />
+                {voiceMode ? (
+                  <VoiceCall onEnd={() => setVoiceMode(false)} />
+                ) : (
+                  <ChatMessages
+                    messages={messages}
+                    sources={sources}
+                    status={status}
+                    onRegenerate={regenerate}
+                  />
+                )}
                 {error && (
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm mt-4">
                     <span>Something went wrong.</span>
@@ -312,14 +347,16 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
               </div>
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10">
-              <div className="max-w-3xl mx-auto">
-                <ChatInput onSubmit={handleSubmit} status={status} defaultInput={pendingInput ?? undefined} />
+            {!voiceMode && (
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10">
+                <div className="max-w-3xl mx-auto">
+                  <ChatInput onSubmit={handleSubmit} status={status} defaultInput={pendingInput ?? undefined} />
+                </div>
               </div>
-            </div>
+            )}
           </main>
 
-          {showSources && lastSources.length > 0 && (
+          {showSources && lastSources.length > 0 && !voiceMode && (
             <CitationPanel sources={lastSources} />
           )}
         </div>

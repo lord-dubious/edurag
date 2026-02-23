@@ -2,7 +2,8 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon, Phone } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputFooter, PromptInputSubmit } from '@/components/ai-elements/prompt-input';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import type { ChatStatus } from 'ai';
@@ -102,6 +103,15 @@ export function Hero(): React.JSX.Element {
           </PromptInputBody>
           <PromptInputFooter className="bg-background/80 backdrop-blur-sm rounded-b-lg border-t-0 p-2">
             <div className="flex-1" />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push('/chat?voice=true')}
+              className="gap-2"
+            >
+              <Phone className="w-4 h-4" />
+              Voice Call
+            </Button>
             <PromptInputSubmit status={'ready' as ChatStatus} />
           </PromptInputFooter>
         </PromptInput>

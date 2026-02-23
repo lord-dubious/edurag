@@ -10,7 +10,6 @@ interface BrandSettings {
   emoji: string | null;
   iconType: 'logo' | 'emoji' | 'upload';
   showTitle: boolean;
-  onboarded: boolean;
 }
 
 interface BrandContextType {
@@ -27,22 +26,16 @@ export function useBrand(): BrandContextType {
   return useContext(BrandContext);
 }
 
-const DEFAULT_BRAND: BrandSettings = {
-  appName: 'EduRAG',
+const defaultBrand: BrandSettings = {
+  appName: 'University Knowledge Base',
   primaryColor: '#2563eb',
   secondaryColor: '#1d4ed8',
   logoUrl: null,
   emoji: '🎓',
   iconType: 'emoji',
   showTitle: true,
-  onboarded: false,
 };
 
-/**
- * Approximates OKLCH color space from hex.
- * This is a lightweight approximation, not a true OKLCH conversion.
- * For accurate OKLCH, use a library like culori or colorjs.io.
- */
 function hexToApproxOklch(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
@@ -78,66 +71,6 @@ function hexToApproxOklch(hex: string): string {
   return `oklch(${oklchL.toFixed(3)} ${oklchC.toFixed(3)} ${oklchH.toFixed(1)})`;
 }
 
-export function BrandProvider({ children }: { children: ReactNode }) {
-  const [brand, setBrand] = useState<BrandSettings | null>(null);
-  const [loading, setLoading] = useState(true);
-
-interface OnboardingStatusResponse {
-  isOnboarded: boolean;
-  settings?: {
-    appName?: string;
-    brandPrimary?: string;
-    brandSecondary?: string;
-    brandLogoUrl?: string;
-    emoji?: string;
-    iconType?: 'logo' | 'emoji' | 'upload';
-    showTitle?: boolean;
-  };
-}
-
-  useEffect(() => {
-    async function fetchBrand() {
-      try {
-        const res = await fetch('/api/onboarding/status');
-        if (res.ok) {
-          const data: OnboardingStatusResponse = await res.json();
-          if (data.isOnboarded && data.settings) {
-            const settings = data.settings;
-            const brandSettings: BrandSettings = {
-              appName: settings.appName || DEFAULT_BRAND.appName,
-              primaryColor: settings.brandPrimary || DEFAULT_BRAND.primaryColor,
-              secondaryColor: settings.brandSecondary || DEFAULT_BRAND.secondaryColor,
-              logoUrl: settings.brandLogoUrl || null,
-              emoji: settings.emoji || null,
-              iconType: settings.iconType || 'emoji',
-              showTitle: settings.showTitle !== false,
-              onboarded: true,
-            };
-            setBrand(brandSettings);
-            applyBrandColors(brandSettings);
-          } else {
-            setBrand(DEFAULT_BRAND);
-          }
-        } else {
-          setBrand(DEFAULT_BRAND);
-        }
-      } catch {
-        setBrand(DEFAULT_BRAND);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchBrand();
-  }, []);
-
-  return (
-    <BrandContext.Provider value={{ brand, loading }}>
-      {children}
-    </BrandContext.Provider>
-  );
-}
-
 function applyBrandColors(brand: BrandSettings): void {
   const root = document.documentElement;
   const primaryOkLCH = hexToApproxOklch(brand.primaryColor);
@@ -154,4 +87,43 @@ function applyBrandColors(brand: BrandSettings): void {
     return `oklch(${newL.toFixed(3)}`;
   });
   root.style.setProperty('--accent-light', lighterPrimary);
+}
+
+export function BrandProvider({ children }: { children: ReactNode }) {
+  const [brand, setBrand] = useState<BrandSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/onboarding/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.branding) {
+          const brandSettings: BrandSettings = {
+            primaryColor: data.branding.primaryColor || defaultBrand.primaryColor,
+            secondaryColor: data.branding.secondaryColor || defaultBrand.secondaryColor,
+            logoUrl: data.branding.logoUrl || null,
+            emoji: data.branding.emoji || null,
+            iconType: data.branding.iconType || 'emoji',
+            showTitle: data.branding.showTitle ?? true,
+            appName: data.branding.appName || 'University Knowledge Base',
+          };
+          setBrand(brandSettings);
+          applyBrandColors(brandSettings);
+        } else {
+          setBrand(defaultBrand);
+        }
+      })
+      .catch(() => {
+        setBrand(defaultBrand);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  return (
+    <BrandContext.Provider value={{ brand, loading }}>
+      {children}
+    </BrandContext.Provider>
+  );
 }

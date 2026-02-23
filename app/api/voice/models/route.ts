@@ -1,15 +1,12 @@
 import { createClient } from '@deepgram/sdk';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env';
 
-export async function GET() {
-  const apiKey = env.DEEPGRAM_API_KEY;
+export async function GET(request: NextRequest) {
+  const apiKey = request.headers.get('X-Deepgram-Key') || env.DEEPGRAM_API_KEY;
 
   if (!apiKey) {
-    return NextResponse.json(
-      { error: 'DEEPGRAM_API_KEY is not configured' },
-      { status: 400 },
-    );
+    return NextResponse.json({ models: [] });
   }
 
   try {

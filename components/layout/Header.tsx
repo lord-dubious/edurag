@@ -55,18 +55,23 @@ export function Header(): React.JSX.Element {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 shadow-sm transition-all">
+    <header 
+      className="sticky top-0 z-50 w-full border-b backdrop-blur-md supports-[backdrop-filter]:bg-background/60 shadow-sm transition-all"
+      style={{ backgroundColor: brand?.primaryColor }}
+    >
       <div className="container mx-auto px-4 flex h-14 items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
           {renderLogo()}
           {showTitle && (
-            <span className="font-semibold text-lg group-hover:text-primary transition-colors">
+            <span className={`font-semibold text-lg transition-colors ${brand?.primaryColor ? 'text-white' : 'group-hover:text-primary'}`}>
               {name}
             </span>
           )}
         </Link>
         <div className="flex items-center gap-4">
-          <ThemeToggle />
+          <div className={brand?.primaryColor ? '[&_button]:text-white/80 [&_button:hover]:text-white [&_svg]:text-white/80' : ''}>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </header>

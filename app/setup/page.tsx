@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,9 +21,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast, Toaster } from 'sonner';
 import { Check, X, Shield, Loader2, Palette, ImageUp, Smile, Upload } from 'lucide-react';
 import { ColorPicker } from '@/components/ui/color-picker';
+import { cn } from '@/lib/utils';
 import type { VoiceConfig } from '@/lib/voice/voiceTypes';
 
 interface BrandData {
@@ -33,7 +45,6 @@ interface BrandData {
   secondaryColor: string;
   iconType: 'logo' | 'emoji' | 'upload';
   emoji: string;
-  uploadedFileName?: string;
   showTitle: boolean;
 }
 
@@ -101,6 +112,7 @@ export default function SetupPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showEditWarning, setShowEditWarning] = useState(false);
 
   const [universityUrl, setUniversityUrl] = useState('');
   const [brandData, setBrandData] = useState<BrandData>({
@@ -130,7 +142,6 @@ export default function SetupPage() {
   const [newExternalUrl, setNewExternalUrl] = useState('');
   const [newExternalLabel, setNewExternalLabel] = useState('');
   const [newExcludePath, setNewExcludePath] = useState('');
-  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [apiKeys, setApiKeys] = useState<ApiKeys>({
     mongodbUri: '',
     chatApiKey: '',
@@ -153,6 +164,83 @@ export default function SetupPage() {
   const [envPreview, setEnvPreview] = useState<string>('');
   const [isVercel, setIsVercel] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp'] },
+    maxSize: 5 * 1024 * 1024,
+    maxFiles: 1,
+    onDrop: async (acceptedFiles) => {
+      const file = acceptedFiles[0];
+      if (file) {
+        setLoading(true);
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          const data = await res.json();
+          if (data.url) {
+            setBrandData(prev => ({ ...prev, logoUrl: data.url, iconType: 'upload' }));
+          }
+        } catch (err) {
+          console.error('Upload failed:', err);
+        } finally {
+          setLoading(false);
+        }
+      }
+    },
+  });
+
+  useEffect(() => {
+    async function loadExistingSettings() {
+      try {
+        const res = await fetch('/api/onboarding/status');
+        const data = await res.json();
+
+        if (data.onboarded) {
+          setShowEditWarning(true);
+        }
+
+        if (data.branding) {
+          setBrandData({
+            universityName: data.branding.appName || '',
+            faviconUrl: data.branding.faviconUrl || '',
+            primaryColor: data.branding.primaryColor || '#3b82f6',
+            secondaryColor: data.branding.secondaryColor || '#1e40af',
+            logoUrl: data.branding.logoUrl || '',
+            emoji: data.branding.emoji || '🎓',
+            iconType: data.branding.iconType || 'emoji',
+            showTitle: data.branding.showTitle ?? true,
+          });
+        }
+
+        if (data.apiKeys) {
+          setApiKeys({
+            mongodbUri: data.apiKeys.mongodbUri || '',
+            chatApiKey: data.apiKeys.chatApiKey || '',
+            chatBaseUrl: data.apiKeys.chatBaseUrl || '',
+            chatModel: data.config?.chatModel || 'llama-3.3-70b',
+            embeddingApiKey: data.apiKeys.embeddingApiKey || '',
+            tavilyApiKey: data.apiKeys.tavilyApiKey || '',
+            adminSecret: '',
+          });
+        }
+
+        if (data.config) {
+          setCrawlConfig(prev => ({
+            ...prev,
+            maxDepth: parseInt(data.config.crawlMaxDepth) || prev.maxDepth,
+            limit: parseInt(data.config.crawlLimit) || prev.limit,
+          }));
+        }
+      } catch (err) {
+        console.error('Failed to load settings:', err);
+      }
+    }
+    loadExistingSettings();
+  }, []);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--accent', brandData.primaryColor);
@@ -374,6 +462,26 @@ export default function SetupPage() {
     <div className="onboarding-container">
       <Toaster position="bottom-right" />
 
+      <AlertDialog open={showEditWarning} onOpenChange={setShowEditWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Modify Configuration?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You&apos;ve already completed setup. Any changes will update your configuration.
+              You can cancel to return to the chat.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => router.push('/chat')}>
+              Cancel & Return
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => setShowEditWarning(false)}>
+              Continue Editing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <aside className="onboarding-sidebar" style={{ backgroundColor: `${brandData.primaryColor}08` }}>
         <div className="brand-logo">
           {brandData.iconType === 'emoji' ? (
@@ -394,6 +502,12 @@ export default function SetupPage() {
 
         {renderStepTracker()}
         {renderBrandPreview()}
+
+        <div className="mt-4">
+          <Button variant="ghost" onClick={() => router.push('/chat')} className="w-full">
+            Cancel
+          </Button>
+        </div>
 
         <div className="mt-auto pt-6 flex items-center gap-2 text-xs text-muted-foreground">
           <Shield className="w-4 h-4" />
@@ -513,83 +627,36 @@ export default function SetupPage() {
                       </div>
                     </TabsContent>
                     <TabsContent value="upload" className="space-y-4">
-                      <div className="space-y-3">
-                        <Label>Upload Logo Image</Label>
-                        <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-                          <input
-                            type="file"
-                            accept="image/png,image/jpeg,image/jpg,image/webp"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-
-                              setUploadingLogo(true);
-                              try {
-                                const formData = new FormData();
-                                formData.append('file', file);
-
-                                const res = await fetch('/api/upload', {
-                                  method: 'POST',
-                                  body: formData,
-                                });
-
-                                if (!res.ok) throw new Error('Upload failed');
-
-                                const data = await res.json();
-                                setBrandData((prev) => ({
-                                  ...prev,
-                                  logoUrl: data.url,
-                                  uploadedFileName: data.fileName,
-                                }));
-                                toast.success('Logo uploaded successfully');
-                              } catch (err) {
-                                toast.error('Failed to upload logo');
-                              } finally {
-                                setUploadingLogo(false);
-                              }
-                            }}
-                            className="hidden"
-                            id="logo-upload"
-                          />
-                          <label htmlFor="logo-upload" className="cursor-pointer">
-                            {uploadingLogo ? (
-                              <div className="flex flex-col items-center gap-2">
-                                <Loader2 className="w-10 h-10 text-muted-foreground animate-spin" />
-                                <p className="text-sm text-muted-foreground">Uploading...</p>
-                              </div>
-                            ) : brandData.logoUrl && brandData.iconType === 'upload' ? (
-                              <div className="flex flex-col items-center gap-2">
-                                <img
-                                  src={brandData.logoUrl}
-                                  alt="Uploaded logo"
-                                  className="w-16 h-16 object-contain rounded-lg"
-                                />
-                                <p className="text-sm text-muted-foreground">Click to change</p>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center gap-2">
-                                <Upload className="w-10 h-10 text-muted-foreground" />
-                                <p className="text-sm font-medium">Click to upload</p>
-                                <p className="text-xs text-muted-foreground">PNG, JPEG, WebP (max 5MB)</p>
-                              </div>
-                            )}
-                          </label>
-                        </div>
-                        {brandData.logoUrl && brandData.iconType === 'upload' && (
-                          <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50">
-                            <img
-                              src={brandData.logoUrl}
-                              alt="Logo preview"
-                              className="w-10 h-10 object-contain"
-                            />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">Logo uploaded</p>
-                              <p className="text-xs text-muted-foreground">{brandData.uploadedFileName}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
+                       <Label>Upload Logo Image</Label>
+                       <div
+                         {...getRootProps()}
+                         className={cn(
+                           'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
+                           isDragActive ? 'border-primary bg-primary/5' : 'hover:border-primary/50'
+                         )}
+                       >
+                         <input {...getInputProps()} />
+                         {loading ? (
+                           <div className="space-y-2">
+                             <Loader2 className="w-8 h-8 mx-auto text-muted-foreground animate-spin" />
+                             <p className="text-sm text-muted-foreground">Uploading...</p>
+                           </div>
+                         ) : brandData.logoUrl && brandData.iconType === 'upload' ? (
+                           <div className="space-y-2">
+                             <img src={brandData.logoUrl} alt="Logo" className="w-16 h-16 mx-auto object-contain" />
+                             <p className="text-sm text-muted-foreground">Drop or click to replace</p>
+                           </div>
+                         ) : (
+                           <div className="space-y-2">
+                             <Upload className="w-8 h-8 mx-auto text-muted-foreground" />
+                             <p className="text-sm font-medium">
+                               {isDragActive ? 'Drop image here' : 'Drag & drop or click to upload'}
+                             </p>
+                             <p className="text-xs text-muted-foreground">PNG, JPG, WEBP up to 5MB</p>
+                           </div>
+                         )}
+                       </div>
+                     </TabsContent>
                     <TabsContent value="logo" className="space-y-3">
                       <Label htmlFor="logoUrl">Logo Image URL</Label>
                       <Input
@@ -730,44 +797,28 @@ export default function SetupPage() {
                 <CardContent>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label>Max Depth</Label>
-                      <Select
-                        value={String(crawlConfig.maxDepth)}
-                        onValueChange={(v) =>
-                          setCrawlConfig((prev) => ({ ...prev, maxDepth: Number(v) }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1 level</SelectItem>
-                          <SelectItem value="2">2 levels</SelectItem>
-                          <SelectItem value="3">3 levels</SelectItem>
-                          <SelectItem value="4">4 levels</SelectItem>
-                          <SelectItem value="5">5 levels</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="crawl-depth">Crawl Depth</Label>
+                      <Input
+                        id="crawl-depth"
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={crawlConfig.maxDepth}
+                        onChange={(e) => setCrawlConfig(prev => ({ ...prev, maxDepth: parseInt(e.target.value) || 3 }))}
+                      />
+                      <p className="text-xs text-muted-foreground">How many levels deep to crawl (1-10)</p>
                     </div>
                     <div className="space-y-2">
-                      <Label>Page Limit</Label>
-                      <Select
-                        value={String(crawlConfig.limit)}
-                        onValueChange={(v) =>
-                          setCrawlConfig((prev) => ({ ...prev, limit: Number(v) }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="50">50 pages</SelectItem>
-                          <SelectItem value="100">100 pages</SelectItem>
-                          <SelectItem value="200">200 pages</SelectItem>
-                          <SelectItem value="300">300 pages</SelectItem>
-                          <SelectItem value="500">500 pages</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="crawl-limit">Page Limit</Label>
+                      <Input
+                        id="crawl-limit"
+                        type="number"
+                        min={1}
+                        max={1000}
+                        value={crawlConfig.limit}
+                        onChange={(e) => setCrawlConfig(prev => ({ ...prev, limit: parseInt(e.target.value) || 100 }))}
+                      />
+                      <p className="text-xs text-muted-foreground">Maximum pages to crawl</p>
                     </div>
                     <div className="space-y-2">
                       <Label>Extract Depth</Label>
