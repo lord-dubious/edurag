@@ -22,6 +22,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  VoiceSelector,
+  VoiceSelectorTrigger,
+  VoiceSelectorContent,
+  VoiceSelectorInput,
+  VoiceSelectorList,
+  VoiceSelectorEmpty,
+  VoiceSelectorItem,
+  VoiceSelectorName,
+  VoiceSelectorPreview,
+  VoiceSelectorAttributes,
+  VoiceSelectorBullet,
+  VoiceSelectorGender,
+  useVoiceSelector,
+} from '@/components/ai-elements/voice-selector';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -1184,26 +1199,48 @@ export default function SetupPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="voiceTtsVoice">Voice</Label>
-                    <Select
+                    <Label>Voice</Label>
+                    <VoiceSelector
                       value={voiceConfig.voiceTtsVoice}
-                      onValueChange={(value) => setVoiceConfig(prev => ({ ...prev, voiceTtsVoice: value }))}
+                      onValueChange={(value) => value && setVoiceConfig(prev => ({ ...prev, voiceTtsVoice: value }))}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder={loadingModels ? "Loading voices..." : "Select voice"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {voiceModels.length > 0 ? (
-                          voiceModels.map(model => (
-                            <SelectItem key={model.name} value={model.name}>
-                              {model.name.replace('aura-2-', '').replace('-en', '')}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="aura-2-andromeda-en">andromeda</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                      <VoiceSelectorTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {voiceConfig.voiceTtsVoice
+                            ? voiceConfig.voiceTtsVoice.replace('aura-2-', '').replace('-en', '')
+                            : loadingModels ? 'Loading voices...' : 'Select voice'}
+                        </Button>
+                      </VoiceSelectorTrigger>
+                      <VoiceSelectorContent>
+                        <VoiceSelectorInput placeholder="Search voices..." />
+                        <VoiceSelectorList>
+                          <VoiceSelectorEmpty>No voices found.</VoiceSelectorEmpty>
+                          {voiceModels.length > 0 ? (
+                            voiceModels.map(model => (
+                              <VoiceSelectorItem
+                                key={model.name}
+                                value={model.name}
+                              >
+                                <VoiceSelectorName>
+                                  {model.name.replace('aura-2-', '').replace('-en', '')}
+                                </VoiceSelectorName>
+                                {model.description && (
+                                  <VoiceSelectorAttributes>
+                                    <span className="text-xs text-muted-foreground truncate max-w-32">
+                                      {model.description}
+                                    </span>
+                                  </VoiceSelectorAttributes>
+                                )}
+                              </VoiceSelectorItem>
+                            ))
+                          ) : (
+                            <VoiceSelectorItem value="aura-2-andromeda-en">
+                              <VoiceSelectorName>andromeda</VoiceSelectorName>
+                            </VoiceSelectorItem>
+                          )}
+                        </VoiceSelectorList>
+                      </VoiceSelectorContent>
+                    </VoiceSelector>
                     <p className="text-xs text-muted-foreground">Select the voice for AI responses</p>
                   </div>
                 </CardContent>

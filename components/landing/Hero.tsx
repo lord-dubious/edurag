@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Image as ImageIcon, Phone } from 'lucide-react';
+import { Image as ImageIcon, Phone, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputFooter, PromptInputSubmit } from '@/components/ai-elements/prompt-input';
+import { SpeechInput } from '@/components/ai-elements/speech-input';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import type { ChatStatus } from 'ai';
 import { useBrand } from '@/components/providers/BrandProvider';
@@ -12,6 +13,7 @@ import { useBrand } from '@/components/providers/BrandProvider';
 export function Hero(): React.JSX.Element {
   const router = useRouter();
   const { brand, loading } = useBrand();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const name = brand?.appName || 'University Knowledge Base';
 
@@ -19,6 +21,13 @@ export function Hero(): React.JSX.Element {
     const encodedQuery = encodeURIComponent(message.text);
     router.push(`/chat?q=${encodedQuery}`);
   }, [router]);
+
+  const handleTranscription = useCallback((text: string) => {
+    if (textareaRef.current) {
+      textareaRef.current.value = text;
+      textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }, []);
 
   const renderLogo = () => {
     if (loading) {
@@ -97,12 +106,17 @@ export function Hero(): React.JSX.Element {
         <PromptInput onSubmit={handleSubmit} className="shadow-lg hover:shadow-xl transition-shadow duration-300">
           <PromptInputBody>
             <PromptInputTextarea
+              ref={textareaRef}
               placeholder="Ask anything about the university..."
               className="min-h-[48px] text-base border-muted focus-visible:ring-primary/20 bg-background/80 backdrop-blur-sm"
             />
           </PromptInputBody>
           <PromptInputFooter className="bg-background/80 backdrop-blur-sm rounded-b-lg border-t-0 p-2">
             <div className="flex-1" />
+            <SpeechInput
+              onTranscriptionChange={handleTranscription}
+              className="size-9"
+            />
             <Button
               type="button"
               variant="outline"

@@ -2,7 +2,36 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Phone, PhoneOff, Mic, MicOff, Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Persona, type PersonaState } from '@/components/ai-elements/persona';
+import {
+  MicSelector,
+  MicSelectorTrigger,
+  MicSelectorContent,
+  MicSelectorInput,
+  MicSelectorList,
+  MicSelectorEmpty,
+  MicSelectorItem,
+  MicSelectorLabel,
+  MicSelectorValue,
+  useAudioDevices,
+} from '@/components/ai-elements/mic-selector';
+import {
+  VoiceSelector,
+  VoiceSelectorTrigger,
+  VoiceSelectorContent,
+  VoiceSelectorInput,
+  VoiceSelectorList,
+  VoiceSelectorEmpty,
+  VoiceSelectorItem,
+  VoiceSelectorName,
+  VoiceSelectorPreview,
+  VoiceSelectorAttributes,
+  VoiceSelectorBullet,
+  VoiceSelectorGender,
+  useVoiceSelector,
+} from '@/components/ai-elements/voice-selector';
+import { Phone, PhoneOff, Settings2 } from 'lucide-react';
 
 interface VoiceCallProps {
   onEnd?: () => void;
@@ -17,12 +46,102 @@ interface VoiceEvent {
   error?: string;
 }
 
+interface VoiceModel {
+  id: string;
+  name: string;
+  gender?: string;
+  accent?: string;
+  language?: string;
+}
+
+function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: string) => void }) {
+  const [voices, setVoices] = useState<VoiceModel[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const { value, setValue, open, setOpen } = useVoiceSelector();
+
+  useEffect(() => {
+    if (open && voices.length === 0) {
+      setLoading(true);
+      fetch('/api/voice/models')
+        .then((res) => res.json())
+        .then((data) => {
+          setVoices(data.voices || []);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, [open, voices.length]);
+
+  const handleVoiceSelect = (voiceId: string) => {
+    setValue(voiceId);
+    onVoiceSelect(voiceId);
+    setOpen(false);
+  };
+
+  const handlePreview = async (voiceId: string) => {
+    setPlayingId(voiceId);
+    setTimeout(() => setPlayingId(null), 2000);
+  };
+
+  return (
+    <>
+      <VoiceSelectorTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Settings2 className="w-4 h-4" />
+          <span className="hidden sm:inline">Voice</span>
+        </Button>
+      </VoiceSelectorTrigger>
+      <VoiceSelectorContent>
+        <VoiceSelectorInput placeholder="Search voices..." />
+        <VoiceSelectorList>
+          {loading ? (
+            <div className="p-4 text-center text-sm text-muted-foreground">Loading voices...</div>
+          ) : (
+            <VoiceSelectorEmpty>No voices found.</VoiceSelectorEmpty>
+          )}
+          {voices.map((voice) => (
+            <VoiceSelectorItem
+              key={voice.id}
+              value={voice.id}
+              onSelect={() => handleVoiceSelect(voice.id)}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <VoiceSelectorName>{voice.name}</VoiceSelectorName>
+                <VoiceSelectorAttributes>
+                  {voice.gender && (
+                    <>
+                      <VoiceSelectorGender value={voice.gender as 'male' | 'female'} />
+                      <VoiceSelectorBullet />
+                    </>
+                  )}
+                  {voice.accent && (
+                    <span className="text-muted-foreground text-xs">{voice.accent}</span>
+                  )}
+                </VoiceSelectorAttributes>
+                <VoiceSelectorPreview
+                  playing={playingId === voice.id}
+                  onPlay={() => handlePreview(voice.id)}
+                  className="ml-auto"
+                />
+              </div>
+            </VoiceSelectorItem>
+          ))}
+        </VoiceSelectorList>
+      </VoiceSelectorContent>
+    </>
+  );
+}
+
 export default function VoiceCall({ onEnd }: VoiceCallProps) {
   const [connectionState, setConnectionState] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
-  const [agentState, setAgentState] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
+  const [agentState, setAgentState] = useState<PersonaState>('idle');
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedMic, setSelectedMic] = useState<string | undefined>();
+  const [selectedVoice, setSelectedVoice] = useState<string | undefined>();
+  const [showSetup, setShowSetup] = useState(true);
 
   const wsRef = useRef<WebSocket | null>(null);
   const micAudioContextRef = useRef<AudioContext | null>(null);
@@ -31,7 +150,7 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
   const audioWorkletNodeRef = useRef<AudioWorkletNode | null>(null);
   const activeSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const timeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
-  const agentStateRef = useRef<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
+  const agentStateRef = useRef<PersonaState>('idle');
 
   const float32ToInt16 = (float32Array: Float32Array): Int16Array => {
     const int16Array = new Int16Array(float32Array.length);
@@ -89,7 +208,6 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
       try {
         source.stop();
       } catch {
-        // ignore
       }
     });
     activeSourceNodesRef.current.clear();
@@ -134,6 +252,7 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
     setErrorMessage(null);
     setTranscript('');
     setResponse('');
+    setShowSetup(false);
 
     try {
       const micAudioContext = new AudioContext({ sampleRate: 16000 });
@@ -144,7 +263,10 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
 
       await micAudioContext.audioWorklet.addModule('/pcm-processor.js');
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const constraints: MediaStreamConstraints = {
+        audio: selectedMic ? { deviceId: { exact: selectedMic } } : true,
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       mediaStreamRef.current = stream;
 
       const source = micAudioContext.createMediaStreamSource(stream);
@@ -161,6 +283,16 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
       ws.onopen = () => {
         setConnectionState('connected');
         source.connect(workletNode);
+        
+        if (selectedVoice) {
+          const voiceMsg = JSON.stringify({ type: 'voice_config', voice: selectedVoice });
+          const encoder = new TextEncoder();
+          const msgBytes = encoder.encode(voiceMsg);
+          const binaryMsg = new Uint8Array(1 + msgBytes.length);
+          binaryMsg[0] = 0x01;
+          binaryMsg.set(msgBytes, 1);
+          ws.send(binaryMsg);
+        }
       };
 
       ws.onmessage = (event) => {
@@ -196,7 +328,6 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
               setConnectionState('error');
             }
           } catch {
-            // ignore parse errors
           }
         }
       };
@@ -234,7 +365,7 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
       setConnectionState('error');
       cleanup();
     }
-  }, [cleanup, playAudio]);
+  }, [cleanup, playAudio, selectedMic, selectedVoice]);
 
   useEffect(() => {
     return () => {
@@ -255,30 +386,16 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
     }
   };
 
-  const getAgentStatusIcon = () => {
-    switch (agentState) {
-      case 'listening':
-        return <Mic className="w-4 h-4" />;
-      case 'thinking':
-        return <Loader2 className="w-4 h-4 animate-spin" />;
-      case 'speaking':
-        return <Phone className="w-4 h-4" />;
-      default:
-        return <MicOff className="w-4 h-4" />;
-    }
-  };
-
   return (
     <div className="flex flex-col h-full w-full max-w-md mx-auto p-4 gap-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${getConnectionStatusColor()}`} />
-          <span className="text-sm text-muted-foreground capitalize">{connectionState}</span>
+          <div className={`w-2 h-2 rounded-full ${getConnectionStatusColor()}`} />
+          <span className="text-xs text-muted-foreground capitalize">{connectionState}</span>
         </div>
-        <div className="flex items-center gap-2">
-          {getAgentStatusIcon()}
-          <span className="text-sm text-muted-foreground capitalize">{agentState}</span>
-        </div>
+        <VoiceSelector value={selectedVoice} onValueChange={setSelectedVoice}>
+          <VoiceSelectionDialog onVoiceSelect={setSelectedVoice} />
+        </VoiceSelector>
       </div>
 
       {errorMessage && (
@@ -287,38 +404,80 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto space-y-4">
-        {transcript && (
-          <div className="p-3 bg-muted rounded-lg">
-            <p className="text-xs text-muted-foreground mb-1">You said:</p>
-            <p className="text-sm">{transcript}</p>
-          </div>
-        )}
+      <div className="flex-1 flex flex-col items-center justify-center gap-4">
+        <Persona state={agentState} className="w-24 h-24" variant="obsidian" />
 
-        {response && (
-          <div className="p-3 bg-primary/10 rounded-lg">
-            <p className="text-xs text-primary mb-1">Agent:</p>
-            <p className="text-sm">{response}</p>
-          </div>
-        )}
-
-        {!transcript && !response && connectionState === 'connected' && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground text-sm">
-              {agentState === 'listening' ? 'Listening...' : 'Waiting for response...'}
-            </p>
-          </div>
-        )}
+        <div className="text-center">
+          <p className="text-sm font-medium capitalize">{agentState}</p>
+          <p className="text-xs text-muted-foreground">
+            {connectionState === 'connected'
+              ? agentState === 'listening'
+                ? 'Speak now...'
+                : agentState === 'thinking'
+                ? 'Thinking...'
+                : agentState === 'speaking'
+                ? 'Speaking...'
+                : 'Ready'
+              : 'Start a voice call'}
+          </p>
+        </div>
       </div>
 
-      <div className="flex justify-center">
+      {(transcript || response) && (
+        <Card className="max-h-40 overflow-y-auto">
+          <CardContent className="p-3 space-y-2">
+            {transcript && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">You:</p>
+                <p className="text-sm">{transcript}</p>
+              </div>
+            )}
+            {response && (
+              <div>
+                <p className="text-xs text-primary mb-1">Assistant:</p>
+                <p className="text-sm">{response}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {showSetup && connectionState === 'disconnected' && (
+        <MicSelector value={selectedMic} onValueChange={setSelectedMic}>
+          <div className="flex flex-col gap-3 w-full">
+            <div className="flex items-center gap-2">
+              <MicSelectorTrigger className="flex-1 justify-start">
+                <MicSelectorValue />
+              </MicSelectorTrigger>
+            </div>
+            <MicSelectorContent>
+              <MicSelectorInput />
+              <MicSelectorList>
+                {(devices) =>
+                  devices.length === 0 ? (
+                    <MicSelectorEmpty>No microphones found</MicSelectorEmpty>
+                  ) : (
+                    devices.map((device) => (
+                      <MicSelectorItem key={device.deviceId} value={device.deviceId}>
+                        <MicSelectorLabel device={device} />
+                      </MicSelectorItem>
+                    ))
+                  )
+                }
+              </MicSelectorList>
+            </MicSelectorContent>
+          </div>
+        </MicSelector>
+      )}
+
+      <div className="flex justify-center gap-2">
         {connectionState === 'disconnected' || connectionState === 'error' ? (
-          <Button onClick={startCall} size="lg" className="gap-2">
+          <Button onClick={startCall} size="lg" className="gap-2 rounded-full">
             <Phone className="w-5 h-5" />
             Start Call
           </Button>
         ) : (
-          <Button onClick={handleEndCall} variant="destructive" size="lg" className="gap-2">
+          <Button onClick={handleEndCall} variant="destructive" size="lg" className="gap-2 rounded-full">
             <PhoneOff className="w-5 h-5" />
             End Call
           </Button>
