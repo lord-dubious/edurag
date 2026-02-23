@@ -6,9 +6,9 @@ import { Image as ImageIcon, Phone, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputFooter, PromptInputSubmit } from '@/components/ai-elements/prompt-input';
 import { SpeechInput } from '@/components/ai-elements/speech-input';
+import { useBrand } from '@/components/providers/BrandProvider';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import type { ChatStatus } from 'ai';
-import { useBrand } from '@/components/providers/BrandProvider';
 
 export function Hero(): React.JSX.Element {
   const router = useRouter();

@@ -168,10 +168,10 @@ export default function SetupPage() {
   });
   const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>({
     deepgramApiKey: '',
-    ttsProvider: 'deepgram',
+    ttsProvider: 'openai',
     voiceTtsApiKey: '',
     voiceTtsBaseUrl: '',
-    voiceTtsVoice: 'aura-2-andromeda-en',
+    voiceTtsVoice: 'alloy',
     voiceTtsModel: '',
   });
   const [voiceModels, setVoiceModels] = useState<{ name: string; description: string }[]>([]);
@@ -195,12 +195,17 @@ export default function SetupPage() {
             method: 'POST',
             body: formData,
           });
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || 'Upload failed');
+          }
           const data = await res.json();
           if (data.url) {
             setBrandData(prev => ({ ...prev, logoUrl: data.url, iconType: 'upload' }));
           }
         } catch (err) {
           console.error('Upload failed:', err);
+          toast.error(err instanceof Error ? err.message : 'Upload failed');
         } finally {
           setLoading(false);
         }
@@ -231,14 +236,14 @@ export default function SetupPage() {
           });
         }
 
-        if (data.apiKeys) {
+        if (data.apiKeys || data.config) {
           setApiKeys({
-            mongodbUri: data.apiKeys.mongodbUri || '',
-            chatApiKey: data.apiKeys.chatApiKey || '',
-            chatBaseUrl: data.apiKeys.chatBaseUrl || '',
+            mongodbUri: data.apiKeys?.mongodbUri || '',
+            chatApiKey: data.apiKeys?.chatApiKey || '',
+            chatBaseUrl: data.config?.chatBaseUrl || '',
             chatModel: data.config?.chatModel || 'llama-3.3-70b',
-            embeddingApiKey: data.apiKeys.embeddingApiKey || '',
-            tavilyApiKey: data.apiKeys.tavilyApiKey || '',
+            embeddingApiKey: data.apiKeys?.embeddingApiKey || '',
+            tavilyApiKey: data.apiKeys?.tavilyApiKey || '',
             adminSecret: '',
           });
         }
@@ -273,9 +278,9 @@ export default function SetupPage() {
       setLoadingModels(true);
       try {
         const res = await fetch('/api/voice/models', {
-          headers: {
-            'X-Deepgram-Key': voiceConfig.deepgramApiKey,
-          },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deepgramApiKey: voiceConfig.deepgramApiKey }),
         });
         if (res.ok) {
           const data = await res.json();
@@ -1176,6 +1181,25 @@ export default function SetupPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
+                    <Label htmlFor="ttsProvider">TTS Provider</Label>
+                    <Select
+                      value={voiceConfig.ttsProvider}
+                      onValueChange={(v: 'deepgram' | 'openai') =>
+                        setVoiceConfig((prev) => ({ ...prev, ttsProvider: v }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="openai">OpenAI</SelectItem>
+                        <SelectItem value="deepgram">Deepgram</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Select the TTS provider</p>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="voiceTtsApiKey">TTS API Key</Label>
                     <Input
                       id="voiceTtsApiKey"
@@ -1196,6 +1220,17 @@ export default function SetupPage() {
                       onChange={(e) => setVoiceConfig((prev) => ({ ...prev, voiceTtsBaseUrl: e.target.value }))}
                     />
                     <p className="text-xs text-muted-foreground">Custom endpoint for TTS API (defaults to OpenAI)</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="voiceTtsModel">TTS Model</Label>
+                    <Input
+                      id="voiceTtsModel"
+                      placeholder="tts-1"
+                      value={voiceConfig.voiceTtsModel}
+                      onChange={(e) => setVoiceConfig((prev) => ({ ...prev, voiceTtsModel: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">TTS model to use (e.g., tts-1, tts-1-hd)</p>
                   </div>
 
                   <div className="space-y-2">

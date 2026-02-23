@@ -7,7 +7,7 @@ import {
   MessageActions,
   MessageAction,
 } from '@/components/ai-elements/message';
-import { Persona } from '@/components/ai-elements/persona';
+import { Spinner } from '@/components/ui/spinner';
 import { Streamdown, type AllowedTags } from 'streamdown';
 import { cjk } from '@streamdown/cjk';
 import { code } from '@streamdown/code';
@@ -195,7 +195,7 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
                   if (part.type.startsWith('tool-')) {
                     return (
                       <div key={`${message.id}-${i}`} className="flex items-center gap-2 text-sm text-muted-foreground px-4 py-2">
-                        <Persona state="thinking" className="w-6 h-6" />
+                        <Spinner className="size-4" />
                         <span>Searching knowledge base...</span>
                       </div>
                     );

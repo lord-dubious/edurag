@@ -14,7 +14,6 @@ import {
   MicSelectorItem,
   MicSelectorLabel,
   MicSelectorValue,
-  useAudioDevices,
 } from '@/components/ai-elements/mic-selector';
 import {
   VoiceSelector,
@@ -32,18 +31,10 @@ import {
   useVoiceSelector,
 } from '@/components/ai-elements/voice-selector';
 import { Phone, PhoneOff, Settings2 } from 'lucide-react';
+import type { VoiceEvent, AgentState } from '@/lib/voice/voiceTypes';
 
 interface VoiceCallProps {
   onEnd?: () => void;
-}
-
-interface VoiceEvent {
-  type: string;
-  state?: 'idle' | 'listening' | 'thinking' | 'speaking';
-  audio?: string;
-  transcript?: string;
-  response?: string;
-  error?: string;
 }
 
 interface VoiceModel {
@@ -54,35 +45,107 @@ interface VoiceModel {
   language?: string;
 }
 
+function float32ToInt16(float32Array: Float32Array): Int16Array {
+  const int16Array = new Int16Array(float32Array.length);
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return int16Array;
+}
+
+function int16ArrayToBase64(int16Array: Int16Array): string {
+  const bytes = new Uint8Array(int16Array.buffer, int16Array.byteOffset, int16Array.byteLength);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToInt16Array(base64: string): Int16Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Int16Array(bytes.buffer);
+}
+
 function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: string) => void }) {
   const [voices, setVoices] = useState<VoiceModel[]>([]);
   const [loading, setLoading] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const { value, setValue, open, setOpen } = useVoiceSelector();
 
   useEffect(() => {
     if (open && voices.length === 0) {
       setLoading(true);
+      setVoiceError(null);
       fetch('/api/voice/models')
         .then((res) => res.json())
         .then((data) => {
           setVoices(data.voices || []);
         })
-        .catch(() => {})
+        .catch((err) => {
+          console.error('Failed to fetch voices:', err);
+          setVoiceError(err instanceof Error ? err.message : 'Failed to load voices');
+        })
         .finally(() => setLoading(false));
     }
   }, [open, voices.length]);
 
-  const handleVoiceSelect = (voiceId: string) => {
+  const handleVoiceSelect = useCallback((voiceId: string) => {
     setValue(voiceId);
     onVoiceSelect(voiceId);
     setOpen(false);
-  };
+  }, [setValue, onVoiceSelect, setOpen]);
 
-  const handlePreview = async (voiceId: string) => {
+  const handlePreview = useCallback(async (voiceId: string) => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current = null;
+    }
+
     setPlayingId(voiceId);
-    setTimeout(() => setPlayingId(null), 2000);
-  };
+
+    try {
+      const res = await fetch(`/api/voice/preview?voice=${encodeURIComponent(voiceId)}`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch preview');
+      }
+      const audioBlob = await res.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      previewAudioRef.current = audio;
+      
+      audio.onended = () => {
+        setPlayingId(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+      
+      audio.onerror = () => {
+        setPlayingId(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      await audio.play();
+    } catch (err) {
+      console.error('Preview playback failed:', err);
+      setPlayingId(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        previewAudioRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <>
@@ -97,6 +160,8 @@ function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: stri
         <VoiceSelectorList>
           {loading ? (
             <div className="p-4 text-center text-sm text-muted-foreground">Loading voices...</div>
+          ) : voiceError ? (
+            <div className="p-4 text-center text-sm text-destructive">{voiceError}</div>
           ) : (
             <VoiceSelectorEmpty>No voices found.</VoiceSelectorEmpty>
           )}
@@ -109,9 +174,9 @@ function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: stri
               <div className="flex items-center gap-2 w-full">
                 <VoiceSelectorName>{voice.name}</VoiceSelectorName>
                 <VoiceSelectorAttributes>
-                  {voice.gender && (
+                  {voice.gender && (voice.gender === 'male' || voice.gender === 'female') && (
                     <>
-                      <VoiceSelectorGender value={voice.gender as 'male' | 'female'} />
+                      <VoiceSelectorGender value={voice.gender} />
                       <VoiceSelectorBullet />
                     </>
                   )}
@@ -149,35 +214,9 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioWorkletNodeRef = useRef<AudioWorkletNode | null>(null);
   const activeSourceNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  const playbackCursorRef = useRef<number>(0);
   const timeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const agentStateRef = useRef<PersonaState>('idle');
-
-  const float32ToInt16 = (float32Array: Float32Array): Int16Array => {
-    const int16Array = new Int16Array(float32Array.length);
-    for (let i = 0; i < float32Array.length; i++) {
-      const s = Math.max(-1, Math.min(1, float32Array[i]));
-      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-    }
-    return int16Array;
-  };
-
-  const int16ArrayToBase64 = (int16Array: Int16Array): string => {
-    const bytes = new Uint8Array(int16Array.buffer, int16Array.byteOffset, int16Array.byteLength);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  };
-
-  const base64ToInt16Array = (base64: string): Int16Array => {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return new Int16Array(bytes.buffer);
-  };
 
   const playAudio = useCallback((base64Audio: string) => {
     if (!speakerAudioContextRef.current) return;
@@ -189,7 +228,8 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
       float32Data[i] = int16Data[i] / (int16Data[i] < 0 ? 0x8000 : 0x7fff);
     }
 
-    const audioBuffer = audioContext.createBuffer(1, float32Data.length, 24000);
+    const sampleRate = audioContext.sampleRate;
+    const audioBuffer = audioContext.createBuffer(1, float32Data.length, sampleRate);
     audioBuffer.getChannelData(0).set(float32Data);
 
     const source = audioContext.createBufferSource();
@@ -200,7 +240,10 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
     };
 
     activeSourceNodesRef.current.add(source);
-    source.start();
+    
+    const startTime = Math.max(audioContext.currentTime, playbackCursorRef.current);
+    source.start(startTime);
+    playbackCursorRef.current = startTime + audioBuffer.duration;
   }, []);
 
   const cleanup = useCallback(() => {
@@ -211,6 +254,7 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
       }
     });
     activeSourceNodesRef.current.clear();
+    playbackCursorRef.current = 0;
 
     timeoutsRef.current.forEach((timeout) => {
       clearTimeout(timeout);
@@ -253,6 +297,7 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
     setTranscript('');
     setResponse('');
     setShowSetup(false);
+    playbackCursorRef.current = 0;
 
     try {
       const micAudioContext = new AudioContext({ sampleRate: 16000 });
@@ -303,31 +348,29 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
         const payload = new TextDecoder().decode(data.slice(1));
 
         if (type === 0x01) {
+          let voiceEvent: VoiceEvent;
           try {
-            const voiceEvent: VoiceEvent = JSON.parse(payload);
+            voiceEvent = JSON.parse(payload) as VoiceEvent;
+          } catch (err) {
+            console.error('Failed to parse voice event:', err, payload);
+            return;
+          }
 
-            if (voiceEvent.state) {
-              setAgentState(voiceEvent.state);
-              agentStateRef.current = voiceEvent.state;
-            }
-
-            if (voiceEvent.audio) {
+          switch (voiceEvent.type) {
+            case 'agent_state':
+              setAgentState(voiceEvent.state as PersonaState);
+              agentStateRef.current = voiceEvent.state as PersonaState;
+              break;
+            case 'agent_audio':
               playAudio(voiceEvent.audio);
-            }
-
-            if (voiceEvent.transcript) {
-              setTranscript((prev) => prev + voiceEvent.transcript);
-            }
-
-            if (voiceEvent.response) {
-              setResponse((prev) => prev + voiceEvent.response);
-            }
-
-            if (voiceEvent.error) {
-              setErrorMessage(voiceEvent.error);
+              break;
+            case 'transcript':
+              setTranscript((prev) => prev + voiceEvent.text);
+              break;
+            case 'error':
+              setErrorMessage(voiceEvent.message);
               setConnectionState('error');
-            }
-          } catch {
+              break;
           }
         }
       };
@@ -344,10 +387,11 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
       workletNode.port.onmessage = (event) => {
         if (
           ws.readyState === WebSocket.OPEN &&
-          event.data instanceof Float32Array &&
+          event.data?.type === 'audio' &&
+          event.data.data instanceof Int16Array &&
           agentStateRef.current !== 'speaking'
         ) {
-          const int16Data = float32ToInt16(event.data);
+          const int16Data = event.data.data as Int16Array;
           const base64Audio = int16ArrayToBase64(int16Data);
 
           const message = JSON.stringify({ type: 'audio', data: base64Audio });
