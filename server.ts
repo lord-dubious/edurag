@@ -1,5 +1,7 @@
 import next from 'next';
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { resolve } from 'path';
+config({ path: resolve(process.cwd(), '.env.local') });
 import { createServer } from 'http';
 import { parse } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
