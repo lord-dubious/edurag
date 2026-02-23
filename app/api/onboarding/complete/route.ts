@@ -128,8 +128,11 @@ async function writeEnvFile(apiKeys: ApiKeys, voiceConfig: VoiceConfig, settings
 export async function POST(request: NextRequest): Promise<Response> {
   try {
     const existingSettings = await getSettings();
-    if (existingSettings?.onboarded) {
-      return errorResponse('FORBIDDEN', 'Onboarding already completed', 403);
+    const url = new URL(request.url);
+    const force = url.searchParams.get('force') === 'true';
+    
+    if (existingSettings?.onboarded && !force) {
+      return errorResponse('FORBIDDEN', 'Onboarding already completed. Use ?force=true to override.', 403);
     }
 
     const body = await request.json();

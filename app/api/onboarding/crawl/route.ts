@@ -50,12 +50,13 @@ function shouldSkipFile(url: string, fileTypeRules: FileTypeRules): boolean {
 }
 
 interface CrawlRequestBody {
-  universityUrl: string;
+  universityUrl?: string;
   externalUrls?: string[];
   excludePaths?: string[];
   crawlConfig?: { maxDepth?: number; limit?: number };
   fileTypeRules?: FileTypeRules;
   crawlerInstructions?: string;
+  embeddingApiKey?: string;
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     crawlConfig = { maxDepth: 3, limit: 300 },
     fileTypeRules = { pdf: 'index', docx: 'index', csv: 'skip' },
     crawlerInstructions = '',
+    embeddingApiKey,
   } = body;
 
   const maxDepth = crawlConfig.maxDepth || 3;
@@ -81,7 +83,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const stream = new ReadableStream({
     async start(controller) {
       const tvly = tavily({ apiKey: env.TAVILY_API_KEY });
-      const embeddings = getEmbeddings();
+      const embeddings = getEmbeddings(embeddingApiKey);
       
       let totalChunks = 0;
       let totalDocs = 0;

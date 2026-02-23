@@ -164,7 +164,9 @@ export default function SetupPage(): React.JSX.Element {
     limit: 300,
     extractDepth: 'advanced',
   });
-  const [crawlerInstructions, setCrawlerInstructions] = useState('');
+  const [crawlerInstructions, setCrawlerInstructions] = useState(
+    'Focus on academic content, course information, faculty pages, admissions, student resources, and official announcements. Skip navigation menus, footers, and duplicate content.'
+  );
   const [crawlProgress, setCrawlProgress] = useState<CrawlProgress | null>(null);
   const [newExternalUrl, setNewExternalUrl] = useState('');
   const [newExternalLabel, setNewExternalLabel] = useState('');

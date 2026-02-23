@@ -79,7 +79,7 @@ function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: stri
       fetch('/api/voice/models')
         .then((res) => res.json())
         .then((data) => {
-          setVoices(data.voices || []);
+          setVoices(data.models || []);
         })
         .catch((err) => {
           console.error('Failed to fetch voices:', err);

@@ -9,7 +9,7 @@ export function middleware(request: NextRequest) {
   }
 
   const onboardedCookie = request.cookies.get('edurag_onboarded')?.value;
-  const hasEnvUrl = !!process.env.NEXT_PUBLIC_UNI_URL;
+  const hasEnvUrl = !!process.env.NEXT_PUBLIC_UNI_URL || !!process.env.NEXT_PUBLIC_APP_URL;
   const isOnboarded = onboardedCookie === 'true' || hasEnvUrl;
 
   if (!isOnboarded && pathname !== '/setup' && !pathname.startsWith('/api/onboarding') && !pathname.startsWith('/api/upload')) {
