@@ -136,6 +136,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const stream = new ReadableStream({
     async start(controller) {
       const tvly = tavily({ apiKey: tavilyApiKey });
+      const embeddingsInstance = getEmbeddings(embeddingApiKey, embeddingModel, embeddingDimensions);
       
       let totalChunks = 0;
       let totalDocs = 0;
@@ -238,7 +239,6 @@ export async function POST(request: NextRequest): Promise<Response> {
               let embeddingsArray: number[][] | undefined;
               try {
                 console.log(`Embedding ${chunks.length} chunks for ${page.url}, first chunk length: ${chunks[0]?.length ?? 0}`);
-                const embeddingsInstance = getEmbeddings(embeddingApiKey, embeddingModel, embeddingDimensions);
                 embeddingsArray = await embeddingsInstance.embedDocuments(chunks);
                 console.log(`Got ${embeddingsArray?.length ?? 0} embeddings`);
               } catch (embedError) {

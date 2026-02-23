@@ -8,7 +8,8 @@ export type AppErrorCode =
   | 'DB_ERROR'
   | 'RATE_LIMITED'
   | 'TIMEOUT'
-  | 'UPLOAD_FAILED';
+  | 'UPLOAD_FAILED'
+  | 'INTERNAL_ERROR';
 
 export interface AppError {
   error: string;

@@ -87,7 +87,7 @@ async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>)
     TAVILY_API_KEY: sanitizeEnvValue(apiKeys.tavilyApiKey),
     UPLOADTHING_SECRET: sanitizeEnvValue(apiKeys.uploadthingSecret),
     UPLOADTHING_APP_ID: sanitizeEnvValue(apiKeys.uploadthingAppId),
-    ADMIN_TOKEN: sanitizeEnvValue(apiKeys.adminSecret),
+    ADMIN_SECRET: sanitizeEnvValue(apiKeys.adminSecret),
     UNIVERSITY_URL: sanitizeEnvValue(settings.uniUrl as string),
   };
 
