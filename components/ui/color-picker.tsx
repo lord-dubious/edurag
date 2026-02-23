@@ -58,7 +58,6 @@ export function ColorPicker({
               <HexColorInput
                 color={value}
                 onChange={onChange}
-                prefixed
                 className="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm font-mono"
               />
             </div>

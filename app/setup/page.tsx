@@ -204,7 +204,8 @@ export default function SetupPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.apiKeys) {
-            setApiKeys(prev => ({ ...prev, ...data.apiKeys }));
+            const { adminSecret, ...safeKeys } = data.apiKeys;
+            setApiKeys(prev => ({ ...prev, ...safeKeys }));
           }
           if (data.uniUrl) setUniversityUrl(data.uniUrl);
           if (data.appName || data.brandPrimary || data.emoji || data.logoUrl) {

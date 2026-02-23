@@ -1,4 +1,4 @@
-import { MongoClient, type Document as MongoDocument, type WithId, type OptionalId } from 'mongodb';
+import { MongoClient, type Collection, type Document as MongoDocument, type WithId, type OptionalId } from 'mongodb';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { env } from './env';
 import { getEmbeddings } from './providers';
@@ -8,7 +8,7 @@ declare global {
 }
 
 export async function getMongoClient(customUri?: string): Promise<MongoClient> {
-  if (globalThis.mongoClient && !customUri) {
+  if (!customUri && globalThis.mongoClient) {
     return globalThis.mongoClient;
   }
   
@@ -29,7 +29,7 @@ export async function getMongoClient(customUri?: string): Promise<MongoClient> {
 export async function getMongoCollection<TSchema extends MongoDocument = MongoDocument>(
   collectionName: string,
   customUri?: string
-) {
+): Promise<Collection<TSchema>> {
   const client = await getMongoClient(customUri);
   return client.db(env.DB_NAME).collection<TSchema>(collectionName);
 }

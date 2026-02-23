@@ -111,21 +111,19 @@ export default async function KnowledgeBasePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Link href={`/admin/domains?crawl=${encodeURIComponent(uniUrl)}`}>
-            <Button disabled={crawlStatus === 'running'} size="lg">
-              {crawlStatus === 'running' ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Crawl in Progress...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Start Re-Crawl
-                </>
-              )}
+          {crawlStatus === 'running' ? (
+            <Button disabled size="lg">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Crawl in Progress...
             </Button>
-          </Link>
+          ) : (
+            <Link href={`/admin/domains?crawl=${encodeURIComponent(uniUrl)}`}>
+              <Button size="lg">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Start Re-Crawl
+              </Button>
+            </Link>
+          )}
         </CardContent>
       </Card>
       

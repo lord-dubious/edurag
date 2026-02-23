@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { nanoid } from 'nanoid';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
@@ -57,14 +57,14 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   const emoji = brand?.emoji;
   const iconType = brand?.iconType || 'emoji';
 
-  const transport = useCallback(() => new DefaultChatTransport({
+  const transport = useMemo(() => new DefaultChatTransport({
     api: '/api/chat',
     body: () => ({ threadId }),
   }), [threadId]);
 
   const { messages, status, error, sendMessage, regenerate } = useChat({
     id: threadId,
-    transport: transport(),
+    transport,
     onFinish: ({ message }) => {
       if (message.parts) {
         const toolParts = message.parts.filter(isVectorSearchToolPart);

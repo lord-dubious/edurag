@@ -25,6 +25,9 @@ async function saveSettings(formData: FormData) {
   const embeddingModel = formData.get('embeddingModel') as string;
   const embeddingDimensions = parseInt(formData.get('embeddingDimensions') as string) || 2048;
   
+  const uploadthingSecret = formData.get('uploadthingSecret') as string;
+  const uploadthingAppId = formData.get('uploadthingAppId') as string;
+  
   await updateSettings({
     appName,
     brandPrimary,
@@ -40,6 +43,8 @@ async function saveSettings(formData: FormData) {
       model: embeddingModel,
       dimensions: embeddingDimensions,
     },
+    uploadthingSecret: uploadthingSecret || undefined,
+    uploadthingAppId: uploadthingAppId || undefined,
   });
   
   revalidatePath('/admin/settings');

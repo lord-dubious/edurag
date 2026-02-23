@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSettings, updateSettings } from '@/lib/db/settings';
-import { env } from '@/lib/env';
+import { env, hasRequiredEnvVars } from '@/lib/env';
 import { errorResponse } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
@@ -139,13 +139,7 @@ export async function GET() {
       autoCrawl: env.AUTO_CRAWL,
       universityUrl: env.UNIVERSITY_URL || settings?.uniUrl || null,
       crawlStatus: settings?.crawlStatus || null,
-      hasRequiredEnvVars: !!(
-        process.env.MONGODB_URI &&
-        process.env.CHAT_API_KEY &&
-        process.env.EMBEDDING_API_KEY &&
-        process.env.TAVILY_API_KEY &&
-        process.env.ADMIN_SECRET
-      ),
+      hasRequiredEnvVars: hasRequiredEnvVars(),
     });
   } catch (error) {
     return errorResponse('DB_ERROR', 'Failed to get startup status', 500, error);

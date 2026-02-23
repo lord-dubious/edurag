@@ -30,7 +30,7 @@ export async function GET(
             status: 200,
             headers: {
                 'Content-Type': contentType,
-                'Cache-Control': 'public, max-age=31536000, immutable',
+                'Cache-Control': 'public, max-age=3600, must-revalidate',
             },
         });
     } catch (error) {

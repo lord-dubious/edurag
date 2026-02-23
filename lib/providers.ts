@@ -32,7 +32,8 @@ export function getEmbeddings(
   const modelName = model || env.EMBEDDING_MODEL;
   const outputDimension = dimensions || env.EMBEDDING_DIMENSIONS;
   
-  if (!apiKey && _embeddings) {
+  const hasOverrides = Boolean(model || dimensions);
+  if (!apiKey && !hasOverrides && _embeddings) {
     return _embeddings;
   }
   
@@ -48,7 +49,7 @@ export function getEmbeddings(
     truncation: true,
   });
   
-  if (!apiKey) {
+  if (!apiKey && !hasOverrides) {
     _embeddings = instance;
   }
   

@@ -29,6 +29,8 @@ export interface OnboardingSettings {
     dimensions?: number;
   };
   crawlerInstructions?: string;
+  uploadthingSecret?: string;
+  uploadthingAppId?: string;
   fileTypeRules?: {
     pdf: 'index' | 'skip';
     docx: 'index' | 'skip';
