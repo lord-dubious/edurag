@@ -69,6 +69,7 @@ export function hasRequiredEnvVars(): boolean {
     process.env.CHAT_API_KEY &&
     process.env.EMBEDDING_API_KEY &&
     process.env.TAVILY_API_KEY &&
-    process.env.ADMIN_SECRET
+    process.env.ADMIN_SECRET &&
+    process.env.ADMIN_SECRET.length >= 16
   );
 }

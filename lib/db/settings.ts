@@ -81,7 +81,7 @@ export function getEnvPreview(settings: OnboardingSettings | null): string {
   const lines: string[] = [];
 
   if (settings.uniUrl) {
-    lines.push(`NEXT_PUBLIC_UNI_URL=${settings.uniUrl}`);
+    lines.push(`UNIVERSITY_URL=${settings.uniUrl}`);
   }
 
   if (settings.brandPrimary) {
@@ -89,7 +89,7 @@ export function getEnvPreview(settings: OnboardingSettings | null): string {
   }
 
   if (settings.appName) {
-    lines.push(`NEXT_PUBLIC_APP_NAME=${settings.appName}`);
+    lines.push(`APP_NAME=${settings.appName}`);
   }
 
   if (settings.brandLogoUrl) {
@@ -110,6 +110,10 @@ export function getEnvPreview(settings: OnboardingSettings | null): string {
 
   if (settings.crawlConfig?.maxDepth !== undefined) {
     lines.push(`CRAWL_MAX_DEPTH=${settings.crawlConfig.maxDepth}`);
+  }
+
+  if (settings.crawlConfig?.maxBreadth !== undefined) {
+    lines.push(`CRAWL_MAX_BREADTH=${settings.crawlConfig.maxBreadth}`);
   }
 
   if (settings.crawlConfig?.limit !== undefined) {

@@ -81,8 +81,23 @@ interface CrawlRequestBody {
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
-  const rawBody = await request.json();
-  const body: CrawlRequestBody = typeof rawBody === 'object' && rawBody !== null ? rawBody : {};
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch (error) {
+    console.error('[Crawl] Failed to parse JSON:', error);
+    return errorResponse('VALIDATION_ERROR', 'Invalid JSON in request body', 400);
+  }
+  
+  if (typeof rawBody !== 'object' || rawBody === null) {
+    return errorResponse('VALIDATION_ERROR', 'Request body must be an object', 400);
+  }
+  
+  const body = rawBody as Record<string, unknown>;
+  
+  if (!body.universityUrl || typeof body.universityUrl !== 'string') {
+    return errorResponse('VALIDATION_ERROR', 'universityUrl is required', 400);
+  }
   
   const { 
     universityUrl, 
@@ -92,7 +107,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     fileTypeRules = { pdf: 'index', docx: 'index', csv: 'skip' },
     crawlerInstructions = '',
     apiKeys = {},
-  } = body;
+  } = body as unknown as CrawlRequestBody;
 
   const embeddingApiKey = apiKeys.embeddingApiKey || env.EMBEDDING_API_KEY;
   const embeddingModel = apiKeys.embeddingModel || env.EMBEDDING_MODEL;

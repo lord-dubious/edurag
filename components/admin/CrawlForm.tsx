@@ -108,7 +108,7 @@ export function CrawlForm({ onSubmit, isLoading }: CrawlFormProps) {
                 type="number"
                 min={1}
                 value={formData.maxBreadth}
-                onChange={(e) => setFormData({ ...formData, maxBreadth: parseInt(e.target.value) || 20 })}
+                onChange={(e) => setFormData({ ...formData, maxBreadth: parseInt(e.target.value, 10) || 20 })}
               />
               <p className="text-xs text-muted-foreground">Links per page (unlimited)</p>
             </div>
@@ -119,7 +119,7 @@ export function CrawlForm({ onSubmit, isLoading }: CrawlFormProps) {
                 type="number"
                 min={1}
                 value={formData.limit}
-                onChange={(e) => setFormData({ ...formData, limit: parseInt(e.target.value) || 100 })}
+                onChange={(e) => setFormData({ ...formData, limit: parseInt(e.target.value, 10) || 300 })}
               />
               <p className="text-xs text-muted-foreground">Max pages to crawl (unlimited)</p>
             </div>

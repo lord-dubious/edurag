@@ -332,7 +332,7 @@ export default function SetupPage() {
     } finally {
       setLoading(false);
     }
-  }, [universityUrl, externalUrls, excludePaths, fileTypeRules, brandData, crawlConfig, crawlerInstructions]);
+  }, [universityUrl, externalUrls, excludePaths, fileTypeRules, brandData, crawlConfig, crawlerInstructions, apiKeys]);
 
   const completeOnboarding = useCallback(async () => {
     setLoading(true);
