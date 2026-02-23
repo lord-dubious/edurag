@@ -1,6 +1,12 @@
 'use client';
 
-import { type UIMessage, type ChatStatus, type TextUIPart } from 'ai';
+import { Fragment, useMemo, memo } from 'react';
+import { Streamdown, type AllowedTags } from 'streamdown';
+import { cjk } from '@streamdown/cjk';
+import { code } from '@streamdown/code';
+import { math } from '@streamdown/math';
+import { mermaid } from '@streamdown/mermaid';
+import { CopyIcon, RefreshCcwIcon, ExternalLinkIcon, MessageCircleQuestionIcon, FileTextIcon } from 'lucide-react';
 import {
   Message,
   MessageContent,
@@ -8,13 +14,7 @@ import {
   MessageAction,
 } from '@/components/ai-elements/message';
 import { Spinner } from '@/components/ui/spinner';
-import { Streamdown, type AllowedTags } from 'streamdown';
-import { cjk } from '@streamdown/cjk';
-import { code } from '@streamdown/code';
-import { math } from '@streamdown/math';
-import { mermaid } from '@streamdown/mermaid';
-import { CopyIcon, RefreshCcwIcon, ExternalLinkIcon, MessageCircleQuestionIcon, FileTextIcon } from 'lucide-react';
-import { Fragment, useMemo, memo } from 'react';
+import type { UIMessage, ChatStatus, TextUIPart } from 'ai';
 
 const CITATION_REGEX = /(?:\[([^\]]+)\]\(cite:(\d+)\))|(?:【(\d+)(?:†[^】]+)?】|\[(\d+)\])/g;
 

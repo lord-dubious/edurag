@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Phone, PhoneOff, Settings2 } from 'lucide-react';
+import type { VoiceEvent, AgentState } from '@/lib/voice/voiceTypes';
+import type { PersonaState } from '@/components/ai-elements/persona';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Persona, type PersonaState } from '@/components/ai-elements/persona';
+import { Persona } from '@/components/ai-elements/persona';
 import {
   MicSelector,
   MicSelectorTrigger,
@@ -30,8 +33,6 @@ import {
   VoiceSelectorGender,
   useVoiceSelector,
 } from '@/components/ai-elements/voice-selector';
-import { Phone, PhoneOff, Settings2 } from 'lucide-react';
-import type { VoiceEvent, AgentState } from '@/lib/voice/voiceTypes';
 
 interface VoiceCallProps {
   onEnd?: () => void;
@@ -63,7 +64,7 @@ function base64ToInt16Array(base64: string): Int16Array {
   return new Int16Array(bytes.buffer);
 }
 
-function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: string) => void }) {
+function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: string) => void }): React.JSX.Element {
   const [voices, setVoices] = useState<VoiceModel[]>([]);
   const [loading, setLoading] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
@@ -88,13 +89,13 @@ function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: stri
     }
   }, [open, voices.length]);
 
-  const handleVoiceSelect = useCallback((voiceId: string) => {
+  const handleVoiceSelect = useCallback((voiceId: string): void => {
     setValue(voiceId);
     onVoiceSelect(voiceId);
     setOpen(false);
   }, [setValue, onVoiceSelect, setOpen]);
 
-  const handlePreview = useCallback(async (voiceId: string) => {
+  const handlePreview = useCallback(async (voiceId: string): Promise<void> => {
     if (previewAudioRef.current) {
       previewAudioRef.current.pause();
       previewAudioRef.current = null;
@@ -189,7 +190,7 @@ function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: stri
   );
 }
 
-export default function VoiceCall({ onEnd }: VoiceCallProps) {
+export default function VoiceCall({ onEnd }: VoiceCallProps): React.JSX.Element {
   const [connectionState, setConnectionState] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [agentState, setAgentState] = useState<PersonaState>('idle');
   const [transcript, setTranscript] = useState('');
@@ -351,6 +352,12 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
             case 'agent_state':
               setAgentState(voiceEvent.state as PersonaState);
               agentStateRef.current = voiceEvent.state as PersonaState;
+              if (voiceEvent.state === 'listening') {
+                setTranscript('');
+              }
+              break;
+            case 'user_stopped_speaking':
+              setTranscript('');
               break;
             case 'agent_audio':
               playAudio(voiceEvent.audio);
@@ -366,12 +373,45 @@ export default function VoiceCall({ onEnd }: VoiceCallProps) {
         }
       };
 
+      const currentWs = ws;
+
       ws.onerror = () => {
         setErrorMessage('WebSocket connection error');
         setConnectionState('error');
+        if (wsRef.current === currentWs) {
+          if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+            mediaStreamRef.current = null;
+          }
+          if (micAudioContextRef.current) {
+            micAudioContextRef.current.close().catch(() => {});
+            micAudioContextRef.current = null;
+          }
+          if (speakerAudioContextRef.current) {
+            speakerAudioContextRef.current.close().catch(() => {});
+            speakerAudioContextRef.current = null;
+          }
+          audioWorkletNodeRef.current = null;
+        }
       };
 
       ws.onclose = () => {
+        if (wsRef.current === currentWs) {
+          if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+            mediaStreamRef.current = null;
+          }
+          if (micAudioContextRef.current) {
+            micAudioContextRef.current.close().catch(() => {});
+            micAudioContextRef.current = null;
+          }
+          if (speakerAudioContextRef.current) {
+            speakerAudioContextRef.current.close().catch(() => {});
+            speakerAudioContextRef.current = null;
+          }
+          audioWorkletNodeRef.current = null;
+          wsRef.current = null;
+        }
         setConnectionState('disconnected');
       };
 

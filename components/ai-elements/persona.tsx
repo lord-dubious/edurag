@@ -1,8 +1,7 @@
 'use client';
 
-import type { FC, ReactNode } from 'react';
-
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import type { FC, ReactNode } from 'react';
 import {
   useRive,
   useStateMachineInput,
@@ -21,7 +20,7 @@ export type PersonaState =
   | 'speaking'
   | 'asleep';
 
-interface PersonaProps {
+export interface PersonaProps {
   state: PersonaState;
   onLoad?: RiveParameters['onLoad'];
   onLoadError?: RiveParameters['onLoadError'];
@@ -180,12 +179,13 @@ export const Persona: FC<PersonaProps> = memo(
     onStop,
     className,
   }) => {
-    const source = SOURCES[variant];
+    const source = SOURCES[variant] ?? SOURCES.obsidian;
 
-    if (!source) {
-      console.warn(`Invalid variant: ${variant}`);
-      return null;
-    }
+    useEffect(() => {
+      if (!SOURCES[variant]) {
+        console.warn(`Invalid variant: ${variant}`);
+      }
+    }, [variant]);
 
     const callbacksRef = useRef({
       onLoad,

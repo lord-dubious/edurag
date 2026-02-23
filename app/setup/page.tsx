@@ -4,6 +4,24 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useDropzone } from 'react-dropzone';
+import { toast, Toaster } from 'sonner';
+import { Check, X, Shield, Loader2, Palette, ImageUp, Smile, Upload } from 'lucide-react';
+import {
+  VoiceSelector,
+  VoiceSelectorTrigger,
+  VoiceSelectorContent,
+  VoiceSelectorInput,
+  VoiceSelectorList,
+  VoiceSelectorEmpty,
+  VoiceSelectorItem,
+  VoiceSelectorName,
+  VoiceSelectorPreview,
+  VoiceSelectorAttributes,
+  VoiceSelectorBullet,
+  VoiceSelectorGender,
+  useVoiceSelector,
+} from '@/components/ai-elements/voice-selector';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,21 +40,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  VoiceSelector,
-  VoiceSelectorTrigger,
-  VoiceSelectorContent,
-  VoiceSelectorInput,
-  VoiceSelectorList,
-  VoiceSelectorEmpty,
-  VoiceSelectorItem,
-  VoiceSelectorName,
-  VoiceSelectorPreview,
-  VoiceSelectorAttributes,
-  VoiceSelectorBullet,
-  VoiceSelectorGender,
-  useVoiceSelector,
-} from '@/components/ai-elements/voice-selector';
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -46,11 +49,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { toast, Toaster } from 'sonner';
-import { Check, X, Shield, Loader2, Palette, ImageUp, Smile, Upload } from 'lucide-react';
 import { ColorPicker } from '@/components/ui/color-picker';
-import { cn } from '@/lib/utils';
 import type { VoiceConfig } from '@/lib/voice/voiceTypes';
+
+interface VoiceModel {
+  name: string;
+  description: string;
+}
 
 interface BrandData {
   universityName: string;
@@ -172,9 +177,9 @@ export default function SetupPage() {
     voiceTtsApiKey: '',
     voiceTtsBaseUrl: '',
     voiceTtsVoice: 'alloy',
-    voiceTtsModel: '',
+    voiceTtsModel: 'tts-1',
   });
-  const [voiceModels, setVoiceModels] = useState<{ name: string; description: string }[]>([]);
+  const [voiceModels, setVoiceModels] = useState<VoiceModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [envPreview, setEnvPreview] = useState<string>('');
   const [isVercel, setIsVercel] = useState(false);
@@ -286,8 +291,9 @@ export default function SetupPage() {
           const data = await res.json();
           setVoiceModels(data.models || []);
         }
-      } catch {
-        // Silently fail, use defaults
+      } catch (err) {
+        console.error('Failed to fetch voice models:', err);
+        toast.error('Failed to fetch Deepgram voice models');
       }
       setLoadingModels(false);
     }

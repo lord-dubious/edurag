@@ -276,7 +276,15 @@ export const MicSelectorValue = ({
   );
 };
 
-export const useAudioDevices = () => {
+interface UseAudioDevicesResult {
+  devices: MediaDeviceInfo[];
+  error: string | null;
+  hasPermission: boolean;
+  loadDevices: () => Promise<void>;
+  loading: boolean;
+}
+
+export const useAudioDevices = (): UseAudioDevicesResult => {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -343,6 +351,10 @@ export const useAudioDevices = () => {
   }, [loadDevicesWithoutPermission]);
 
   useEffect(() => {
+    if (!navigator?.mediaDevices?.addEventListener) {
+      return;
+    }
+
     const handleDeviceChange = () => {
       if (hasPermission) {
         loadDevicesWithPermission();

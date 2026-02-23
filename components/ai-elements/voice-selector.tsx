@@ -1,11 +1,11 @@
 'use client';
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import type { ComponentProps, ReactNode } from 'react';
 
 import { CircleSmallIcon, MarsIcon, MarsStrokeIcon, NonBinaryIcon, PauseIcon, PlayIcon, TransgenderIcon, VenusAndMarsIcon, VenusIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import type { ComponentProps, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -47,9 +47,7 @@ function useControllableState<T>({
       if (!isControlled) {
         setUncontrolledProp(nextValue);
       }
-      if (nextValue !== undefined) {
-        onChange?.(nextValue);
-      }
+      (onChange as ((value: T | undefined) => void) | undefined)?.(nextValue);
     },
     [isControlled, onChange]
   );
@@ -108,7 +106,7 @@ interface VoiceSelectorContextValue {
 
 const VoiceSelectorContext = createContext<VoiceSelectorContextValue | null>(null);
 
-export const useVoiceSelector = () => {
+export const useVoiceSelector = (): VoiceSelectorContextValue => {
   const context = useContext(VoiceSelectorContext);
   if (!context) {
     throw new Error('VoiceSelector components must be used within VoiceSelector');
@@ -116,11 +114,11 @@ export const useVoiceSelector = () => {
   return context;
 };
 
-export type VoiceSelectorProps = ComponentProps<typeof Dialog> & {
+export interface VoiceSelectorProps extends ComponentProps<typeof Dialog> {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string | undefined) => void;
-};
+}
 
 export const VoiceSelector = ({
   value: valueProp,
@@ -158,15 +156,15 @@ export const VoiceSelector = ({
   );
 };
 
-export type VoiceSelectorTriggerProps = ComponentProps<typeof DialogTrigger>;
+export interface VoiceSelectorTriggerProps extends ComponentProps<typeof DialogTrigger> {}
 
 export const VoiceSelectorTrigger = (props: VoiceSelectorTriggerProps) => (
   <DialogTrigger {...props} />
 );
 
-export type VoiceSelectorContentProps = ComponentProps<typeof DialogContent> & {
+export interface VoiceSelectorContentProps extends Omit<ComponentProps<typeof DialogContent>, 'title'> {
   title?: ReactNode;
-};
+}
 
 export const VoiceSelectorContent = ({
   className,
@@ -186,13 +184,13 @@ export const VoiceSelectorContent = ({
   </DialogContent>
 );
 
-export type VoiceSelectorDialogProps = ComponentProps<typeof CommandDialog>;
+export interface VoiceSelectorDialogProps extends ComponentProps<typeof CommandDialog> {}
 
 export const VoiceSelectorDialog = (props: VoiceSelectorDialogProps) => (
   <CommandDialog {...props} />
 );
 
-export type VoiceSelectorInputProps = ComponentProps<typeof CommandInput>;
+export interface VoiceSelectorInputProps extends ComponentProps<typeof CommandInput> {}
 
 export const VoiceSelectorInput = ({
   className,
@@ -395,7 +393,7 @@ export const VoiceSelectorPreview = ({
       onClick?.(event);
       onPlay?.();
     },
-    [onClick, onPlay]
+    [onClick, onPlay,]
   );
 
   let icon = <PlayIcon className='size-3' />;

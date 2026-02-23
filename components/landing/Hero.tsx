@@ -29,6 +29,10 @@ export function Hero(): React.JSX.Element {
     }
   }, []);
 
+  const handleVoiceClick = useCallback(() => {
+    router.push('/chat?voice=true');
+  }, [router]);
+
   const renderLogo = () => {
     if (loading) {
       return (
@@ -120,7 +124,7 @@ export function Hero(): React.JSX.Element {
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push('/chat?voice=true')}
+              onClick={handleVoiceClick}
               className="gap-2"
             >
               <Phone className="w-4 h-4" />

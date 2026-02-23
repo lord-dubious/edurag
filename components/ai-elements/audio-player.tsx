@@ -1,9 +1,5 @@
 "use client";
 
-import type { Experimental_SpeechResult as SpeechResult } from "ai";
-import type { ComponentProps, CSSProperties } from "react";
-import type { JSX } from "react";
-
 import {
   MediaControlBar,
   MediaController,
@@ -24,6 +20,10 @@ import {
   ButtonGroup,
   ButtonGroupText,
 } from "@/components/ui/button-group";
+
+import type { Experimental_SpeechResult as SpeechResult } from "ai";
+import type { ComponentProps, CSSProperties } from "react";
+import type { JSX } from "react";
 
 export type AudioPlayerProps = Omit<
   ComponentProps<typeof MediaController>,
