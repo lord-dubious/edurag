@@ -186,6 +186,11 @@ async function main() {
         return;
       }
       
+      if (!DEV && !origin) {
+        socket.destroy();
+        return;
+      }
+      
       if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
         socket.destroy();
         return;

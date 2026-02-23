@@ -426,7 +426,7 @@ export default function VoiceCall({ onEnd }: VoiceCallProps): React.JSX.Element 
     };
   }, [cleanup]);
 
-  const getConnectionStatusColor = () => {
+  const getConnectionStatusColor = (): string => {
     switch (connectionState) {
       case 'connected':
         return 'bg-green-500';

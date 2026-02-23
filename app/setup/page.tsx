@@ -283,29 +283,33 @@ export default function SetupPage() {
   }, [brandData.primaryColor]);
 
   useEffect(() => {
-    async function fetchModels() {
-      if (!voiceConfig.deepgramApiKey) {
-        setVoiceModels([]);
-        return;
-      }
-      setLoadingModels(true);
-      try {
-        const res = await fetch('/api/voice/models', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deepgramApiKey: voiceConfig.deepgramApiKey }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setVoiceModels(data.models || []);
+    const timeoutId = setTimeout(async () => {
+      async function fetchModels() {
+        if (!voiceConfig.deepgramApiKey) {
+          setVoiceModels([]);
+          return;
         }
-      } catch (err) {
-        console.error('Failed to fetch voice models:', err);
-        toast.error('Failed to fetch Deepgram voice models');
+        setLoadingModels(true);
+        try {
+          const res = await fetch('/api/voice/models', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deepgramApiKey: voiceConfig.deepgramApiKey }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setVoiceModels(data.models || []);
+          }
+        } catch (err) {
+          console.error('Failed to fetch voice models:', err);
+          toast.error('Failed to fetch Deepgram voice models');
+        }
+        setLoadingModels(false);
       }
-      setLoadingModels(false);
-    }
-    fetchModels();
+      fetchModels();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
   }, [voiceConfig.deepgramApiKey]);
 
   const startCrawl = useCallback(async () => {

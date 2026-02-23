@@ -5,9 +5,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MicIcon, SquareIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import type { ComponentProps } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import type { ComponentProps } from 'react';
 
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;

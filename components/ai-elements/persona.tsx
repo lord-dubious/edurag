@@ -1,17 +1,12 @@
 'use client';
 
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import type { FC, ReactNode } from 'react';
-import {
-  useRive,
-  useStateMachineInput,
-  useViewModel,
-  useViewModelInstance,
-  useViewModelInstanceColor,
-} from '@rive-app/react-webgl2';
-import type { RiveParameters } from '@rive-app/react-webgl2';
+
+import { useRive, useStateMachineInput, useViewModel, useViewModelInstance, useViewModelInstanceColor } from '@rive-app/react-webgl2';
 
 import { cn } from '@/lib/utils';
+import type { FC, ReactNode } from 'react';
+import type { RiveParameters } from '@rive-app/react-webgl2';
 
 export type PersonaState =
   | 'idle'
@@ -130,7 +125,7 @@ interface PersonaWithModelProps {
 }
 
 const PersonaWithModel = memo(
-  ({ rive, source, children }: PersonaWithModelProps) => {
+  ({ rive, source, children }: PersonaWithModelProps): ReactNode => {
     const theme = useTheme(source.dynamicColor);
     const viewModel = useViewModel(rive, { useDefault: true });
     const viewModelInstance = useViewModelInstance(viewModel, {
@@ -148,7 +143,7 @@ const PersonaWithModel = memo(
       }
 
       const [r, g, b] = theme === 'dark' ? [255, 255, 255] : [0, 0, 0];
-      viewModelInstanceColor.setRgb(r, g, b);
+      viewModelInstanceColor.setRgb?.(r, g, b);
     }, [viewModelInstanceColor, theme, source.dynamicColor]);
 
     return children;
@@ -162,7 +157,7 @@ interface PersonaWithoutModelProps {
 }
 
 const PersonaWithoutModel = memo(
-  ({ children }: PersonaWithoutModelProps) => children
+  ({ children }: PersonaWithoutModelProps): ReactNode => children
 );
 
 PersonaWithoutModel.displayName = 'PersonaWithoutModel';
