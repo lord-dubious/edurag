@@ -312,7 +312,7 @@ export default function SetupPage(): React.JSX.Element {
     return () => clearTimeout(timeoutId);
   }, [voiceConfig.deepgramApiKey]);
 
-  const startCrawl = useCallback(async () => {
+  const startCrawl = useCallback(async (): Promise<void> => {
     setLoading(true);
     setCrawlLogs([]);
     const initialProgress = {
@@ -403,7 +403,7 @@ export default function SetupPage(): React.JSX.Element {
     }
   }, [universityUrl, externalUrls, excludePaths, fileTypeRules, brandData, crawlConfig, crawlerInstructions]);
 
-  const completeOnboarding = useCallback(async () => {
+  const completeOnboarding = useCallback(async (): Promise<void> => {
     setLoading(true);
 
     try {
@@ -446,7 +446,7 @@ export default function SetupPage(): React.JSX.Element {
     }
   }, [universityUrl, brandData, router, crawlConfig, excludePaths, externalUrls, fileTypeRules, apiKeys, voiceConfig]);
 
-  const addExternalUrl = () => {
+  const addExternalUrl = (): void => {
     if (newExternalUrl && !externalUrls.some((e) => e.url === newExternalUrl)) {
       setExternalUrls([...externalUrls, { url: newExternalUrl, label: newExternalLabel || newExternalUrl }]);
       setNewExternalUrl('');
@@ -454,7 +454,7 @@ export default function SetupPage(): React.JSX.Element {
     }
   };
 
-  const addExcludePath = () => {
+  const addExcludePath = (): void => {
     if (newExcludePath && !excludePaths.includes(newExcludePath)) {
       setExcludePaths([...excludePaths, newExcludePath]);
       setNewExcludePath('');

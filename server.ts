@@ -268,7 +268,18 @@ async function main() {
     ws.on('message', (data) => {
       if (!session.dgReady || session.agentState === 'speaking') return;
       if (Buffer.isBuffer(data)) {
-        dg.sendAudio(data);
+        if (data.length > 0 && data[0] === 0x01) {
+          try {
+            const payload = JSON.parse(data.slice(1).toString());
+            if (payload.type === 'voice_config' && payload.voice) {
+              console.log('Received voice_config:', payload.voice);
+            }
+          } catch {
+            // Ignore malformed control frames
+          }
+        } else {
+          dg.sendAudio(data);
+        }
       }
     });
 
