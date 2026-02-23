@@ -2,8 +2,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Phone, PhoneOff, Settings2 } from 'lucide-react';
-import type { VoiceEvent, AgentState } from '@/lib/voice/voiceTypes';
-import type { PersonaState } from '@/components/ai-elements/persona';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Persona } from '@/components/ai-elements/persona';
@@ -33,6 +31,8 @@ import {
   VoiceSelectorGender,
   useVoiceSelector,
 } from '@/components/ai-elements/voice-selector';
+import type { VoiceEvent, AgentState } from '@/lib/voice/voiceTypes';
+import type { PersonaState } from '@/components/ai-elements/persona';
 
 interface VoiceCallProps {
   onEnd?: () => void;
@@ -111,17 +111,18 @@ function VoiceSelectionDialog({ onVoiceSelect }: { onVoiceSelect: (voiceId: stri
       }
       const audioBlob = await res.blob();
       audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      const objectUrl = audioUrl;
+      const audio = new Audio(objectUrl);
       previewAudioRef.current = audio;
       
       audio.onended = () => {
         setPlayingId(null);
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        URL.revokeObjectURL(objectUrl);
       };
       
       audio.onerror = () => {
         setPlayingId(null);
-        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        URL.revokeObjectURL(objectUrl);
       };
 
       await audio.play();
@@ -212,7 +213,7 @@ export default function VoiceCall({ onEnd }: VoiceCallProps): React.JSX.Element 
   const timeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const agentStateRef = useRef<PersonaState>('idle');
 
-  const playAudio = useCallback((base64Audio: string) => {
+  const playAudio = useCallback((base64Audio: string): void => {
     if (!speakerAudioContextRef.current) return;
 
     const audioContext = speakerAudioContextRef.current;
@@ -240,7 +241,7 @@ export default function VoiceCall({ onEnd }: VoiceCallProps): React.JSX.Element 
     playbackCursorRef.current = startTime + audioBuffer.duration;
   }, []);
 
-  const cleanup = useCallback(() => {
+  const cleanup = useCallback((): void => {
     activeSourceNodesRef.current.forEach((source) => {
       try {
         source.stop();
@@ -401,16 +402,8 @@ export default function VoiceCall({ onEnd }: VoiceCallProps): React.JSX.Element 
           agentStateRef.current !== 'speaking'
         ) {
           const int16Data = event.data.data as Int16Array;
-          const base64Audio = int16ArrayToBase64(int16Data);
-
-          const message = JSON.stringify({ type: 'audio', data: base64Audio });
-          const encoder = new TextEncoder();
-          const messageBytes = encoder.encode(message);
-          const binaryMessage = new Uint8Array(1 + messageBytes.length);
-          binaryMessage[0] = 0x01;
-          binaryMessage.set(messageBytes, 1);
-
-          ws.send(binaryMessage);
+          const pcmBytes = new Uint8Array(int16Data.buffer);
+          ws.send(pcmBytes);
         }
       };
     } catch (err) {

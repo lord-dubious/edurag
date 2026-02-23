@@ -135,7 +135,7 @@ const PRESET_COLORS = [
 
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 
-export default function SetupPage() {
+export default function SetupPage(): React.JSX.Element {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);

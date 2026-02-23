@@ -231,7 +231,7 @@ export const VoiceSelectorItem = ({
     () => {
       setValue(value);
       setOpen(false);
-      consumerOnSelect?.();
+      consumerOnSelect?.(value ?? '');
     },
     [setValue, setOpen, value, consumerOnSelect]
   );

@@ -16,7 +16,7 @@ export type PersonaState =
   | 'asleep';
 
 export interface PersonaProps {
-  state: PersonaState;
+  state?: PersonaState;
   onLoad?: RiveParameters['onLoad'];
   onLoadError?: RiveParameters['onLoadError'];
   onReady?: () => void;

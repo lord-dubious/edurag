@@ -317,11 +317,13 @@ export const SpeechInput = ({
         )}
         disabled={isDisabled}
         onClick={toggleListening}
+        aria-label={isListening ? 'Stop recording' : 'Start recording'}
+        aria-pressed={isListening}
         {...props}
       >
-        {isProcessing && <Spinner />}
-        {!isProcessing && isListening && <SquareIcon className="size-4" />}
-        {!(isProcessing || isListening) && <MicIcon className="size-4" />}
+        {isProcessing && <Spinner aria-hidden="true" />}
+        {!isProcessing && isListening && <SquareIcon className="size-4" aria-hidden="true" />}
+        {!(isProcessing || isListening) && <MicIcon className="size-4" aria-hidden="true" />}
       </Button>
     </div>
   );
