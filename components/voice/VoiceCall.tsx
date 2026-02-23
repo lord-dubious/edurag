@@ -510,10 +510,17 @@ export default function VoiceCall({ onEnd }: VoiceCallProps): React.JSX.Element 
 
       <div className="flex justify-center gap-2">
         {connectionState === 'disconnected' || connectionState === 'error' ? (
-          <Button onClick={startCall} size="lg" className="gap-2 rounded-full">
-            <Phone className="w-5 h-5" />
-            Start Call
-          </Button>
+          <>
+            {showSetup && onEnd && (
+              <Button onClick={onEnd} variant="outline" size="lg" className="gap-2 rounded-full">
+                Cancel
+              </Button>
+            )}
+            <Button onClick={startCall} size="lg" className="gap-2 rounded-full">
+              <Phone className="w-5 h-5" />
+              Start Call
+            </Button>
+          </>
         ) : (
           <Button onClick={handleEndCall} variant="destructive" size="lg" className="gap-2 rounded-full">
             <PhoneOff className="w-5 h-5" />
