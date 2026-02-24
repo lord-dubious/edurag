@@ -23,15 +23,37 @@ export function getChatModel() {
   return _chatModel;
 }
 
-export function getEmbeddings() {
-  if (!_embeddings) {
-    _embeddings = new VoyageEmbeddings({
-      apiKey: env.EMBEDDING_API_KEY,
-      modelName: env.EMBEDDING_MODEL,
-      outputDimension: env.EMBEDDING_DIMENSIONS,
-    });
+export function getEmbeddings(
+  apiKey?: string,
+  model?: string,
+  dimensions?: number
+): VoyageEmbeddings {
+  const key = apiKey || env.EMBEDDING_API_KEY;
+  const modelName = model || env.EMBEDDING_MODEL;
+  const outputDimension = dimensions || env.EMBEDDING_DIMENSIONS;
+  
+  const hasOverrides = Boolean(model || dimensions);
+  if (!apiKey && !hasOverrides && _embeddings) {
+    return _embeddings;
   }
-  return _embeddings;
+  
+  if (!key) {
+    throw new Error('Embedding API key is required');
+  }
+  
+  const instance = new VoyageEmbeddings({
+    apiKey: key,
+    modelName,
+    outputDimension,
+    inputType: 'document',
+    truncation: true,
+  });
+  
+  if (!apiKey && !hasOverrides) {
+    _embeddings = instance;
+  }
+  
+  return instance;
 }
 
 export const chatProvider = new Proxy({} as ReturnType<typeof createOpenAI>, {
@@ -43,11 +65,5 @@ export const chatProvider = new Proxy({} as ReturnType<typeof createOpenAI>, {
 export const chatModel = new Proxy({} as ReturnType<ReturnType<typeof createOpenAI>['chat']>, {
   get(_, prop) {
     return getChatModel()[prop as keyof ReturnType<ReturnType<typeof createOpenAI>['chat']>];
-  },
-});
-
-export const embeddings = new Proxy({} as VoyageEmbeddings, {
-  get(_, prop) {
-    return getEmbeddings()[prop as keyof VoyageEmbeddings];
   },
 });

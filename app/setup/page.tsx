@@ -20,8 +20,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast, Toaster } from 'sonner';
-import { Check, X, Shield, Loader2, Palette, ImageUp, Smile, Upload } from 'lucide-react';
+import { Check, X, Shield, Loader2, Palette, ImageUp, Smile, Upload, Eye, EyeOff } from 'lucide-react';
 import { ColorPicker } from '@/components/ui/color-picker';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
 
 interface BrandData {
   universityName: string;
@@ -63,6 +64,7 @@ interface FileTypeRules {
 
 interface CrawlConfig {
   maxDepth: number;
+  maxBreadth: number;
   limit: number;
   extractDepth: 'basic' | 'advanced';
 }
@@ -81,8 +83,14 @@ interface ApiKeys {
   chatApiKey: string;
   chatBaseUrl: string;
   chatModel: string;
+  chatMaxTokens: number;
+  chatMaxSteps: number;
   embeddingApiKey: string;
+  embeddingModel: string;
+  embeddingDimensions: number;
   tavilyApiKey: string;
+  uploadthingSecret: string;
+  uploadthingAppId: string;
   adminSecret: string;
 }
 
@@ -102,6 +110,37 @@ const PRESET_COLORS = [
 import dynamic from 'next/dynamic';
 
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
+
+interface PasswordInputProps {
+  id: string;
+  placeholder?: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  className?: string;
+}
+
+const PasswordInput = ({ id, placeholder, value, onChange, className }: PasswordInputProps) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        type={show ? 'text' : 'password'}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        className={`${className} pr-10`}
+      />
+      <button
+        type="button"
+        onClick={() => setShow(!show)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+      >
+        {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+};
 
 export default function SetupPage() {
   const router = useRouter();
@@ -128,10 +167,11 @@ export default function SetupPage() {
   });
   const [crawlConfig, setCrawlConfig] = useState<CrawlConfig>({
     maxDepth: 3,
+    maxBreadth: 50,
     limit: 300,
     extractDepth: 'advanced',
   });
-  const [crawlerInstructions, setCrawlerInstructions] = useState('');
+  const [crawlerInstructions, setCrawlerInstructions] = useState(DEFAULT_CRAWL_INSTRUCTIONS);
   const [crawlProgress, setCrawlProgress] = useState<CrawlProgress | null>(null);
   const [newExternalUrl, setNewExternalUrl] = useState('');
   const [newExternalLabel, setNewExternalLabel] = useState('');
@@ -141,9 +181,15 @@ export default function SetupPage() {
     mongodbUri: '',
     chatApiKey: '',
     chatBaseUrl: '',
-    chatModel: 'llama-3.3-70b',
+    chatModel: '',
+    chatMaxTokens: 32000,
+    chatMaxSteps: 5,
     embeddingApiKey: '',
+    embeddingModel: 'voyage-4-large',
+    embeddingDimensions: 2048,
     tavilyApiKey: '',
+    uploadthingSecret: '',
+    uploadthingAppId: '',
     adminSecret: '',
   });
   const [envPreview, setEnvPreview] = useState<string>('');
@@ -152,11 +198,43 @@ export default function SetupPage() {
   const [crawlLogs, setCrawlLogs] = useState<CrawlLogEntry[]>([]);
 
   useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/onboarding/complete');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.apiKeys) {
+            const { adminSecret, ...safeKeys } = data.apiKeys;
+            setApiKeys(prev => ({ ...prev, ...safeKeys }));
+          }
+          if (data.uniUrl) setUniversityUrl(data.uniUrl);
+          if (data.appName || data.brandPrimary || data.emoji || data.logoUrl) {
+            setBrandData(prev => ({
+              ...prev,
+              universityName: data.appName || prev.universityName,
+              primaryColor: data.brandPrimary || prev.primaryColor,
+              secondaryColor: data.brandSecondary || prev.secondaryColor,
+              emoji: data.emoji || prev.emoji,
+              logoUrl: data.logoUrl || prev.logoUrl,
+              iconType: data.iconType || prev.iconType,
+              showTitle: data.showTitle ?? prev.showTitle,
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch existing settings:', err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  useEffect(() => {
     document.documentElement.style.setProperty('--accent', brandData.primaryColor);
     document.documentElement.style.setProperty('--accent-light', brandData.primaryColor + '15');
     document.documentElement.style.setProperty('--accent-mid', brandData.primaryColor + '80');
     document.documentElement.style.setProperty('--accent-glow', brandData.primaryColor + '40');
   }, [brandData.primaryColor]);
+
 
   const startCrawl = useCallback(async () => {
     setLoading(true);
@@ -193,6 +271,13 @@ export default function SetupPage() {
           logoUrl: brandData.logoUrl,
           crawlConfig,
           crawlerInstructions,
+          apiKeys: {
+            embeddingApiKey: apiKeys.embeddingApiKey,
+            embeddingModel: apiKeys.embeddingModel,
+            embeddingDimensions: apiKeys.embeddingDimensions,
+            tavilyApiKey: apiKeys.tavilyApiKey,
+            mongodbUri: apiKeys.mongodbUri,
+          },
         }),
       });
 
@@ -247,7 +332,7 @@ export default function SetupPage() {
     } finally {
       setLoading(false);
     }
-  }, [universityUrl, externalUrls, excludePaths, fileTypeRules, brandData, crawlConfig, crawlerInstructions]);
+  }, [universityUrl, externalUrls, excludePaths, fileTypeRules, brandData, crawlConfig, crawlerInstructions, apiKeys]);
 
   const completeOnboarding = useCallback(async () => {
     setLoading(true);
@@ -364,7 +449,7 @@ export default function SetupPage() {
 MONGODB_URI=${apiKeys.mongodbUri ? apiKeys.mongodbUri.replace(/:([^@]+)@/, ':****@') : ''}
 CHAT_API_KEY=${apiKeys.chatApiKey ? '****' + apiKeys.chatApiKey.slice(-4) : ''}
 CHAT_BASE_URL=${apiKeys.chatBaseUrl || ''}
-CHAT_MODEL=${apiKeys.chatModel || 'llama-3.3-70b'}
+CHAT_MODEL=${apiKeys.chatModel || ''}
 EMBEDDING_API_KEY=${apiKeys.embeddingApiKey ? '****' + apiKeys.embeddingApiKey.slice(-4) : ''}
 TAVILY_API_KEY=${apiKeys.tavilyApiKey ? '****' + apiKeys.tavilyApiKey.slice(-4) : ''}
 ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}`;
@@ -739,14 +824,12 @@ ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}
                       role="switch"
                       aria-checked={brandData.showTitle}
                       onClick={() => setBrandData(prev => ({ ...prev, showTitle: !prev.showTitle }))}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        brandData.showTitle ? 'bg-primary' : 'bg-muted'
-                      }`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${brandData.showTitle ? 'bg-primary' : 'bg-muted'
+                        }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          brandData.showTitle ? 'translate-x-6' : 'translate-x-1'
-                        }`}
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${brandData.showTitle ? 'translate-x-6' : 'translate-x-1'
+                          }`}
                       />
                     </button>
                   </div>
@@ -783,46 +866,52 @@ ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}
                   <CardTitle className="text-lg">Crawl Settings</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <Label>Max Depth</Label>
-                      <Select
-                        value={String(crawlConfig.maxDepth)}
-                        onValueChange={(v) =>
-                          setCrawlConfig((prev) => ({ ...prev, maxDepth: Number(v) }))
+                      <Input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={crawlConfig.maxDepth}
+                        onChange={(e) =>
+                          setCrawlConfig((prev) => ({
+                            ...prev,
+                            maxDepth: Math.min(5, Math.max(1, parseInt(e.target.value) || 1)),
+                          }))
                         }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1 level</SelectItem>
-                          <SelectItem value="2">2 levels</SelectItem>
-                          <SelectItem value="3">3 levels</SelectItem>
-                          <SelectItem value="4">4 levels</SelectItem>
-                          <SelectItem value="5">5 levels</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      />
+                      <p className="text-xs text-muted-foreground">Crawl depth (1-5 levels)</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Max Breadth</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={crawlConfig.maxBreadth}
+                        onChange={(e) =>
+                          setCrawlConfig((prev) => ({
+                            ...prev,
+                            maxBreadth: Math.max(1, parseInt(e.target.value) || 1),
+                          }))
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">Links per page</p>
                     </div>
                     <div className="space-y-2">
                       <Label>Page Limit</Label>
-                      <Select
-                        value={String(crawlConfig.limit)}
-                        onValueChange={(v) =>
-                          setCrawlConfig((prev) => ({ ...prev, limit: Number(v) }))
+                      <Input
+                        type="number"
+                        min={1}
+                        value={crawlConfig.limit}
+                        onChange={(e) =>
+                          setCrawlConfig((prev) => ({
+                            ...prev,
+                            limit: Math.max(1, parseInt(e.target.value) || 1),
+                          }))
                         }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="50">50 pages</SelectItem>
-                          <SelectItem value="100">100 pages</SelectItem>
-                          <SelectItem value="200">200 pages</SelectItem>
-                          <SelectItem value="300">300 pages</SelectItem>
-                          <SelectItem value="500">500 pages</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      />
+                      <p className="text-xs text-muted-foreground">Max pages to crawl</p>
                     </div>
                     <div className="space-y-2">
                       <Label>Extract Depth</Label>
@@ -1007,99 +1096,205 @@ ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}
                 </p>
               </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Required API Keys
-                  </CardTitle>
-                  <CardDescription>
-                    These keys are stored securely and used to power the AI features
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="mongodbUri">MongoDB Connection String *</Label>
-                    <Input
-                      id="mongodbUri"
-                      type="password"
-                      placeholder="mongodb+srv://..."
-                      value={apiKeys.mongodbUri}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, mongodbUri: e.target.value }))}
-                    />
-                    <p className="text-xs text-muted-foreground">MongoDB Atlas connection string with vector search</p>
-                  </div>
+              <div className="grid gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Shield className="w-5 h-5" style={{ color: brandData.primaryColor }} />
+                      Storage & Database
+                    </CardTitle>
+                    <CardDescription>
+                      Configure your MongoDB connection for vector search
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <Label htmlFor="mongodbUri">MongoDB Connection String *</Label>
+                      <PasswordInput
+                        id="mongodbUri"
+                        placeholder="mongodb+srv://..."
+                        value={apiKeys.mongodbUri}
+                        onChange={(e) => setApiKeys((prev) => ({ ...prev, mongodbUri: e.target.value }))}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="chatApiKey">Chat API Key *</Label>
-                    <Input
-                      id="chatApiKey"
-                      type="password"
-                      placeholder="sk-..."
-                      value={apiKeys.chatApiKey}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, chatApiKey: e.target.value }))}
-                    />
-                    <p className="text-xs text-muted-foreground">Cerebras or OpenAI API key for chat</p>
-                  </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Smile className="w-5 h-5" style={{ color: brandData.primaryColor }} />
+                      AI Models
+                    </CardTitle>
+                    <CardDescription>
+                      Keys for chat generation and chunk embeddings
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="chatApiKey">Chat API Key *</Label>
+                      <PasswordInput
+                        id="chatApiKey"
+                        placeholder="sk-..."
+                        value={apiKeys.chatApiKey}
+                        onChange={(e) => setApiKeys((prev) => ({ ...prev, chatApiKey: e.target.value }))}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="embeddingApiKey">Embedding API Key *</Label>
+                      <PasswordInput
+                        id="embeddingApiKey"
+                        placeholder="pa-..."
+                        value={apiKeys.embeddingApiKey}
+                        onChange={(e) => setApiKeys((prev) => ({ ...prev, embeddingApiKey: e.target.value }))}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="embeddingModel">Embedding Model</Label>
+                        <Input
+                          id="embeddingModel"
+                          placeholder="voyage-4-large"
+                          value={apiKeys.embeddingModel}
+                          onChange={(e) => setApiKeys((prev) => ({ ...prev, embeddingModel: e.target.value }))}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="embeddingDimensions">Dimensions</Label>
+                        <Input
+                          id="embeddingDimensions"
+                          type="number"
+                          placeholder="2048"
+                          value={apiKeys.embeddingDimensions}
+                          onChange={(e) => setApiKeys((prev) => ({ ...prev, embeddingDimensions: parseInt(e.target.value) || 2048 }))}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="chatBaseUrl">Chat API Base URL (Optional)</Label>
+                      <Input
+                        id="chatBaseUrl"
+                        placeholder="https://api.cerebras.ai/v1"
+                        value={apiKeys.chatBaseUrl}
+                        onChange={(e) => setApiKeys((prev) => ({ ...prev, chatBaseUrl: e.target.value }))}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="chatModel">Chat Model (Optional)</Label>
+                      <Input
+                        id="chatModel"
+                        placeholder="llama-3.3-70b"
+                        value={apiKeys.chatModel}
+                        onChange={(e) => setApiKeys((prev) => ({ ...prev, chatModel: e.target.value }))}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="chatMaxTokens">Max Tokens</Label>
+                        <Input
+                          id="chatMaxTokens"
+                          type="number"
+                          placeholder="32000"
+                          value={apiKeys.chatMaxTokens}
+                          onChange={(e) => setApiKeys((prev) => ({ ...prev, chatMaxTokens: parseInt(e.target.value) || 32000 }))}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="chatMaxSteps">Max Steps</Label>
+                        <Input
+                          id="chatMaxSteps"
+                          type="number"
+                          min={1}
+                          max={20}
+                          placeholder="5"
+                          value={apiKeys.chatMaxSteps}
+                          onChange={(e) => setApiKeys((prev) => ({ ...prev, chatMaxSteps: Math.min(20, Math.max(1, parseInt(e.target.value) || 5)) }))}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="chatBaseUrl">Chat API Base URL</Label>
-                    <Input
-                      id="chatBaseUrl"
-                      placeholder="https://api.cerebras.ai/v1"
-                      value={apiKeys.chatBaseUrl}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, chatBaseUrl: e.target.value }))}
-                    />
-                    <p className="text-xs text-muted-foreground">Optional: Custom API endpoint</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="chatModel">Chat Model</Label>
-                    <Input
-                      id="chatModel"
-                      placeholder="llama-3.3-70b"
-                      value={apiKeys.chatModel}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, chatModel: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="embeddingApiKey">Embedding API Key *</Label>
-                    <Input
-                      id="embeddingApiKey"
-                      type="password"
-                      placeholder="pa-..."
-                      value={apiKeys.embeddingApiKey}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, embeddingApiKey: e.target.value }))}
-                    />
-                    <p className="text-xs text-muted-foreground">Voyage AI key for embeddings</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="tavilyApiKey">Tavily API Key *</Label>
-                    <Input
-                      id="tavilyApiKey"
-                      type="password"
-                      placeholder="tvly-..."
-                      value={apiKeys.tavilyApiKey}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, tavilyApiKey: e.target.value }))}
-                    />
-                    <p className="text-xs text-muted-foreground">Tavily key for web crawling</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="adminSecret">Admin Secret *</Label>
-                    <Input
-                      id="adminSecret"
-                      type="password"
-                      placeholder="your-secure-admin-token"
-                      value={apiKeys.adminSecret}
-                      onChange={(e) => setApiKeys((prev) => ({ ...prev, adminSecret: e.target.value }))}
-                    />
-                    <p className="text-xs text-muted-foreground">Bearer token for admin access</p>
-                  </div>
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Upload className="w-5 h-5" style={{ color: brandData.primaryColor }} />
+                      Crawling & Security
+                    </CardTitle>
+                    <CardDescription>
+                      Configure web crawling and administrative access
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="tavilyApiKey">Tavily API Key *</Label>
+                      <PasswordInput
+                        id="tavilyApiKey"
+                        placeholder="tvly-..."
+                        value={apiKeys.tavilyApiKey}
+                        onChange={(e) => setApiKeys((prev) => ({ ...prev, tavilyApiKey: e.target.value }))}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="adminSecret">Admin Secret *</Label>
+                      <div className="flex gap-2">
+                        <PasswordInput
+                          id="adminSecret"
+                          placeholder="your-secure-admin-token"
+                          value={apiKeys.adminSecret}
+                          onChange={(e) => setApiKeys((prev) => ({ ...prev, adminSecret: e.target.value }))}
+                          className="font-mono text-sm flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            const array = new Uint8Array(32);
+                            crypto.getRandomValues(array);
+                            const token = Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
+                            setApiKeys((prev) => ({ ...prev, adminSecret: token }));
+                          }}
+                        >
+                          Generate
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Secure token for admin panel access</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="uploadthingSecret">Uploadthing Secret (Optional)</Label>
+                      <PasswordInput
+                        id="uploadthingSecret"
+                        placeholder="sk_live_..."
+                        value={apiKeys.uploadthingSecret}
+                        onChange={(e) => setApiKeys((prev) => ({ ...prev, uploadthingSecret: e.target.value }))}
+                        className="font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">For cloud logo storage on Vercel/Netlify</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="uploadthingAppId">Uploadthing App ID (Optional)</Label>
+                      <Input
+                        id="uploadthingAppId"
+                        placeholder="abc123..."
+                        value={apiKeys.uploadthingAppId}
+                        onChange={(e) => setApiKeys((prev) => ({ ...prev, uploadthingAppId: e.target.value }))}
+                        className="font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">Get from uploadthing.com (free tier available)</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
               <Alert>
                 <Shield className="w-4 h-4" />
@@ -1192,6 +1387,15 @@ ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}
                     <div className="text-sm text-muted-foreground">Documents</div>
                   </CardContent>
                 </Card>
+              </div>
+
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(3)}>
+                  Back
+                </Button>
+                <Button disabled style={{ backgroundColor: brandData.primaryColor }} className="text-white opacity-50">
+                  Crawl in Progress...
+                </Button>
               </div>
             </div>
           )}
@@ -1380,7 +1584,10 @@ ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}
                 </CardContent>
               </Card>
 
-              <div className="flex justify-end">
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep(2)}>
+                  Re-crawl
+                </Button>
                 <Button
                   onClick={completeOnboarding}
                   disabled={loading}

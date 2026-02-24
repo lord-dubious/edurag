@@ -15,9 +15,22 @@ export interface OnboardingSettings {
   excludePaths?: string[];
   crawlConfig?: {
     maxDepth?: number;
+    maxBreadth?: number;
     limit?: number;
     excludePaths?: string[];
   };
+  crawlStatus?: 'pending' | 'running' | 'complete' | 'failed';
+  chatConfig?: {
+    maxTokens?: number;
+    maxSteps?: number;
+  };
+  embeddingConfig?: {
+    model?: string;
+    dimensions?: number;
+  };
+  crawlerInstructions?: string;
+  uploadthingSecret?: string;
+  uploadthingAppId?: string;
   fileTypeRules?: {
     pdf: 'index' | 'skip';
     docx: 'index' | 'skip';
@@ -64,50 +77,54 @@ export function getEnvPreview(settings: OnboardingSettings | null): string {
   if (!settings) {
     return '';
   }
-  
+
   const lines: string[] = [];
-  
+
   if (settings.uniUrl) {
-    lines.push(`NEXT_PUBLIC_UNI_URL=${settings.uniUrl}`);
+    lines.push(`UNIVERSITY_URL=${settings.uniUrl}`);
   }
-  
+
   if (settings.brandPrimary) {
     lines.push(`BRAND_PRIMARY=${settings.brandPrimary}`);
   }
-  
+
   if (settings.appName) {
-    lines.push(`NEXT_PUBLIC_APP_NAME=${settings.appName}`);
+    lines.push(`APP_NAME=${settings.appName}`);
   }
-  
+
   if (settings.brandLogoUrl) {
     lines.push(`BRAND_LOGO_URL=${settings.brandLogoUrl}`);
   }
-  
+
   if (settings.emoji) {
     lines.push(`BRAND_EMOJI=${settings.emoji}`);
   }
-  
+
   if (settings.brandSecondary) {
     lines.push(`BRAND_SECONDARY=${settings.brandSecondary}`);
   }
-  
+
   if (settings.externalUrls && settings.externalUrls.length > 0) {
     lines.push(`EXTERNAL_URLS=${settings.externalUrls.join(',')}`);
   }
-  
+
   if (settings.crawlConfig?.maxDepth !== undefined) {
     lines.push(`CRAWL_MAX_DEPTH=${settings.crawlConfig.maxDepth}`);
   }
-  
+
+  if (settings.crawlConfig?.maxBreadth !== undefined) {
+    lines.push(`CRAWL_MAX_BREADTH=${settings.crawlConfig.maxBreadth}`);
+  }
+
   if (settings.crawlConfig?.limit !== undefined) {
     lines.push(`CRAWL_LIMIT=${settings.crawlConfig.limit}`);
   }
-  
+
   if (settings.crawlConfig?.excludePaths && settings.crawlConfig.excludePaths.length > 0) {
     lines.push(`CRAWL_EXCLUDE_PATHS=${settings.crawlConfig.excludePaths.join(',')}`);
   } else if (settings.excludePaths && settings.excludePaths.length > 0) {
     lines.push(`CRAWL_EXCLUDE_PATHS=${settings.excludePaths.join(',')}`);
   }
-  
+
   return lines.join('\n');
 }

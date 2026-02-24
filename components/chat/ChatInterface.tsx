@@ -3,14 +3,13 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { nanoid } from 'nanoid';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport, type UIMessage } from 'ai';
-import { PanelLeftIcon, MoonIcon, SunIcon } from 'lucide-react';
+import { DefaultChatTransport } from 'ai';
+import { MoonIcon, SunIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
-import { SessionSidebar } from './SessionSidebar';
 import { CitationPanel } from './CitationPanel';
-import { SESSIONS_STORAGE_KEY } from '@/lib/constants';
+import { useBrand } from '@/components/providers/BrandProvider';
 import type { Source } from '@/lib/agent/types';
 
 interface VectorSearchResult {
@@ -34,79 +33,38 @@ function isVectorSearchToolPart(part: MessagePart): part is VectorSearchToolPart
   return part.type === 'tool-vector_search' && part.state === 'output-available' && 'output' in part;
 }
 
-export interface StoredSession {
-  id: string;
-  title: string;
-  createdAt: number;
-  messages: UIMessage[];
-  sources: Record<string, Source[]>;
-  initialQuery?: string;
-}
-
-export function loadSessions(): StoredSession[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const data = localStorage.getItem(SESSIONS_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveSessions(sessions: StoredSession[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
-}
-
-export function findSessionByQuery(query: string): StoredSession | undefined {
-  const sessions = loadSessions();
-  const normalizedQuery = query.trim().toLowerCase();
-  return sessions.find(s => s.initialQuery?.trim().toLowerCase() === normalizedQuery);
-}
-
 interface ChatInterfaceProps {
   initialQuery?: string;
 }
 
+const SUGGESTIONS = [
+  { label: 'Programs', query: 'What programs are offered?' },
+  { label: 'Tuition', query: 'How much is tuition?' },
+  { label: 'Admissions', query: 'What are the admission requirements?' },
+  { label: 'Campus Life', query: 'Tell me about campus life' },
+];
+
 export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
-  const initialSessionsRef = useRef<StoredSession[] | null>(null);
-  if (initialSessionsRef.current === null) {
-    initialSessionsRef.current = loadSessions();
-  }
-  const initialSessions = initialSessionsRef.current;
-
-  const initialThreadId = useMemo(() => {
-    if (initialQuery) {
-      return findSessionByQuery(initialQuery)?.id ?? nanoid();
-    }
-    return initialSessions.length > 0 ? initialSessions[0].id : nanoid();
-  }, [initialQuery, initialSessions]);
-
-  const [threadId, setThreadId] = useState(initialThreadId);
-  const [sources, setSources] = useState<Record<string, Source[]>>(() => {
-    const session = initialSessions.find(s => s.id === initialThreadId);
-    return session?.sources ?? {};
-  });
+  const [threadId] = useState(() => nanoid());
+  const [sources, setSources] = useState<Record<string, Source[]>>({});
   const [showSources, setShowSources] = useState(true);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sessionsVersion, setSessionsVersion] = useState(0);
-  const [pendingInput, setPendingInput] = useState<string | null>(null);
-  const isLoadingSessionRef = useRef(false);
+  const initialQuerySentRef = useRef(false);
   const { theme, setTheme } = useTheme();
+  const { brand } = useBrand();
+  
+  const appName = brand?.appName || 'University Knowledge Base';
+  const logoUrl = brand?.logoUrl;
+  const emoji = brand?.emoji;
+  const iconType = brand?.iconType || 'emoji';
 
   const transport = useMemo(() => new DefaultChatTransport({
     api: '/api/chat',
     body: () => ({ threadId }),
   }), [threadId]);
 
-  const { messages, status, error, sendMessage, regenerate, setMessages } = useChat({
+  const { messages, status, error, sendMessage, regenerate } = useChat({
     id: threadId,
     transport,
-    messages: (() => {
-      if (initialQuery) return [];
-      const session = initialSessions.find(s => s.id === initialThreadId);
-      return session?.messages ?? [];
-    })(),
     onFinish: ({ message }) => {
       if (message.parts) {
         const toolParts = message.parts.filter(isVectorSearchToolPart);
@@ -138,66 +96,15 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     },
   });
 
-  const initialQuerySentRef = useRef(false);
-
   useEffect(() => {
     if (!initialQuery) return;
     if (initialQuerySentRef.current) return;
     if (status !== 'ready') return;
     if (messages.length > 0) return;
 
-    const existingSession = findSessionByQuery(initialQuery);
-    if (existingSession) {
-      isLoadingSessionRef.current = true;
-      setThreadId(existingSession.id);
-      setMessages(existingSession.messages);
-      setSources(existingSession.sources);
-      initialQuerySentRef.current = true;
-      return;
-    }
-
-    setPendingInput(initialQuery);
     initialQuerySentRef.current = true;
-  }, [initialQuery, status, messages.length, setMessages]);
-
-  useEffect(() => {
-    if (status === 'ready' && isLoadingSessionRef.current) {
-      isLoadingSessionRef.current = false;
-      return;
-    }
-
-    if (messages.length === 0) return;
-    if (status === 'streaming') return;
-    if (isLoadingSessionRef.current) return;
-
-    const sessions = loadSessions();
-    const existingIndex = sessions.findIndex(s => s.id === threadId);
-
-    const title = messages[0]?.parts
-      ?.filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-      .map(p => p.text)
-      .join('')?.slice(0, 50) ?? 'New Chat';
-
-    const existingSession = existingIndex >= 0 ? sessions[existingIndex] : null;
-
-    const updatedSession: StoredSession = {
-      id: threadId,
-      title,
-      createdAt: existingSession?.createdAt ?? Date.now(),
-      messages,
-      sources,
-      initialQuery: existingSession ? existingSession.initialQuery : initialQuery,
-    };
-
-    if (existingIndex >= 0) {
-      sessions[existingIndex] = updatedSession;
-    } else {
-      sessions.unshift(updatedSession);
-    }
-
-    saveSessions(sessions);
-    setSessionsVersion(v => v + 1);
-  }, [messages, sources, threadId, status, initialQuery]);
+    sendMessage({ text: initialQuery });
+  }, [initialQuery, status, messages.length, sendMessage]);
 
   const handleSubmit = useCallback(
     (message: { text: string }) => {
@@ -206,123 +113,116 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     [sendMessage]
   );
 
-  const handleNewChat = useCallback(() => {
-    const newId = nanoid();
-    setThreadId(newId);
-    setMessages([]);
-    setSources({});
-    setPendingInput(null);
-    initialQuerySentRef.current = true;
-  }, [setMessages]);
-
-  const handleSelectSession = useCallback((id: string) => {
-    const sessions = loadSessions();
-    const session = sessions.find(s => s.id === id);
-    if (session) {
-      isLoadingSessionRef.current = true;
-      setThreadId(id);
-      setMessages(session.messages);
-      setSources(session.sources);
-      setPendingInput(null);
-    }
-  }, [setMessages]);
-
-  const handleDeleteSession = useCallback((id: string) => {
-    const sessions = loadSessions().filter(s => s.id !== id);
-    saveSessions(sessions);
-    if (id === threadId) {
-      handleNewChat();
-    }
-  }, [threadId, handleNewChat]);
+  const handleSuggestionClick = useCallback(
+    (query: string) => {
+      if (status === 'ready') {
+        sendMessage({ text: query });
+      }
+    },
+    [status, sendMessage]
+  );
 
   const lastMessage = messages.at(-1);
   const lastSources = lastMessage ? sources[lastMessage.id] ?? [] : [];
+  const isEmpty = messages.length === 0 && status === 'ready';
 
   return (
-    <div className="flex h-screen">
-      <SessionSidebar
-        currentThreadId={threadId}
-        onNewChat={handleNewChat}
-        onSelectSession={handleSelectSession}
-        onDeleteSession={handleDeleteSession}
-        collapsed={sidebarCollapsed}
-        sessionsVersion={sessionsVersion}
-      />
-
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center gap-3 px-4 h-14 border-b bg-background shrink-0">
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
-            title="Toggle sidebar"
-          >
-            <PanelLeftIcon className="w-4 h-4" />
-          </button>
-          <h1 className="flex-1 text-sm font-medium text-muted-foreground truncate">
-            {process.env.NEXT_PUBLIC_APP_NAME}
+    <div className="flex h-screen flex-col">
+      <header className="flex items-center gap-3 px-4 h-14 border-b bg-background shrink-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {iconType === 'logo' && logoUrl ? (
+            <img src={logoUrl} alt={appName} className="h-7 w-auto object-contain" />
+          ) : iconType === 'emoji' && emoji ? (
+            <span className="text-xl">{emoji}</span>
+          ) : null}
+          <h1 className="text-sm font-medium text-muted-foreground truncate">
+            {appName}
           </h1>
-          <div className="flex items-center gap-2">
-            {lastSources.length > 0 && (
-              <button
-                onClick={() => setShowSources(!showSources)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${showSources
-                  ? 'border-primary text-primary bg-primary/10'
-                  : 'border-border hover:border-primary hover:text-primary'
-                  }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Sources {lastSources.length}
-              </button>
-            )}
+        </div>
+        <div className="flex items-center gap-2">
+          {lastSources.length > 0 && (
             <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
-              title="Toggle theme"
+              onClick={() => setShowSources(!showSources)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${showSources
+                ? 'border-primary text-primary bg-primary/10'
+                : 'border-border hover:border-primary hover:text-primary'
+                }`}
             >
-              {theme === 'dark' ? (
-                <SunIcon className="w-4 h-4" />
-              ) : (
-                <MoonIcon className="w-4 h-4" />
-              )}
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              Sources {lastSources.length}
             </button>
-          </div>
-        </header>
+          )}
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
+            title="Toggle theme"
+          >
+            {theme === 'dark' ? (
+              <SunIcon className="w-4 h-4" />
+            ) : (
+              <MoonIcon className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      </header>
 
-        <div className="flex-1 flex overflow-hidden">
-          <main className="flex-1 flex flex-col min-w-0 relative">
-            <div className="flex-1 overflow-y-auto">
-              <div className="max-w-3xl mx-auto p-4 md:p-6 pb-48 md:pb-56">
+      <div className="flex-1 flex overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 relative">
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-3xl mx-auto p-4 md:p-6 pb-48 md:pb-56">
+              {isEmpty && (
+                 <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-6">
+                   <div className="space-y-2">
+                     <h2 className="text-2xl font-semibold">Welcome to {appName}</h2>
+                     <p className="text-muted-foreground max-w-md">
+                       Ask me anything about admissions, programs, tuition, campus life, and more.
+                     </p>
+                   </div>
+                  <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                    {SUGGESTIONS.map((suggestion) => (
+                      <button
+                        key={suggestion.label}
+                        onClick={() => handleSuggestionClick(suggestion.query)}
+                        className="h-auto py-3 px-4 justify-start text-left gap-2 rounded-md border border-border bg-background hover:bg-accent hover:border-primary/30 transition-all text-sm font-medium"
+                      >
+                        {suggestion.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!isEmpty && (
                 <ChatMessages
                   messages={messages}
                   sources={sources}
                   status={status}
                   onRegenerate={regenerate}
                 />
-                {error && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm mt-4">
-                    <span>Something went wrong.</span>
-                    <button
-                      onClick={() => regenerate()}
-                      className="underline font-medium"
-                    >
-                      Try again
-                    </button>
-                  </div>
-                )}
-              </div>
+              )}
+              {error && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm mt-4">
+                  <span>Something went wrong.</span>
+                  <button
+                    onClick={() => regenerate()}
+                    className="underline font-medium"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
 
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10">
-              <div className="max-w-3xl mx-auto">
-                <ChatInput onSubmit={handleSubmit} status={status} defaultInput={pendingInput ?? undefined} />
-              </div>
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10">
+            <div className="max-w-3xl mx-auto">
+              <ChatInput onSubmit={handleSubmit} status={status} />
             </div>
-          </main>
+          </div>
+        </main>
 
-          {showSources && lastSources.length > 0 && (
-            <CitationPanel sources={lastSources} />
-          )}
-        </div>
+        {showSources && lastSources.length > 0 && (
+          <CitationPanel sources={lastSources} />
+        )}
       </div>
     </div>
   );

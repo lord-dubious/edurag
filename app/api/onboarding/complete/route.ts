@@ -3,14 +3,21 @@ import { access, readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { updateSettings, getSettings } from '@/lib/db/settings';
 import { errorResponse } from '@/lib/errors';
+import { hasRequiredEnvVars } from '@/lib/env';
 
 interface ApiKeys {
   mongodbUri: string;
   chatApiKey: string;
   chatBaseUrl: string;
   chatModel: string;
+  chatMaxTokens: number;
+  chatMaxSteps: number;
   embeddingApiKey: string;
+  embeddingModel: string;
+  embeddingDimensions: number;
   tavilyApiKey: string;
+  uploadthingSecret: string;
+  uploadthingAppId: string;
   adminSecret: string;
 }
 
@@ -19,21 +26,24 @@ function maskSecret(value: string | undefined): string {
   return '*'.repeat(value.length - 4) + value.slice(-4);
 }
 
-function sanitizeEnvValue(value: string | undefined): string | undefined {
-  if (!value) return undefined;
+function sanitizeEnvValue(value: string | undefined | null): string | undefined {
+  if (value === undefined || value === null) return undefined;
   return value.replace(/[\n\r]/g, '');
 }
 
 type EnvEntry = { type: 'comment'; text: string } | { type: 'kv'; key: string; value: string } | { type: 'blank' };
 
 async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>): Promise<{ success: boolean; skipped: boolean; error?: string }> {
+  const isProduction = process.env.NODE_ENV === 'production';
   const isVercel = process.env.VERCEL === '1';
-  if (isVercel) {
+  const isNetlify = process.env.NETLIFY === 'true';
+  
+  if (isProduction || isVercel || isNetlify) {
     return { success: false, skipped: true };
   }
 
   const envPath = path.join(process.cwd(), '.env.local');
-  
+
   let existingEnv = '';
   try {
     await access(envPath);
@@ -45,7 +55,7 @@ async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>)
   const lines = existingEnv.split('\n');
   const entries: EnvEntry[] = [];
   const envMap = new Map<string, string>();
-  
+
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) {
@@ -70,26 +80,27 @@ async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>)
     CHAT_API_KEY: sanitizeEnvValue(apiKeys.chatApiKey),
     CHAT_BASE_URL: sanitizeEnvValue(apiKeys.chatBaseUrl),
     CHAT_MODEL: sanitizeEnvValue(apiKeys.chatModel),
+    CHAT_MAX_TOKENS: apiKeys.chatMaxTokens != null ? String(apiKeys.chatMaxTokens) : undefined,
+    CHAT_MAX_STEPS: apiKeys.chatMaxSteps != null ? String(apiKeys.chatMaxSteps) : undefined,
     EMBEDDING_API_KEY: sanitizeEnvValue(apiKeys.embeddingApiKey),
+    EMBEDDING_MODEL: sanitizeEnvValue(apiKeys.embeddingModel),
+    EMBEDDING_DIMENSIONS: apiKeys.embeddingDimensions != null ? String(apiKeys.embeddingDimensions) : undefined,
     TAVILY_API_KEY: sanitizeEnvValue(apiKeys.tavilyApiKey),
-    ADMIN_TOKEN: sanitizeEnvValue(apiKeys.adminSecret),
-    NEXT_PUBLIC_UNI_URL: sanitizeEnvValue(settings.uniUrl as string),
-    BRAND_PRIMARY: sanitizeEnvValue(settings.brandPrimary as string),
-    BRAND_SECONDARY: sanitizeEnvValue(settings.brandSecondary as string),
-    BRAND_LOGO_URL: sanitizeEnvValue(settings.brandLogoUrl as string),
-    BRAND_EMOJI: sanitizeEnvValue(settings.emoji as string),
-    NEXT_PUBLIC_APP_NAME: sanitizeEnvValue(settings.appName as string),
+    UPLOADTHING_SECRET: sanitizeEnvValue(apiKeys.uploadthingSecret),
+    UPLOADTHING_APP_ID: sanitizeEnvValue(apiKeys.uploadthingAppId),
+    ADMIN_SECRET: sanitizeEnvValue(apiKeys.adminSecret),
+    UNIVERSITY_URL: sanitizeEnvValue(settings.uniUrl as string),
   };
 
   for (const [key, value] of Object.entries(updates)) {
-    if (value) {
+    if (value !== undefined) {
       envMap.set(key, value);
     }
   }
 
   const existingKeys = new Set(entries.filter(e => e.type === 'kv').map(e => e.key));
   for (const [key, value] of Object.entries(updates)) {
-    if (value && !existingKeys.has(key)) {
+    if (value !== undefined && value !== '' && !existingKeys.has(key)) {
       entries.push({ type: 'kv', key, value });
       existingKeys.add(key);
     }
@@ -104,8 +115,10 @@ async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>)
         return '';
       }
       const updatedValue = envMap.get(entry.key);
+      if (updatedValue === '') return null;
       return `${entry.key}=${updatedValue ?? entry.value}`;
     })
+    .filter(line => line !== null)
     .join('\n');
 
   try {
@@ -148,75 +161,82 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (!brandPrimary) {
       return errorResponse('VALIDATION_ERROR', 'Brand primary color is required', 400);
     }
-    if (!universityName) {
-      return errorResponse('VALIDATION_ERROR', 'University name is required', 400);
-    }
-    if (!apiKeys?.mongodbUri) {
-      return errorResponse('VALIDATION_ERROR', 'MongoDB connection string is required', 400);
-    }
-    if (!apiKeys?.chatApiKey) {
-      return errorResponse('VALIDATION_ERROR', 'Chat API key is required', 400);
-    }
-    if (!apiKeys?.embeddingApiKey) {
-      return errorResponse('VALIDATION_ERROR', 'Embedding API key is required', 400);
-    }
-    if (!apiKeys?.tavilyApiKey) {
-      return errorResponse('VALIDATION_ERROR', 'Tavily API key is required', 400);
-    }
-    if (!apiKeys?.adminSecret) {
-      return errorResponse('VALIDATION_ERROR', 'Admin secret is required', 400);
+
+    const hasAllEnvVars = hasRequiredEnvVars();
+
+    if (!hasAllEnvVars) {
+      if (!apiKeys?.mongodbUri) {
+        return errorResponse('VALIDATION_ERROR', 'MongoDB connection string is required', 400);
+      }
+      if (!apiKeys?.chatApiKey) {
+        return errorResponse('VALIDATION_ERROR', 'Chat API key is required', 400);
+      }
+      if (!apiKeys?.embeddingApiKey) {
+        return errorResponse('VALIDATION_ERROR', 'Embedding API key is required', 400);
+      }
+      if (!apiKeys?.tavilyApiKey) {
+        return errorResponse('VALIDATION_ERROR', 'Tavily API key is required', 400);
+      }
+      if (!apiKeys?.adminSecret) {
+        return errorResponse('VALIDATION_ERROR', 'Admin secret is required', 400);
+      }
+      if (!apiKeys?.embeddingModel) {
+        return errorResponse('VALIDATION_ERROR', 'Embedding model is required', 400);
+      }
+      if (!apiKeys?.embeddingDimensions) {
+        return errorResponse('VALIDATION_ERROR', 'Embedding dimensions is required', 400);
+      }
     }
 
     const settings = {
       onboarded: true,
       uniUrl: universityUrl,
-      appName: universityName,
+      appName: universityName || 'University Knowledge Base',
       brandPrimary: brandPrimary,
-      brandSecondary: brandSecondary,
-      brandLogoUrl: logoUrl,
-      emoji: emoji,
+      brandSecondary: brandSecondary || brandPrimary,
+      brandLogoUrl: (iconType === 'logo' || iconType === 'upload') ? logoUrl : '',
+      emoji: iconType === 'emoji' ? emoji : '',
       iconType: iconType || 'emoji',
       showTitle: showTitle !== false,
       externalUrls: externalUrls || [],
       excludePaths: excludePaths || [],
-      crawlConfig: crawlConfig || { maxDepth: 3, limit: 300 },
+      crawlConfig: crawlConfig || { maxDepth: 3, maxBreadth: 50, limit: 300 },
       fileTypeRules: fileTypeRules || { pdf: 'index', docx: 'index', csv: 'skip' },
     };
 
     await updateSettings(settings);
 
-    const writeResult = await writeEnvFile(apiKeys, settings);
-    if (!writeResult.success && !writeResult.skipped) {
-      console.error('Failed to write .env.local:', writeResult.error);
+    if (apiKeys && !hasAllEnvVars) {
+      const writeResult = await writeEnvFile(apiKeys, settings);
+      if (!writeResult.success && !writeResult.skipped) {
+        console.error('Failed to write .env.local:', writeResult.error);
+      }
     }
 
     const envPreview = [
-      `MONGODB_URI=${maskSecret(apiKeys.mongodbUri)}`,
-      `CHAT_API_KEY=${maskSecret(apiKeys.chatApiKey)}`,
-      sanitizeEnvValue(apiKeys.chatBaseUrl) ? `CHAT_BASE_URL=${sanitizeEnvValue(apiKeys.chatBaseUrl)}` : null,
-      `CHAT_MODEL=${sanitizeEnvValue(apiKeys.chatModel) || process.env.CHAT_MODEL || 'llama-3.3-70b'}`,
-      `EMBEDDING_API_KEY=${maskSecret(apiKeys.embeddingApiKey)}`,
-      `TAVILY_API_KEY=${maskSecret(apiKeys.tavilyApiKey)}`,
-      `ADMIN_TOKEN=${maskSecret(apiKeys.adminSecret)}`,
-      `NEXT_PUBLIC_UNI_URL=${sanitizeEnvValue(universityUrl) || ''}`,
-      `BRAND_PRIMARY=${sanitizeEnvValue(brandPrimary) || ''}`,
-      sanitizeEnvValue(brandSecondary) ? `BRAND_SECONDARY=${sanitizeEnvValue(brandSecondary)}` : null,
-      sanitizeEnvValue(logoUrl) ? `BRAND_LOGO_URL=${sanitizeEnvValue(logoUrl)}` : null,
-      sanitizeEnvValue(emoji) ? `BRAND_EMOJI=${sanitizeEnvValue(emoji)}` : null,
-      `NEXT_PUBLIC_APP_NAME=${sanitizeEnvValue(universityName) || ''}`,
+      `MONGODB_URI=${maskSecret(apiKeys?.mongodbUri || process.env.MONGODB_URI)}`,
+      `CHAT_API_KEY=${maskSecret(apiKeys?.chatApiKey || process.env.CHAT_API_KEY)}`,
+      apiKeys?.chatBaseUrl || process.env.CHAT_BASE_URL ? `CHAT_BASE_URL=${sanitizeEnvValue(apiKeys?.chatBaseUrl || process.env.CHAT_BASE_URL)}` : null,
+      `CHAT_MODEL=${sanitizeEnvValue(apiKeys?.chatModel) || process.env.CHAT_MODEL || 'gpt-oss-120b'}`,
+      `EMBEDDING_API_KEY=${maskSecret(apiKeys?.embeddingApiKey || process.env.EMBEDDING_API_KEY)}`,
+      `EMBEDDING_MODEL=${apiKeys?.embeddingModel || process.env.EMBEDDING_MODEL || 'voyage-4-large'}`,
+      `EMBEDDING_DIMENSIONS=${apiKeys?.embeddingDimensions || process.env.EMBEDDING_DIMENSIONS || 2048}`,
+      `TAVILY_API_KEY=${maskSecret(apiKeys?.tavilyApiKey || process.env.TAVILY_API_KEY)}`,
+      `ADMIN_SECRET=${maskSecret(apiKeys?.adminSecret || process.env.ADMIN_SECRET)}`,
+      `UNIVERSITY_URL=${sanitizeEnvValue(universityUrl) || ''}`,
     ].filter(Boolean).join('\n');
 
-    const response = NextResponse.json({ 
+    const response = NextResponse.json({
       success: true,
       envPreview,
-      isVercel: process.env.VERCEL === '1',
-      envWritten: writeResult.success,
+      isProduction: process.env.NODE_ENV === 'production',
+      envWritten: !hasAllEnvVars,
     });
     response.cookies.set('edurag_onboarded', 'true', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 365, // 1 year
+      maxAge: 60 * 60 * 24 * 365,
       path: '/',
     });
     return response;
@@ -238,6 +258,18 @@ export async function GET(): Promise<Response> {
       iconType: settings?.iconType,
       showTitle: settings?.showTitle,
       appName: settings?.appName,
+      hasAllEnvVars: hasRequiredEnvVars(),
+      apiKeys: {
+        mongodbUri: process.env.MONGODB_URI || '',
+        chatApiKey: process.env.CHAT_API_KEY || '',
+        chatBaseUrl: process.env.CHAT_BASE_URL || '',
+        chatModel: process.env.CHAT_MODEL || '',
+        embeddingApiKey: process.env.EMBEDDING_API_KEY || '',
+        embeddingModel: process.env.EMBEDDING_MODEL || '',
+        embeddingDimensions: process.env.EMBEDDING_DIMENSIONS || '',
+        tavilyApiKey: process.env.TAVILY_API_KEY || '',
+        adminSecret: process.env.ADMIN_SECRET ? '****' : '',
+      },
     });
   } catch (error) {
     return errorResponse('DB_ERROR', 'Failed to get onboarding status', 500, error);

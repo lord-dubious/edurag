@@ -10,7 +10,7 @@ describe('Conversation Management', () => {
   let client: MongoClient;
 
   beforeAll(async () => {
-    client = new MongoClient(env.MONGODB_URI);
+    client = new MongoClient(env.MONGODB_URI!);
     await client.connect();
     await clearHistory(TEST_THREAD_ID);
   });

@@ -3,7 +3,7 @@ import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { Document } from '@langchain/core/documents';
 import { env } from './env';
-import { embeddings } from './providers';
+import { getEmbeddings } from './providers';
 import { getMongoCollection } from './vectorstore';
 import { DEFAULT_CRAWL_INSTRUCTIONS } from './agent/prompts';
 
@@ -150,7 +150,8 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
   }
 
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
-  const vectorStore = new MongoDBAtlasVectorSearch(embeddings, {
+  const embeddingsInstance = getEmbeddings();
+  const vectorStore = new MongoDBAtlasVectorSearch(embeddingsInstance, {
     collection,
     indexName: env.VECTOR_INDEX_NAME,
     textKey: 'text',

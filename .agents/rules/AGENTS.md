@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # EduRAG — Agent Instructions
 
 ## Project Overview

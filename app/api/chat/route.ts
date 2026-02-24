@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { type UIMessage, type TextUIPart, type ToolUIPart } from 'ai';
 import { runAgent } from '@/lib/agent';
-import { getHistory, appendMessage } from '@/lib/conversation';
 import { trackAndMaybeGenerateFaq } from '@/lib/faq-manager';
+import { getSettings } from '@/lib/db/settings';
 import { errorResponse } from '@/lib/errors';
 import { nanoid } from 'nanoid';
 
@@ -13,7 +13,7 @@ const bodySchema = z.object({
     parts: z.array(z.record(z.string(), z.unknown())),
     content: z.string().optional(),
   })),
-  threadId: z.string().min(1),
+  threadId: z.string().optional(),
 });
 
 export const maxDuration = 60;
@@ -65,42 +65,24 @@ export async function POST(req: Request) {
   );
 
   try {
-    const history = await getHistory(threadId);
+    const uiMessages: UIMessage[] = messages.map((m): UIMessage => ({
+      id: m.id,
+      role: m.role as 'user' | 'assistant',
+      parts: convertToUIMessageParts(m.parts),
+    }));
 
-    const historyMessageIds = new Set(history.map(m => `${m.role}:${m.content.slice(0, 50)}`));
-    const clientMessages = messages.filter(m => {
-      if (m.role !== 'user' && m.role !== 'assistant') return true;
-      const text = m.parts.filter(isTextPart).map(p => p.text).join('') || m.content || '';
-      return !historyMessageIds.has(`${m.role}:${text.slice(0, 50)}`);
-    });
-
-    const uiMessages: UIMessage[] = [
-      ...history.map((m): UIMessage => ({
-        id: nanoid(),
-        role: m.role as 'user' | 'assistant',
-        parts: [{ type: 'text', text: m.content }] as TextUIPart[],
-      })),
-      ...clientMessages.map((m): UIMessage => ({
-        id: m.id,
-        role: m.role as 'user' | 'assistant',
-        parts: convertToUIMessageParts(m.parts),
-      })),
-    ];
+    const settings = await getSettings();
+    const universityName = settings?.appName || 'University Knowledge Base';
+    const maxSteps = settings?.chatConfig?.maxSteps;
+    const maxTokens = settings?.chatConfig?.maxTokens;
 
     const result = runAgent({
       messages: uiMessages,
-      threadId,
+      threadId: threadId ?? nanoid(),
+      universityName,
+      maxSteps,
+      maxTokens,
     });
-
-    result.then(async (fullResult) => {
-      try {
-        const text = await fullResult.text;
-        await appendMessage(threadId, { role: 'user', content: userText, timestamp: new Date() });
-        await appendMessage(threadId, { role: 'assistant', content: text, timestamp: new Date() });
-      } catch (err) {
-        console.error('[Chat] persistence failed:', err);
-      }
-    }).catch(err => console.error('[Chat] agent error:', err));
 
     return (await result).toUIMessageStreamResponse();
   } catch (err) {
