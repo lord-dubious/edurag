@@ -1,14 +1,23 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useDeepgramVoice, AgentState, VoiceMessage } from '@/lib/voice/useDeepgramVoice';
-import { VOICE_CONVERSATION_KEY } from '@/lib/voice/config';
+import { useDeepgramVoice, AgentState, Source } from '@/lib/voice/useDeepgramVoice';
 import { Button } from '@/components/ui/button';
 import { Persona, PersonaState } from '@/components/ai-elements/persona';
-import { Phone, PhoneOff, X } from 'lucide-react';
+import { PhoneOff } from 'lucide-react';
+import type { UIMessage } from '@ai-sdk/react';
+
+export interface VoiceMessagePayload {
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: Source[];
+}
 
 interface VoiceChatProps {
+  messages?: UIMessage[];
   onClose?: () => void;
+  onMessageAdded?: (msg: VoiceMessagePayload) => void;
+  onShowNotes?: (topic: string) => void;
 }
 
 const stateLabels: Record<AgentState, string> = {
@@ -27,12 +36,12 @@ const personaStateMap: Record<AgentState, PersonaState> = {
   speaking: 'speaking',
 };
 
-export function VoiceChat({ onClose }: VoiceChatProps) {
+export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes }: VoiceChatProps) {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [agentResponse, setAgentResponse] = useState('');
-  const [messages, setMessages] = useState<VoiceMessage[]>([]);
+  const [currentSources, setCurrentSources] = useState<Source[]>([]);
 
   useEffect(() => {
     fetch('/api/voice-token')
@@ -50,42 +59,22 @@ export function VoiceChat({ onClose }: VoiceChatProps) {
       });
   }, []);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(VOICE_CONVERSATION_KEY);
-    if (saved) {
-      try {
-        setMessages(JSON.parse(saved));
-      } catch {}
-    }
-  }, []);
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem(VOICE_CONVERSATION_KEY, JSON.stringify(messages));
-    }
-  }, [messages]);
 
   const handleUserMessage = useCallback((text: string) => {
     setCurrentTranscript(text);
     if (text.trim()) {
-      setMessages(prev => [...prev, {
-        role: 'user',
-        content: text,
-        timestamp: Date.now(),
-      }]);
+      onMessageAdded?.({ role: 'user', content: text });
     }
-  }, []);
+  }, [onMessageAdded]);
 
   const handleAgentMessage = useCallback((text: string) => {
     setAgentResponse(text);
     if (text.trim()) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: text,
-        timestamp: Date.now(),
-      }]);
+      onMessageAdded?.({ role: 'assistant', content: text, sources: currentSources });
+      setCurrentSources([]);
     }
-  }, []);
+  }, [currentSources, onMessageAdded]);
 
   const handleStateChange = useCallback((newState: AgentState) => {
     if (newState === 'listening') {
@@ -100,12 +89,23 @@ export function VoiceChat({ onClose }: VoiceChatProps) {
     setError(err.message);
   }, []);
 
-  const { state, isPlaying, start, stop, interrupt } = useDeepgramVoice({
+  const handleSources = useCallback((sources: Source[]) => {
+    setCurrentSources(sources);
+  }, []);
+
+  const handleShowNotes = useCallback((topic: string) => {
+    onShowNotes?.(topic);
+  }, [onShowNotes]);
+
+  const { state, start, stop } = useDeepgramVoice({
     apiKey,
+    history: messages,
     onUserMessage: handleUserMessage,
     onAgentMessage: handleAgentMessage,
     onStateChange: handleStateChange,
     onError: handleError,
+    onSources: handleSources,
+    onRequestNotes: handleShowNotes,
   });
 
   const handleEnd = useCallback(() => {
@@ -113,92 +113,109 @@ export function VoiceChat({ onClose }: VoiceChatProps) {
     onClose?.();
   }, [stop, onClose]);
 
+  useEffect(() => {
+    if (apiKey && state === 'idle') {
+      start();
+    }
+  }, [apiKey, state, start]);
+
   const isInCall = state !== 'idle';
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex flex-col">
+    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex flex-col pointer-events-auto">
       <header className="flex justify-between items-center p-4 border-b">
-        <span className="text-sm font-medium text-muted-foreground">Voice Assistant</span>
-        <Button variant="ghost" size="sm" onClick={onClose} className="text-muted-foreground">
-          <X className="h-4 w-4 mr-1" />
+        <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+          {isInCall ? (
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+            </span>
+          ) : (
+            <span className="h-3 w-3 rounded-full bg-muted-foreground"></span>
+          )}
+          Voice Assistant
+        </span>
+        <Button variant="ghost" size="sm" onClick={() => { handleEnd(); onClose?.(); }} className="text-muted-foreground">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x h-4 w-4 mr-1"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           Close
         </Button>
       </header>
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-4">
+      <div className="flex-1 flex flex-col justify-center items-center overflow-hidden p-6 relative">
         {error ? (
-          <div className="text-center space-y-4">
-            <div className="text-destructive text-lg">{error}</div>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              Retry
-            </Button>
+          <div className="flex flex-col items-center justify-center space-y-4 max-w-sm text-center">
+            <div className="p-4 bg-destructive/10 rounded-full text-destructive">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+            </div>
+            <p className="text-sm font-medium text-destructive">{error}</p>
+            <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
           </div>
         ) : !apiKey ? (
-          <div className="text-muted-foreground animate-pulse">Connecting...</div>
+          <div className="flex flex-col items-center justify-center space-y-4 text-muted-foreground">
+            <div className="animate-pulse">Connecting...</div>
+          </div>
         ) : (
           <>
-            <Persona 
-              state={personaStateMap[state]} 
-              variant="halo" 
-              className="size-32 md:size-40"
-            />
-
-            <div className="text-center space-y-3 max-w-xl">
-              <p className="text-sm font-medium text-muted-foreground">
+            <div className="flex flex-col items-center justify-center shrink-0 w-full max-w-lg transition-all duration-500 ease-in-out">
+              <Persona
+                state={personaStateMap[state]}
+                variant="halo"
+                className="size-32 md:size-48 mb-8 transition-all duration-300"
+              />
+              <p className="text-base md:text-lg font-medium text-muted-foreground min-h-[28px] animate-in fade-in transition-opacity">
                 {stateLabels[state]}
               </p>
-              
-              {state === 'listening' && currentTranscript && (
-                <p className="text-xl md:text-2xl font-light text-center">
-                  "{currentTranscript}"
-                </p>
-              )}
-              
-              {state === 'speaking' && agentResponse && (
-                <p className="text-base text-muted-foreground text-center">
-                  {agentResponse}
-                </p>
-              )}
+            </div>
 
+            <div className="absolute bottom-24 w-full px-6 flex flex-col items-center justify-end min-h-[120px] pointer-events-none">
+              {(state === 'listening' && currentTranscript) && (
+                <div className="animate-in slide-in-from-bottom-4 fade-in duration-300 text-center max-w-2xl px-4 mix-blend-plus-lighter">
+                  <p className="text-lg md:text-xl font-medium text-muted-foreground line-clamp-3 drop-shadow-sm">
+                    &quot;{currentTranscript}&quot;
+                  </p>
+                </div>
+              )}
+              {(state === 'speaking' && agentResponse) && (
+                <div className="animate-in slide-in-from-bottom-4 fade-in duration-300 text-center max-w-3xl px-4">
+                  <p className="text-xl md:text-2xl font-semibold text-primary line-clamp-4 leading-relaxed drop-shadow-md">
+                    {agentResponse}
+                  </p>
+                </div>
+              )}
               {state === 'thinking' && (
-                <p className="text-sm text-muted-foreground">
-                  Searching knowledge base...
-                </p>
+                <div className="animate-in fade-in duration-200 flex items-center gap-3 text-muted-foreground bg-muted/50 py-3 px-5 rounded-full backdrop-blur-md border border-border/50">
+                  <svg className="animate-spin size-5" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span className="font-medium tracking-wide">Searching knowledge base...</span>
+                </div>
               )}
             </div>
           </>
         )}
       </div>
 
-      <footer className="flex justify-center items-center p-6 gap-3 border-t">
+      <footer className="flex justify-center items-center p-6 gap-4 border-t bg-background/50">
         {!isInCall ? (
-          <Button 
+          <Button
             onClick={start}
             disabled={!apiKey}
-            className="gap-2"
+            size="lg"
+            className="rounded-full shadow-lg h-14 w-full max-w-sm text-base gap-2"
           >
-            <Phone className="h-4 w-4" />
-            Start Call
+            Start Conversation
           </Button>
         ) : (
-          <>
-            <Button 
-              variant="destructive" 
-              onClick={handleEnd}
-              className="gap-2"
-            >
-              <PhoneOff className="h-4 w-4" />
-              End
-            </Button>
-            {isPlaying && (
-              <Button 
-                variant="outline" 
-                onClick={interrupt}
-              >
-                Interrupt
-              </Button>
-            )}
-          </>
+          <Button
+            variant="destructive"
+            size="lg"
+            onClick={() => { handleEnd(); onClose?.(); }}
+            className="rounded-full shadow-lg h-14 w-full max-w-sm text-base gap-2"
+          >
+            <PhoneOff className="h-5 w-5" />
+            End Call
+          </Button>
         )}
       </footer>
     </div>

@@ -9,7 +9,7 @@ import { useTheme } from 'next-themes';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { CitationPanel } from './CitationPanel';
-import { VoiceChat } from '@/components/voice/VoiceChat';
+import { VoiceChat, VoiceMessagePayload } from '@/components/voice/VoiceChat';
 import { useBrand } from '@/components/providers/BrandProvider';
 import type { Source } from '@/lib/agent/types';
 
@@ -53,7 +53,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   const initialQuerySentRef = useRef(false);
   const { theme, setTheme } = useTheme();
   const { brand } = useBrand();
-  
+
   const appName = brand?.appName || 'University Knowledge Base';
   const logoUrl = brand?.logoUrl;
   const emoji = brand?.emoji;
@@ -64,7 +64,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     body: () => ({ threadId }),
   }), [threadId]);
 
-  const { messages, status, error, sendMessage, regenerate } = useChat({
+  const { messages, setMessages, status, error, sendMessage, regenerate } = useChat({
     id: threadId,
     transport,
     onFinish: ({ message }) => {
@@ -115,6 +115,29 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     [sendMessage]
   );
 
+  const handleVoiceMessage = useCallback((msg: VoiceMessagePayload) => {
+    const id = nanoid();
+    setMessages(prev => [...prev, {
+      id,
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content,
+      createdAt: new Date(),
+      parts: [{ type: 'text', text: msg.content }],
+    }]);
+
+    if (msg.sources && msg.sources.length > 0) {
+      setSources(prev => ({
+        ...prev,
+        [id]: msg.sources!
+      }));
+    }
+  }, [setMessages]);
+
+  const handleShowNotes = useCallback((topic: string) => {
+    if (status !== 'ready') return;
+    sendMessage({ text: `I am providing the detailed Markdown notes and source links for "${topic}" now as requested in our conversation.` });
+  }, [status, sendMessage]);
+
   const handleSuggestionClick = useCallback(
     (query: string) => {
       if (status === 'ready') {
@@ -154,85 +177,89 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
               Sources {lastSources.length}
             </button>
           )}
-           <button
-             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-             className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
-             title="Toggle theme"
-           >
-             {theme === 'dark' ? (
-               <SunIcon className="w-4 h-4" />
-             ) : (
-               <MoonIcon className="w-4 h-4" />
-             )}
-            </button>
-          </div>
-        </header>
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
+            title="Toggle theme"
+          >
+            {theme === 'dark' ? (
+              <SunIcon className="w-4 h-4" />
+            ) : (
+              <MoonIcon className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {voiceMode ? (
-          <main className="flex-1 flex flex-col min-w-0">
-            <VoiceChat onClose={() => setVoiceMode(false)} />
-          </main>
-        ) : (
-          <>
-            <main className="flex-1 flex flex-col min-w-0 relative">
-              <div className="flex-1 overflow-y-auto">
-                <div className="max-w-3xl mx-auto p-4 md:p-6 pb-48 md:pb-56">
-                  {isEmpty && (
-                     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-6">
-                       <div className="space-y-2">
-                         <h2 className="text-2xl font-semibold">Welcome to {appName}</h2>
-                         <p className="text-muted-foreground max-w-md">
-                           Ask me anything about admissions, programs, tuition, campus life, and more.
-                         </p>
-                       </div>
-                      <div className="grid grid-cols-2 gap-3 w-full max-w-md">
-                        {SUGGESTIONS.map((suggestion) => (
-                          <button
-                            key={suggestion.label}
-                            onClick={() => handleSuggestionClick(suggestion.query)}
-                            className="h-auto py-3 px-4 justify-start text-left gap-2 rounded-md border border-border bg-background hover:bg-accent hover:border-primary/30 transition-all text-sm font-medium"
-                          >
-                            {suggestion.label}
-                          </button>
-                        ))}
-                      </div>
+        <>
+          <main className="flex-1 flex flex-col min-w-0 relative bg-background">
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-3xl mx-auto p-4 md:p-6 pb-48 md:pb-56">
+                {isEmpty && (
+                  <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-6">
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-semibold">Welcome to {appName}</h2>
+                      <p className="text-muted-foreground max-w-md">
+                        Ask me anything about admissions, programs, tuition, campus life, and more.
+                      </p>
                     </div>
-                  )}
-                  {!isEmpty && (
-                    <ChatMessages
-                      messages={messages}
-                      sources={sources}
-                      status={status}
-                      onRegenerate={regenerate}
-                    />
-                  )}
-                  {error && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm mt-4">
-                      <span>Something went wrong.</span>
-                      <button
-                        onClick={() => regenerate()}
-                        className="underline font-medium"
-                      >
-                        Try again
-                      </button>
+                    <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                      {SUGGESTIONS.map((suggestion) => (
+                        <button
+                          key={suggestion.label}
+                          onClick={() => handleSuggestionClick(suggestion.query)}
+                          className="h-auto py-3 px-4 justify-start text-left gap-2 rounded-md border border-border bg-background hover:bg-accent hover:border-primary/30 transition-all text-sm font-medium"
+                        >
+                          {suggestion.label}
+                        </button>
+                      ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+                {!isEmpty && (
+                  <ChatMessages
+                    messages={messages}
+                    sources={sources}
+                    status={status}
+                    onRegenerate={regenerate}
+                  />
+                )}
+                {error && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm mt-4">
+                    <span>Something went wrong.</span>
+                    <button
+                      onClick={() => regenerate()}
+                      className="underline font-medium"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                )}
               </div>
+            </div>
 
-              <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10">
-                <div className="max-w-3xl mx-auto">
+            <div className={`absolute bottom-0 left-0 right-0 py-4 px-2 sm:px-4 bg-gradient-to-t from-background via-background/95 to-transparent z-10 
+                ${voiceMode ? "bg-background pb-6" : ""}`}>
+              <div className="max-w-3xl mx-auto">
+                {voiceMode ? (
+                  <VoiceChat
+                    messages={messages}
+                    onClose={() => setVoiceMode(false)}
+                    onMessageAdded={handleVoiceMessage}
+                    onShowNotes={handleShowNotes}
+                  />
+                ) : (
                   <ChatInput onSubmit={handleSubmit} status={status} onVoiceMode={() => setVoiceMode(true)} />
-                </div>
+                )}
               </div>
-            </main>
+            </div>
+          </main>
 
-            {showSources && lastSources.length > 0 && (
-              <CitationPanel sources={lastSources} />
-            )}
-          </>
-        )}
+          {showSources && lastSources.length > 0 && (
+            <CitationPanel sources={lastSources} />
+          )}
+        </>
       </div>
     </div>
   );
