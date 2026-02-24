@@ -44,6 +44,10 @@ const envSchema = z.object({
   UPLOADTHING_APP_ID: z.string().min(1).optional(),
   
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+
+  DEEPGRAM_API_KEY: z.string().min(1).optional(),
+  DEEPGRAM_STT_MODEL: z.string().default('nova-3'),
+  DEEPGRAM_TTS_MODEL: z.string().default('aura-2-thalia-en'),
 });
 
 let _env: z.infer<typeof envSchema> | undefined;

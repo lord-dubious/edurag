@@ -8,17 +8,20 @@ import {
   PromptInputSubmit,
   PromptInputTools,
   PromptInputProvider,
+  PromptInputButton,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input';
+import { Phone } from 'lucide-react';
 import type { ChatStatus } from 'ai';
 
 interface Props {
   onSubmit: (message: PromptInputMessage) => void;
   status: ChatStatus;
   defaultInput?: string;
+  onVoiceMode?: () => void;
 }
 
-export function ChatInput({ onSubmit, status, defaultInput }: Props) {
+export function ChatInput({ onSubmit, status, defaultInput, onVoiceMode }: Props) {
   const input = (
     <PromptInput onSubmit={onSubmit} className="w-full max-w-3xl mx-auto">
       <PromptInputBody>
@@ -26,7 +29,14 @@ export function ChatInput({ onSubmit, status, defaultInput }: Props) {
       </PromptInputBody>
       <PromptInputFooter>
         <PromptInputTools />
-        <PromptInputSubmit status={status} />
+        <div className="flex items-center gap-1">
+          {onVoiceMode && (
+            <PromptInputButton onClick={onVoiceMode} title="Voice call">
+              <Phone className="size-4" />
+            </PromptInputButton>
+          )}
+          <PromptInputSubmit status={status} />
+        </div>
       </PromptInputFooter>
     </PromptInput>
   );

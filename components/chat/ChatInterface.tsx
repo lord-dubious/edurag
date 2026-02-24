@@ -9,6 +9,7 @@ import { useTheme } from 'next-themes';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { CitationPanel } from './CitationPanel';
+import { VoiceChat } from '@/components/voice/VoiceChat';
 import { useBrand } from '@/components/providers/BrandProvider';
 import type { Source } from '@/lib/agent/types';
 
@@ -48,6 +49,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   const [threadId] = useState(() => nanoid());
   const [sources, setSources] = useState<Record<string, Source[]>>({});
   const [showSources, setShowSources] = useState(true);
+  const [voiceMode, setVoiceMode] = useState(false);
   const initialQuerySentRef = useRef(false);
   const { theme, setTheme } = useTheme();
   const { brand } = useBrand();
@@ -152,76 +154,84 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
               Sources {lastSources.length}
             </button>
           )}
-          <button
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
-            title="Toggle theme"
-          >
-            {theme === 'dark' ? (
-              <SunIcon className="w-4 h-4" />
-            ) : (
-              <MoonIcon className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-      </header>
+           <button
+             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+             className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
+             title="Toggle theme"
+           >
+             {theme === 'dark' ? (
+               <SunIcon className="w-4 h-4" />
+             ) : (
+               <MoonIcon className="w-4 h-4" />
+             )}
+            </button>
+          </div>
+        </header>
 
       <div className="flex-1 flex overflow-hidden">
-        <main className="flex-1 flex flex-col min-w-0 relative">
-          <div className="flex-1 overflow-y-auto">
-            <div className="max-w-3xl mx-auto p-4 md:p-6 pb-48 md:pb-56">
-              {isEmpty && (
-                 <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-6">
-                   <div className="space-y-2">
-                     <h2 className="text-2xl font-semibold">Welcome to {appName}</h2>
-                     <p className="text-muted-foreground max-w-md">
-                       Ask me anything about admissions, programs, tuition, campus life, and more.
-                     </p>
-                   </div>
-                  <div className="grid grid-cols-2 gap-3 w-full max-w-md">
-                    {SUGGESTIONS.map((suggestion) => (
+        {voiceMode ? (
+          <main className="flex-1 flex flex-col min-w-0">
+            <VoiceChat onClose={() => setVoiceMode(false)} />
+          </main>
+        ) : (
+          <>
+            <main className="flex-1 flex flex-col min-w-0 relative">
+              <div className="flex-1 overflow-y-auto">
+                <div className="max-w-3xl mx-auto p-4 md:p-6 pb-48 md:pb-56">
+                  {isEmpty && (
+                     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-6">
+                       <div className="space-y-2">
+                         <h2 className="text-2xl font-semibold">Welcome to {appName}</h2>
+                         <p className="text-muted-foreground max-w-md">
+                           Ask me anything about admissions, programs, tuition, campus life, and more.
+                         </p>
+                       </div>
+                      <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                        {SUGGESTIONS.map((suggestion) => (
+                          <button
+                            key={suggestion.label}
+                            onClick={() => handleSuggestionClick(suggestion.query)}
+                            className="h-auto py-3 px-4 justify-start text-left gap-2 rounded-md border border-border bg-background hover:bg-accent hover:border-primary/30 transition-all text-sm font-medium"
+                          >
+                            {suggestion.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {!isEmpty && (
+                    <ChatMessages
+                      messages={messages}
+                      sources={sources}
+                      status={status}
+                      onRegenerate={regenerate}
+                    />
+                  )}
+                  {error && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm mt-4">
+                      <span>Something went wrong.</span>
                       <button
-                        key={suggestion.label}
-                        onClick={() => handleSuggestionClick(suggestion.query)}
-                        className="h-auto py-3 px-4 justify-start text-left gap-2 rounded-md border border-border bg-background hover:bg-accent hover:border-primary/30 transition-all text-sm font-medium"
+                        onClick={() => regenerate()}
+                        className="underline font-medium"
                       >
-                        {suggestion.label}
+                        Try again
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              )}
-              {!isEmpty && (
-                <ChatMessages
-                  messages={messages}
-                  sources={sources}
-                  status={status}
-                  onRegenerate={regenerate}
-                />
-              )}
-              {error && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm mt-4">
-                  <span>Something went wrong.</span>
-                  <button
-                    onClick={() => regenerate()}
-                    className="underline font-medium"
-                  >
-                    Try again
-                  </button>
+              </div>
+
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10">
+                <div className="max-w-3xl mx-auto">
+                  <ChatInput onSubmit={handleSubmit} status={status} onVoiceMode={() => setVoiceMode(true)} />
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            </main>
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10">
-            <div className="max-w-3xl mx-auto">
-              <ChatInput onSubmit={handleSubmit} status={status} />
-            </div>
-          </div>
-        </main>
-
-        {showSources && lastSources.length > 0 && (
-          <CitationPanel sources={lastSources} />
+            {showSources && lastSources.length > 0 && (
+              <CitationPanel sources={lastSources} />
+            )}
+          </>
         )}
       </div>
     </div>
