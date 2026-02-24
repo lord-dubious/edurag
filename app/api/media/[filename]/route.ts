@@ -22,7 +22,7 @@ export async function GET(
     } catch (readError) {
       const errorCode = (readError as NodeJS.ErrnoException).code;
       if (errorCode === 'ENOENT') {
-        return errorResponse('VALIDATION_ERROR', 'File not found', 404);
+        return errorResponse('NOT_FOUND', 'File not found', 404);
       }
       console.error('[Media] Error reading file:', readError);
       return errorResponse('INTERNAL_ERROR', 'Failed to read file', 500);
@@ -42,7 +42,7 @@ export async function GET(
     };
 
     if (ext === '.svg' || ext === '.svgz') {
-      headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:";
+      headers['Content-Security-Policy'] = `default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:`;
     }
 
     return new NextResponse(new Uint8Array(fileBuffer), {

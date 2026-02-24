@@ -1,4 +1,3 @@
-import type { NextRequest } from 'next/server';
 import { tavily } from '@tavily/core';
 import { env } from '@/lib/env';
 import { getMongoCollection } from '@/lib/vectorstore';
@@ -6,6 +5,7 @@ import { getEmbeddings } from '@/lib/providers';
 import { cleanContent, extractTitle } from '@/lib/crawl';
 import { errorResponse } from '@/lib/errors';
 import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
+import type { NextRequest } from 'next/server';
 
 interface CrawlProgress {
   phase: 'preparing' | 'crawling' | 'chunking' | 'embedding' | 'storing' | 'complete' | 'error';
@@ -52,16 +52,11 @@ function shouldSkipFile(url: string, fileTypeRules: FileTypeRules): boolean {
 
 function isBinaryFile(url: string): boolean {
   const lowerUrl = url.toLowerCase();
-  return lowerUrl.endsWith('.pdf') || 
-         lowerUrl.endsWith('.docx') || 
-         lowerUrl.endsWith('.doc') || 
-         lowerUrl.endsWith('.xlsx') || 
-         lowerUrl.endsWith('.xls') || 
-         lowerUrl.endsWith('.pptx') || 
-         lowerUrl.endsWith('.ppt') ||
-         lowerUrl.endsWith('.zip') ||
+  return lowerUrl.endsWith('.zip') ||
          lowerUrl.endsWith('.exe') ||
-         lowerUrl.endsWith('.dmg');
+         lowerUrl.endsWith('.dmg') ||
+         lowerUrl.endsWith('.apk') ||
+         lowerUrl.endsWith('.iso');
 }
 
 interface CrawlRequestBody {
@@ -216,7 +211,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
               const title = extractTitle(page.rawContent, page.url) || page.url.split('/').pop() || 'Untitled';
               const rawChunks = chunkText(cleaned, 1500, 300);
-              const chunks = rawChunks.filter(c => c.trim().length > 50);
+              const chunks = rawChunks.filter((c: string) => c.trim().length > 50);
               
               if (chunks.length === 0) {
                 console.log(`No valid chunks for ${page.url}`);

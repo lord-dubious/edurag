@@ -3,6 +3,7 @@ import { access, readFile, writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { updateSettings, getSettings } from '@/lib/db/settings';
 import { errorResponse } from '@/lib/errors';
+import { hasRequiredEnvVars } from '@/lib/env';
 
 interface ApiKeys {
   mongodbUri: string;
@@ -83,7 +84,7 @@ async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>)
     CHAT_MAX_STEPS: apiKeys.chatMaxSteps != null ? String(apiKeys.chatMaxSteps) : undefined,
     EMBEDDING_API_KEY: sanitizeEnvValue(apiKeys.embeddingApiKey),
     EMBEDDING_MODEL: sanitizeEnvValue(apiKeys.embeddingModel),
-    EMBEDDING_DIMENSIONS: apiKeys.embeddingDimensions ? String(apiKeys.embeddingDimensions) : undefined,
+    EMBEDDING_DIMENSIONS: apiKeys.embeddingDimensions != null ? String(apiKeys.embeddingDimensions) : undefined,
     TAVILY_API_KEY: sanitizeEnvValue(apiKeys.tavilyApiKey),
     UPLOADTHING_SECRET: sanitizeEnvValue(apiKeys.uploadthingSecret),
     UPLOADTHING_APP_ID: sanitizeEnvValue(apiKeys.uploadthingAppId),
@@ -161,13 +162,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       return errorResponse('VALIDATION_ERROR', 'Brand primary color is required', 400);
     }
 
-    const hasAllEnvVars = !!(
-      process.env.MONGODB_URI &&
-      process.env.CHAT_API_KEY &&
-      process.env.EMBEDDING_API_KEY &&
-      process.env.TAVILY_API_KEY &&
-      process.env.ADMIN_SECRET
-    );
+    const hasAllEnvVars = hasRequiredEnvVars();
 
     if (!hasAllEnvVars) {
       if (!apiKeys?.mongodbUri) {
@@ -227,7 +222,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       `EMBEDDING_MODEL=${apiKeys?.embeddingModel || process.env.EMBEDDING_MODEL || 'voyage-4-large'}`,
       `EMBEDDING_DIMENSIONS=${apiKeys?.embeddingDimensions || process.env.EMBEDDING_DIMENSIONS || 2048}`,
       `TAVILY_API_KEY=${maskSecret(apiKeys?.tavilyApiKey || process.env.TAVILY_API_KEY)}`,
-      `ADMIN_TOKEN=${maskSecret(apiKeys?.adminSecret || process.env.ADMIN_TOKEN)}`,
+      `ADMIN_SECRET=${maskSecret(apiKeys?.adminSecret || process.env.ADMIN_SECRET)}`,
       `UNIVERSITY_URL=${sanitizeEnvValue(universityUrl) || ''}`,
     ].filter(Boolean).join('\n');
 
@@ -235,7 +230,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       success: true,
       envPreview,
       isProduction: process.env.NODE_ENV === 'production',
-      envWritten: hasAllEnvVars ? false : true,
+      envWritten: !hasAllEnvVars,
     });
     response.cookies.set('edurag_onboarded', 'true', {
       httpOnly: true,
@@ -263,13 +258,7 @@ export async function GET(): Promise<Response> {
       iconType: settings?.iconType,
       showTitle: settings?.showTitle,
       appName: settings?.appName,
-      hasAllEnvVars: !!(
-        process.env.MONGODB_URI &&
-        process.env.CHAT_API_KEY &&
-        process.env.EMBEDDING_API_KEY &&
-        process.env.TAVILY_API_KEY &&
-        process.env.ADMIN_SECRET
-      ),
+      hasAllEnvVars: hasRequiredEnvVars(),
       apiKeys: {
         mongodbUri: process.env.MONGODB_URI || '',
         chatApiKey: process.env.CHAT_API_KEY || '',
@@ -279,7 +268,7 @@ export async function GET(): Promise<Response> {
         embeddingModel: process.env.EMBEDDING_MODEL || '',
         embeddingDimensions: process.env.EMBEDDING_DIMENSIONS || '',
         tavilyApiKey: process.env.TAVILY_API_KEY || '',
-        adminSecret: process.env.ADMIN_TOKEN ? '****' : '',
+        adminSecret: process.env.ADMIN_SECRET ? '****' : '',
       },
     });
   } catch (error) {
