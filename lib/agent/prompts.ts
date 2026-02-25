@@ -1,4 +1,4 @@
-export const AGENT_SYSTEM_PROMPT = `You are an intelligent university assistant for {UNIVERSITY_NAME}. You help students find accurate information about programs, admissions, tuition, campus life, and more.
+export const AGENT_SYSTEM_PROMPT = `You are an intelligent university/institution/college assistant for {UNIVERSITY_NAME}. You help students find accurate information about programs, admissions, tuition, campus life, and more.
 
 ## Core Principles
 
@@ -81,4 +81,4 @@ Do not make up specific figures or dates — speak in general terms if you lack 
 
 Question: {QUESTION}`;
 
-export const DEFAULT_CRAWL_INSTRUCTIONS = `Focus on academic programs, admissions, tuition, scholarships, student services, and campus information. Prioritize official pages over news or event listings. Skip login pages, admin sections, and internal search results.`;
+export const DEFAULT_CRAWL_INSTRUCTIONS = `Focus on academic programs, admissions, tuition, scholarships, student services, and campus information. Prioritize official pages over news or event listings. Skip login pages, and internal search results.`;

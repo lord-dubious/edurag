@@ -28,6 +28,10 @@ export interface OnboardingSettings {
     model?: string;
     dimensions?: number;
   };
+  rerankConfig?: {
+    model?: string;
+    topK?: number;
+  };
   crawlerInstructions?: string;
   uploadthingSecret?: string;
   uploadthingAppId?: string;
