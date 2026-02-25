@@ -2,6 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 
 export default function AdminLoginPage() {
   const [token, setToken] = useState('');
@@ -38,24 +42,31 @@ export default function AdminLoginPage() {
         <h1 className="text-2xl font-bold mb-6">Admin Login</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Admin Token</label>
-            <input
+            <Label htmlFor="admin-token" className="block mb-2">Admin Token</Label>
+            <Input
+              id="admin-token"
               type="password"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full"
               placeholder="Enter admin secret"
               required
+              aria-invalid={!!error}
+              aria-describedby={error ? "login-error" : undefined}
             />
           </div>
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          <button
+          {error && (
+            <p id="login-error" role="alert" className="text-destructive text-sm">
+              {error}
+            </p>
+          )}
+          <Button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+            className="w-full"
           >
-            {loading ? 'Authenticating...' : 'Login'}
-          </button>
+            {loading ? <><Spinner className="mr-2" />Authenticating...</> : 'Login'}
+          </Button>
         </form>
       </div>
     </div>
