@@ -36,7 +36,7 @@ export async function getMongoCollection<TSchema extends MongoDocument = MongoDo
 
 export type { MongoDocument, WithId, OptionalId };
 
-export async function getVectorStore() {
+export async function getVectorStore(): Promise<MongoDBAtlasVectorSearch> {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
   const embeddingsInstance = getEmbeddings();
 

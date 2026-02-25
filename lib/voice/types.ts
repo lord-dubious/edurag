@@ -1,7 +1,10 @@
+import type { Source } from '@/lib/voice/useDeepgramVoice';
+
 export interface VoiceMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  sources?: Source[];
 }
 
 export interface VoiceConversation {

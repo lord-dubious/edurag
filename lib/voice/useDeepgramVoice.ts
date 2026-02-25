@@ -15,12 +15,9 @@ export interface Source {
   content: string;
 }
 
-export interface VoiceMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-  sources?: Source[];
-}
+import type { VoiceMessage } from '@/lib/voice/types';
+
+export type { VoiceMessage };
 
 export interface UseDeepgramVoiceOptions {
   apiKey: string | null;
@@ -63,7 +60,6 @@ export function useDeepgramVoice({
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false);
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const lastSearchResultsRef = useRef<string>('');
 
   const updateState = useCallback((newState: AgentState) => {
     setState(newState);
@@ -87,41 +83,53 @@ export function useDeepgramVoice({
       return;
     }
 
-    const sampleRate = 24000;
-    const totalLength = audioQueueRef.current.reduce((sum, buf) => sum + (buf.byteLength / 2), 0);
-    const allAudio = new Int16Array(totalLength);
-    let offset = 0;
-    for (const chunk of audioQueueRef.current) {
-      const int16 = new Int16Array(chunk);
-      allAudio.set(int16, offset);
-      offset += int16.length;
-    }
-    audioQueueRef.current = [];
+    try {
+      const sampleRate = 24000;
+      const totalLength = audioQueueRef.current.reduce((sum, buf) => sum + (buf.byteLength / 2), 0);
+      const allAudio = new Int16Array(totalLength);
+      let offset = 0;
+      for (const chunk of audioQueueRef.current) {
+        const int16 = new Int16Array(chunk);
+        allAudio.set(int16, offset);
+        offset += int16.length;
+      }
+      audioQueueRef.current = [];
 
-    const audioBuffer = audioContext.createBuffer(1, allAudio.length, sampleRate);
-    const channelData = audioBuffer.getChannelData(0);
-    for (let i = 0; i < allAudio.length; i++) {
-      channelData[i] = allAudio[i] / 32768;
-    }
+      const audioBuffer = audioContext.createBuffer(1, allAudio.length, sampleRate);
+      const channelData = audioBuffer.getChannelData(0);
+      for (let i = 0; i < allAudio.length; i++) {
+        channelData[i] = allAudio[i] / 32768;
+      }
 
-    const source = audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContext.destination);
-    currentSourceRef.current = source;
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      currentSourceRef.current = source;
 
-    source.onended = () => {
+      source.onended = () => {
+        isPlayingRef.current = false;
+        setIsPlaying(false);
+        currentSourceRef.current = null;
+
+        if (audioQueueRef.current.length > 0) {
+          playAudioQueueRef.current?.();
+        } else if (wsRef.current?.readyState === WebSocket.OPEN) {
+          updateState('listening');
+        }
+      };
+
+      source.start();
+    } catch (err) {
+      console.error('[playAudioQueue] Error playing audio:', err);
       isPlayingRef.current = false;
       setIsPlaying(false);
       currentSourceRef.current = null;
-
-      if (audioQueueRef.current.length > 0) {
-        playAudioQueueRef.current?.();
-      } else if (wsRef.current?.readyState === WebSocket.OPEN) {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
         updateState('listening');
+      } else {
+        updateState('idle');
       }
-    };
-
-    source.start();
+    }
   }, [updateState]);
 
   useEffect(() => {
@@ -218,32 +226,49 @@ export function useDeepgramVoice({
                 `${r.title ? r.title + ': ' : ''}${stripMarkdownForVoice(r.content)}`
               )
               .join('\n\n');
-            lastSearchResultsRef.current = plainTextContext;
 
             onRequestNotes?.(args.query);
 
-            ws.send(JSON.stringify({
-              type: 'FunctionCallResponse',
-              id: func.id,
-              name: func.name,
-              content: `Use the following information to answer the user's question naturally, as if you already know it. Never mention searching, databases, or results. Just answer their question directly and thoroughly like a knowledgeable person would.\n\n${plainTextContext}`,
-            }));
+            if (ws.readyState === WebSocket.OPEN) {
+              try {
+                ws.send(JSON.stringify({
+                  type: 'FunctionCallResponse',
+                  id: func.id,
+                  name: func.name,
+                  content: `Use the following information to answer the user's question naturally, as if you already know it. Never mention searching, databases, or results. Just answer their question directly and thoroughly like a knowledgeable person would.\n\n${plainTextContext}`,
+                }));
+              } catch (sendErr) {
+                console.error('[ws.send] Failed to send function response:', sendErr);
+              }
+            }
           } else {
-            ws.send(JSON.stringify({
-              type: 'FunctionCallResponse',
-              id: func.id,
-              name: func.name,
-              content: 'No results were found in the knowledge base. Let the user know you could not find that specific information and suggest they contact the university directly or check the official website.',
-            }));
+            if (ws.readyState === WebSocket.OPEN) {
+              try {
+                ws.send(JSON.stringify({
+                  type: 'FunctionCallResponse',
+                  id: func.id,
+                  name: func.name,
+                  content: 'No results were found in the knowledge base. Let the user know you could not find that specific information and suggest they contact the university directly or check the official website.',
+                }));
+              } catch (sendErr) {
+                console.error('[ws.send] Failed to send empty response:', sendErr);
+              }
+            }
           }
         } catch (error) {
           console.error('Function call error:', error);
-          ws.send(JSON.stringify({
-            type: 'FunctionCallResponse',
-            id: func.id,
-            name: func.name,
-            content: JSON.stringify({ error: 'Failed to execute function' }),
-          }));
+          if (ws.readyState === WebSocket.OPEN) {
+            try {
+              ws.send(JSON.stringify({
+                type: 'FunctionCallResponse',
+                id: func.id,
+                name: func.name,
+                content: JSON.stringify({ error: 'Failed to execute function' }),
+              }));
+            } catch (sendErr) {
+              console.error('[ws.send] Failed to send error response:', sendErr);
+            }
+          }
         }
       }
     }
@@ -334,8 +359,7 @@ export function useDeepgramVoice({
   const handleMessageRef = useRef(handleMessage);
   useEffect(() => { handleMessageRef.current = handleMessage; }, [handleMessage]);
 
-  const sendSettingsRef = useRef(sendSettings);
-  useEffect(() => { sendSettingsRef.current = sendSettings; }, [sendSettings]);
+
 
   const cleanupAudioResources = useCallback(() => {
     if (currentSourceRef.current) {
@@ -518,8 +542,8 @@ export function stripMarkdownForVoice(text: string): string {
     .replace(/__([^_]+)__/g, '$1')
     .replace(/_([^_]+)_/g, '$1')
     .replace(/~~([^~]+)~~/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/^\s*[-*+]\s+/gm, '')
     .replace(/^\s*\d+\.\s+/gm, '')
     .replace(/^\s*>\s*/gm, '')
