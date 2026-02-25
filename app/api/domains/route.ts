@@ -37,17 +37,24 @@ export async function POST(req: NextRequest) {
     return errorResponse('VALIDATION_ERROR', 'Domain already exists', 400);
   }
 
-  const result = await collection.insertOne({
+  const now = new Date();
+  const domainData = {
     url: body.url,
     name: body.name ?? new URL(body.url).hostname,
     threadId: new ObjectId().toString(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const result = await collection.insertOne(domainData);
+
+  return Response.json({
+    success: true,
+    data: {
+      _id: result.insertedId,
+      ...domainData
+    }
   });
-
-  const domain = await collection.findOne({ _id: result.insertedId });
-
-  return Response.json({ success: true, data: domain });
 }
 
 export async function DELETE(req: NextRequest) {
