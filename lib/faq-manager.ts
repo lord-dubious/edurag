@@ -42,11 +42,7 @@ async function synthesizeFaqAnswer(faqId: string, question: string) {
     prompt: FAQ_SYNTHESIS_PROMPT.replace('{QUESTION}', question),
   });
 
-  const col = await getMongoCollection(env.FAQ_COLLECTION);
-  await col.updateOne(
-    { _id: new ObjectId(faqId) },
-    { $set: { answer: text, public: false, pendingApproval: true } },
-  );
+  await updateFaqStatus(faqId, { answer: text, public: false, pendingApproval: true });
 }
 
 export async function getPublicFaqs(limit = 10): Promise<FaqDocument[]> {
@@ -68,17 +64,17 @@ export async function getPendingFaqs(limit = 50): Promise<FaqDocument[]> {
 }
 
 export async function approveFaq(faqId: string): Promise<void> {
-  const col = await getMongoCollection(env.FAQ_COLLECTION);
-  await col.updateOne(
-    { _id: new ObjectId(faqId) },
-    { $set: { public: true, pendingApproval: false } },
-  );
+  await updateFaqStatus(faqId, { public: true, pendingApproval: false });
 }
 
 export async function rejectFaq(faqId: string): Promise<void> {
+  await updateFaqStatus(faqId, { public: false, pendingApproval: false });
+}
+
+async function updateFaqStatus(faqId: string, updates: Partial<FaqDocument>): Promise<void> {
   const col = await getMongoCollection(env.FAQ_COLLECTION);
   await col.updateOne(
     { _id: new ObjectId(faqId) },
-    { $set: { public: false, pendingApproval: false } },
+    { $set: updates },
   );
 }
