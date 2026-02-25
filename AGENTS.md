@@ -308,7 +308,7 @@ const handleSubmit = useCallback(async (text: string) => {
 | `GET /api/onboarding/status` | Check onboarding status |
 | `POST /api/onboarding/detect` | Auto-detect university info from URL |
 | `GET /api/startup` | App initialization check |
-| `POST /api/voice-token` | Get temporary Deepgram credentials |
+| `GET /api/voice-token` | Get temporary Deepgram credentials |
 | `POST /api/voice-function` | Voice agent function calls |
 | `POST /api/upload` | File upload handling |
 | `POST /api/uploadthing` | UploadThing integration |

@@ -74,6 +74,7 @@ export function useDeepgramVoice({
     if (!audioContext) {
       isPlayingRef.current = false;
       setIsPlaying(false);
+      updateState('idle');
       return;
     }
 
@@ -319,6 +320,49 @@ export function useDeepgramVoice({
     }
   }, [onUserMessage, onAgentMessage, updateState, playAudioQueue, onError, handleFunctionCall, sendSettings]);
 
+  const cleanupAudioResources = useCallback(() => {
+    if (currentSourceRef.current) {
+      try {
+        currentSourceRef.current.stop();
+      } catch { }
+      currentSourceRef.current = null;
+    }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => {
+        try {
+          track.stop();
+        } catch { }
+      });
+      mediaStreamRef.current = null;
+    }
+
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch { }
+      audioContextRef.current = null;
+    }
+
+    audioQueueRef.current = [];
+    isPlayingRef.current = false;
+    setIsPlaying(false);
+  }, []);
+
+  const stop = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close(1000, 'User ended call');
+      wsRef.current = null;
+    }
+
+    cleanupAudioResources();
+    updateState('idle');
+  }, [updateState, cleanupAudioResources]);
+
+  useEffect(() => {
+    return () => { stop(); };
+  }, [stop]);
+
   const startAudioCapture = useCallback(async () => {
     const stream = mediaStreamRef.current;
     const audioContext = audioContextRef.current;
@@ -386,12 +430,14 @@ export function useDeepgramVoice({
 
       ws.onerror = (event) => {
         console.error('WebSocket error event:', event);
+        cleanupAudioResources();
         onError?.(new Error('WebSocket connection failed. Check your API key.'));
         updateState('idle');
       };
 
       ws.onclose = (event) => {
         console.log('WebSocket closed:', event.code, event.reason);
+        cleanupAudioResources();
         if (event.code !== 1000 && event.code !== 1005) {
           onError?.(new Error(`Connection closed: ${event.reason || 'Unknown reason'}`));
         }
@@ -404,41 +450,8 @@ export function useDeepgramVoice({
     } finally {
       isStartingRef.current = false;
     }
-  }, [apiKey, updateState, handleMessage, onError, startAudioCapture]);
+  }, [apiKey, updateState, handleMessage, onError, startAudioCapture, cleanupAudioResources]);
 
-
-  const stop = useCallback(() => {
-    if (currentSourceRef.current) {
-      try {
-        currentSourceRef.current.stop();
-      } catch { }
-      currentSourceRef.current = null;
-    }
-
-    if (wsRef.current) {
-      wsRef.current.close(1000, 'User ended call');
-      wsRef.current = null;
-    }
-
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
-    }
-
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-
-    audioQueueRef.current = [];
-    isPlayingRef.current = false;
-    setIsPlaying(false);
-    updateState('idle');
-  }, [updateState]);
-
-  useEffect(() => {
-    return () => { stop(); };
-  }, [stop]);
 
   const interrupt = useCallback(() => {
     const ws = wsRef.current;

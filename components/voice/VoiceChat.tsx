@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useDeepgramVoice, AgentState, Source } from '@/lib/voice/useDeepgramVoice';
+import { useDeepgramVoice } from '@/lib/voice/useDeepgramVoice';
+import type { AgentState, Source } from '@/lib/voice/useDeepgramVoice';
 import { Button } from '@/components/ui/button';
-import { Persona, PersonaState } from '@/components/ai-elements/persona';
+import { Persona } from '@/components/ai-elements/persona';
+import type { PersonaState } from '@/components/ai-elements/persona';
 import { PhoneOff } from 'lucide-react';
 import type { UIMessage } from '@ai-sdk/react';
 

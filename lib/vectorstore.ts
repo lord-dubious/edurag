@@ -92,7 +92,12 @@ export async function similaritySearchWithScore(
 
     const documents = validResults.map(([doc]) => doc.pageContent);
 
-    const rerankTimeout = parseInt(process.env.RERANK_TIMEOUT_MS ?? '5000', 10);
+    let rerankTimeout = parseInt(process.env.RERANK_TIMEOUT_MS ?? '5000', 10);
+    if (isNaN(rerankTimeout) || rerankTimeout <= 0) {
+      console.warn(`[rerank] Invalid RERANK_TIMEOUT_MS "${process.env.RERANK_TIMEOUT_MS}", falling back to 5000ms`);
+      rerankTimeout = 5000;
+    }
+
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Rerank timeout')), rerankTimeout)
     );
@@ -120,6 +125,11 @@ export async function similaritySearchWithScore(
           return [doc, item.relevanceScore ?? 0] as [typeof doc, number];
         });
 
+      if (rerankedResults.length === 0) {
+        console.warn('[rerank] Reranking returned no valid results, falling back to original vector search results');
+        return allResults.slice(0, k);
+      }
+
       console.log(
         '[rerank] Reranked',
         allResults.length,
@@ -131,11 +141,13 @@ export async function similaritySearchWithScore(
 
       return rerankedResults;
     }
-  } catch (error) {
-    console.error('[rerank] Reranking failed, falling back to vector results:', error);
-  }
 
-  return allResults.slice(0, k);
+    console.warn('[rerank] Reranking failed or returned empty data, falling back to original vector search results');
+    return allResults.slice(0, k);
+  } catch (err) {
+    console.error('[rerank] failed, falling back to vector search:', err);
+    return allResults.slice(0, k);
+  }
 }
 
 export async function closeMongoClient() {

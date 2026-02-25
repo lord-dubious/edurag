@@ -143,7 +143,7 @@ export function SpeechInput({
 
         recorder.onstop = async () => {
           const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-          stream.getTracks().forEach(t => t.stop());
+          stream.getTracks().forEach(t => { t.stop(); });
 
           if (onAudioRecorded) {
             setState('processing');
