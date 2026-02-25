@@ -54,6 +54,7 @@ export async function similaritySearchWithScore(
   query: string,
   k: number = 5
 ): Promise<[import('@langchain/core/documents').Document, number][]> {
+  k = Math.max(1, Math.floor(k));
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
   const embeddingsInstance = getEmbeddings();
 

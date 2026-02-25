@@ -39,7 +39,7 @@ const personaStateMap: Record<AgentState, PersonaState> = {
   speaking: 'speaking',
 };
 
-export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, institutionName }: VoiceChatProps) {
+export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, institutionName }: VoiceChatProps): React.JSX.Element {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
@@ -47,8 +47,12 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   const currentSourcesRef = useRef<Source[]>([]);
 
   useEffect(() => {
-    fetch('/api/voice-token')
-      .then(res => res.json())
+    const controller = new AbortController();
+    fetch('/api/voice-token', { signal: controller.signal })
+      .then(res => {
+        if (!res.ok) throw new Error(`Voice token request failed (${res.status})`);
+        return res.json();
+      })
       .then(data => {
         if (data.error) {
           setError(data.error);
@@ -57,9 +61,11 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
         }
       })
       .catch(err => {
+        if (err.name === 'AbortError') return;
         setError('Failed to get API key');
         console.error(err);
       });
+    return () => { controller.abort(); };
   }, []);
 
 

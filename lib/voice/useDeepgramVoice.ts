@@ -34,6 +34,14 @@ export interface UseDeepgramVoiceOptions {
   institutionName?: string;
 }
 
+export interface UseDeepgramVoiceReturn {
+  state: AgentState;
+  isPlaying: boolean;
+  start: () => Promise<void>;
+  stop: () => void;
+  interrupt: () => void;
+}
+
 export function useDeepgramVoice({
   apiKey,
   history,
@@ -44,7 +52,7 @@ export function useDeepgramVoice({
   onSources,
   onRequestNotes,
   institutionName,
-}: UseDeepgramVoiceOptions) {
+}: UseDeepgramVoiceOptions): UseDeepgramVoiceReturn {
   const [state, setState] = useState<AgentState>('idle');
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -125,14 +133,17 @@ export function useDeepgramVoice({
 
     const deepgramHistory = history
       ?.filter(msg => msg.role === 'user' || msg.role === 'assistant')
-      ?.filter(msg => {
-        if ('content' in msg) return typeof msg.content === 'string' && msg.content.length > 0;
-        return false;
+      ?.map(msg => {
+        const textParts = (msg.parts ?? [])
+          .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+          .map(p => p.text);
+        return { text: textParts.join(' '), role: msg.role };
       })
-      ?.map(msg => ({
-        type: 'History',
-        role: msg.role === 'user' ? 'user' : 'assistant',
-        content: (msg as unknown as { content: string }).content
+      .filter(entry => entry.text.length > 0)
+      .map(entry => ({
+        type: 'History' as const,
+        role: entry.role === 'user' ? 'user' as const : 'assistant' as const,
+        content: entry.text,
       })) || [];
 
     ws.send(JSON.stringify({
@@ -426,10 +437,18 @@ export function useDeepgramVoice({
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
 
-      ws.onopen = () => {
+      ws.onopen = async () => {
         console.log('[Deepgram] WebSocket opened, waiting for Welcome...');
-        startAudioCapture();
-        updateState('listening');
+        try {
+          await startAudioCapture();
+          updateState('listening');
+        } catch (err) {
+          console.error('[Deepgram] Audio capture failed:', err);
+          onError?.(err instanceof Error ? err : new Error('Audio capture failed'));
+          ws.close();
+          cleanupAudioResources();
+          updateState('idle');
+        }
       };
 
       ws.onmessage = (event: MessageEvent) => handleMessageRef.current(event);
@@ -451,6 +470,7 @@ export function useDeepgramVoice({
       };
     } catch (error) {
       console.error('Start error:', error);
+      cleanupAudioResources();
       onError?.(error instanceof Error ? error : new Error('Failed to start'));
       updateState('idle');
     } finally {
