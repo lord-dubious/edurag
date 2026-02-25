@@ -14,6 +14,7 @@ const envSchema = z.object({
 
   RERANK_MODEL: z.string().default('rerank-2.5'),
   RERANK_TOP_K: z.coerce.number().min(1).max(20).default(6),
+  RERANK_TIMEOUT_MS: z.coerce.number().positive().default(5000),
 
   MONGODB_URI: z.string().min(1).optional(),
   DB_NAME: z.string().default('edurag'),
@@ -51,6 +52,7 @@ const envSchema = z.object({
   DEEPGRAM_API_KEY: z.string().min(1).optional(),
   DEEPGRAM_STT_MODEL: z.string().default('nova-3'),
   DEEPGRAM_TTS_MODEL: z.string().default('aura-2-thalia-en'),
+  DEEPGRAM_THINK_MODEL: z.string().default('gemini-2.5-flash'),
 });
 
 let _env: z.infer<typeof envSchema> | undefined;

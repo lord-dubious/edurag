@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { PhoneOff, X } from 'lucide-react';
+import type { UIMessage } from '@ai-sdk/react';
 import { useDeepgramVoice } from '@/lib/voice/useDeepgramVoice';
 import type { AgentState, Source } from '@/lib/voice/useDeepgramVoice';
 import { Button } from '@/components/ui/button';
 import { Persona } from '@/components/ai-elements/persona';
 import type { PersonaState } from '@/components/ai-elements/persona';
-import { PhoneOff } from 'lucide-react';
-import type { UIMessage } from '@ai-sdk/react';
 
 export interface VoiceMessagePayload {
   role: 'user' | 'assistant';
@@ -44,7 +44,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   const [error, setError] = useState<string | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [agentResponse, setAgentResponse] = useState('');
-  const [currentSources, setCurrentSources] = useState<Source[]>([]);
+  const currentSourcesRef = useRef<Source[]>([]);
 
   useEffect(() => {
     fetch('/api/voice-token')
@@ -74,10 +74,10 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   const handleAgentMessage = useCallback((text: string) => {
     setAgentResponse(text);
     if (text.trim()) {
-      onMessageAdded?.({ role: 'assistant', content: text, sources: currentSources });
-      setCurrentSources([]);
+      onMessageAdded?.({ role: 'assistant', content: text, sources: currentSourcesRef.current });
+      currentSourcesRef.current = [];
     }
-  }, [currentSources, onMessageAdded]);
+  }, [onMessageAdded]);
 
   const handleStateChange = useCallback((newState: AgentState) => {
     if (newState === 'listening') {
@@ -93,7 +93,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   }, []);
 
   const handleSources = useCallback((sources: Source[]) => {
-    setCurrentSources(sources);
+    currentSourcesRef.current = sources;
   }, []);
 
   const handleShowNotes = useCallback((topic: string) => {
@@ -142,7 +142,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
           Voice Assistant
         </span>
         <Button variant="ghost" size="sm" onClick={handleEnd} className="text-muted-foreground">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x h-4 w-4 mr-1"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          <X className="h-4 w-4 mr-1" />
           Close
         </Button>
       </header>

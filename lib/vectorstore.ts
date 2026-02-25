@@ -53,7 +53,7 @@ export async function getVectorStore() {
 export async function similaritySearchWithScore(
   query: string,
   k: number = 5
-) {
+): Promise<[import('@langchain/core/documents').Document, number][]> {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
   const embeddingsInstance = getEmbeddings();
 
@@ -76,6 +76,7 @@ export async function similaritySearchWithScore(
     return allResults;
   }
 
+  let timerId: ReturnType<typeof setTimeout> | undefined;
   try {
     const voyageClient = getVoyageClient();
 
@@ -92,15 +93,9 @@ export async function similaritySearchWithScore(
 
     const documents = validResults.map(([doc]) => doc.pageContent);
 
-    let rerankTimeout = parseInt(process.env.RERANK_TIMEOUT_MS ?? '5000', 10);
-    if (isNaN(rerankTimeout) || rerankTimeout <= 0) {
-      console.warn(`[rerank] Invalid RERANK_TIMEOUT_MS "${process.env.RERANK_TIMEOUT_MS}", falling back to 5000ms`);
-      rerankTimeout = 5000;
-    }
-
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Rerank timeout')), rerankTimeout)
-    );
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timerId = setTimeout(() => reject(new Error('Rerank timeout')), env.RERANK_TIMEOUT_MS);
+    });
 
     const rerankResponse = await Promise.race([
       voyageClient.rerank({
@@ -112,6 +107,7 @@ export async function similaritySearchWithScore(
       }),
       timeoutPromise,
     ]);
+    clearTimeout(timerId!);
 
     if (rerankResponse.data && rerankResponse.data.length > 0) {
       const rerankedResults = rerankResponse.data
@@ -145,6 +141,7 @@ export async function similaritySearchWithScore(
     console.warn('[rerank] Reranking failed or returned empty data, falling back to original vector search results');
     return allResults.slice(0, k);
   } catch (err) {
+    clearTimeout(timerId);
     console.error('[rerank] failed, falling back to vector search:', err);
     return allResults.slice(0, k);
   }

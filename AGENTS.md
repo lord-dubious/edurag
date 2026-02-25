@@ -442,4 +442,4 @@ This forces all packages to use zod v4, which is required by AI SDK 6 but not ye
 - **Vercel AI SDK**: https://ai-sdk.dev/llms.txt
 - **Tavily JS SDK**: https://docs.tavily.com/llms.txt
 - **MongoDB Atlas**: https://www.mongodb.com/docs/llms.txt
-- **Full Architecture**: See `EDURAG_ARCHITECTURE.md`
+- **Full Architecture**: See `EDURAG_ARCHITECTURE.md` (generated on request)

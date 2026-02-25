@@ -5,6 +5,7 @@ import {
   useEffect
 } from 'react';
 import type { UIMessage } from '@ai-sdk/react';
+import { env } from '@/lib/env';
 
 export type AgentState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking';
 
@@ -147,13 +148,13 @@ export function useDeepgramVoice({
         listen: {
           provider: {
             type: 'deepgram',
-            model: 'nova-3',
+            model: env.DEEPGRAM_STT_MODEL,
           },
         },
         think: {
           provider: {
             type: 'google',
-            model: 'gemini-2.5-flash',
+            model: env.DEEPGRAM_THINK_MODEL,
           },
           prompt: getSystemPrompt(institutionName),
           functions: [
@@ -176,7 +177,7 @@ export function useDeepgramVoice({
         speak: {
           provider: {
             type: 'deepgram',
-            model: 'aura-2-thalia-en',
+            model: env.DEEPGRAM_TTS_MODEL,
           },
         },
       }
@@ -239,7 +240,6 @@ export function useDeepgramVoice({
 
   const handleMessage = useCallback((event: MessageEvent) => {
     if (event.data instanceof ArrayBuffer) {
-      console.log('Received audio chunk:', event.data.byteLength, 'bytes');
       audioQueueRef.current.push(event.data);
       if (!isPlayingRef.current && audioQueueRef.current.length > 0) {
         playAudioQueue();
@@ -319,6 +319,12 @@ export function useDeepgramVoice({
         console.log('Deepgram message:', data.type, data);
     }
   }, [onUserMessage, onAgentMessage, updateState, playAudioQueue, onError, handleFunctionCall, sendSettings]);
+
+  const handleMessageRef = useRef(handleMessage);
+  useEffect(() => { handleMessageRef.current = handleMessage; }, [handleMessage]);
+
+  const sendSettingsRef = useRef(sendSettings);
+  useEffect(() => { sendSettingsRef.current = sendSettings; }, [sendSettings]);
 
   const cleanupAudioResources = useCallback(() => {
     if (currentSourceRef.current) {
@@ -426,7 +432,7 @@ export function useDeepgramVoice({
         updateState('listening');
       };
 
-      ws.onmessage = handleMessage;
+      ws.onmessage = (event: MessageEvent) => handleMessageRef.current(event);
 
       ws.onerror = (event) => {
         console.error('WebSocket error event:', event);
@@ -450,7 +456,7 @@ export function useDeepgramVoice({
     } finally {
       isStartingRef.current = false;
     }
-  }, [apiKey, updateState, handleMessage, onError, startAudioCapture, cleanupAudioResources]);
+  }, [apiKey, updateState, onError, startAudioCapture, cleanupAudioResources]);
 
 
   const interrupt = useCallback(() => {

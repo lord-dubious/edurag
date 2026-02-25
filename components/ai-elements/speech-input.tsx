@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { MicIcon, MicOffIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { MicIcon, MicOffIcon } from 'lucide-react';
 
 interface SpeechRecognitionEvent extends Event {
   resultIndex: number;
@@ -177,8 +177,8 @@ export function SpeechInput({
       mediaRecorderRef.current?.stop();
     } else {
       recognitionRef.current?.stop();
+      setState('idle');
     }
-    setState('idle');
   }, [useMediaRecorder]);
 
   const toggleListening = useCallback(() => {
