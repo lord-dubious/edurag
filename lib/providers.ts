@@ -4,7 +4,7 @@ import { VoyageAIClient } from 'voyageai';
 import { env } from './env';
 
 let _chatProvider: ReturnType<typeof createOpenAI> | undefined;
-let _chatModel: ReturnType<typeof createOpenAI>['chat'] extends (...args: any[]) => infer R ? R : never | undefined;
+let _chatModel: ReturnType<ReturnType<typeof createOpenAI>['chat']> | undefined;
 let _embeddings: VoyageEmbeddings | undefined;
 let _voyageClient: VoyageAIClient | undefined;
 
