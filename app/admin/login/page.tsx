@@ -51,8 +51,8 @@ export default function AdminLoginPage() {
               className="w-full"
               placeholder="Enter admin secret"
               required
-              aria-invalid={!!error}
-              aria-describedby={error ? "login-error" : undefined}
+              aria-invalid={error === 'Invalid token'}
+              aria-describedby={error ? 'login-error' : undefined}
             />
           </div>
           {error && (
