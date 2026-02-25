@@ -71,7 +71,11 @@ export function useDeepgramVoice({
     updateState('speaking');
 
     const audioContext = audioContextRef.current;
-    if (!audioContext) return;
+    if (!audioContext) {
+      isPlayingRef.current = false;
+      setIsPlaying(false);
+      return;
+    }
 
     const sampleRate = 24000;
     const totalLength = audioQueueRef.current.reduce((sum, buf) => sum + (buf.byteLength / 2), 0);
@@ -337,11 +341,13 @@ export function useDeepgramVoice({
     source.connect(workletNode);
   }, []);
 
+  const isStartingRef = useRef(false);
   const start = useCallback(async () => {
-    if (!apiKey) {
-      onError?.(new Error('No API key'));
+    if (!apiKey || isStartingRef.current) {
+      if (!apiKey) onError?.(new Error('No API key'));
       return;
     }
+    isStartingRef.current = true;
 
     try {
       updateState('connecting');
@@ -395,8 +401,11 @@ export function useDeepgramVoice({
       console.error('Start error:', error);
       onError?.(error instanceof Error ? error : new Error('Failed to start'));
       updateState('idle');
+    } finally {
+      isStartingRef.current = false;
     }
   }, [apiKey, updateState, handleMessage, onError, startAudioCapture]);
+
 
   const stop = useCallback(() => {
     if (currentSourceRef.current) {
@@ -426,6 +435,10 @@ export function useDeepgramVoice({
     setIsPlaying(false);
     updateState('idle');
   }, [updateState]);
+
+  useEffect(() => {
+    return () => { stop(); };
+  }, [stop]);
 
   const interrupt = useCallback(() => {
     const ws = wsRef.current;

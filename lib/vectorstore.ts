@@ -92,20 +92,33 @@ export async function similaritySearchWithScore(
 
     const documents = validResults.map(([doc]) => doc.pageContent);
 
-    const rerankResponse = await voyageClient.rerank({
-      query,
-      documents,
-      model: env.RERANK_MODEL,
-      topK: k,
-      truncation: true,
-    });
+    const rerankTimeout = parseInt(process.env.RERANK_TIMEOUT_MS ?? '5000', 10);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Rerank timeout')), rerankTimeout)
+    );
+
+    const rerankResponse = await Promise.race([
+      voyageClient.rerank({
+        query,
+        documents,
+        model: env.RERANK_MODEL,
+        topK: k,
+        truncation: true,
+      }),
+      timeoutPromise,
+    ]);
 
     if (rerankResponse.data && rerankResponse.data.length > 0) {
-      const rerankedResults = rerankResponse.data.map((item) => {
-        const idx = item.index ?? 0;
-        const [doc] = validResults[idx];
-        return [doc, item.relevanceScore ?? 0] as [typeof doc, number];
-      });
+      const rerankedResults = rerankResponse.data
+        .filter((item) => {
+          const idx = item.index ?? -1;
+          return idx >= 0 && idx < validResults.length;
+        })
+        .map((item) => {
+          const idx = item.index!;
+          const [doc] = validResults[idx];
+          return [doc, item.relevanceScore ?? 0] as [typeof doc, number];
+        });
 
       console.log(
         '[rerank] Reranked',

@@ -333,7 +333,7 @@ Protected routes: `/admin/*`, `/api/crawl/*`, `/api/domains/*`, `/api/settings` 
 
 Required in `.env.local`:
 
-```
+```dotenv
 # Required for core functionality
 MONGODB_URI=mongodb+srv://...
 CHAT_API_KEY=...              # LLM API key (Cerebras, OpenAI-compatible)
@@ -413,7 +413,7 @@ Questions are automatically tracked and synthesized:
 
 ---
 
-## Package Overrides
+## Package Overrides (npm Peer Dependencies)
 
 The `package.json` includes an `overrides` section to resolve npm peer dependency conflicts:
 

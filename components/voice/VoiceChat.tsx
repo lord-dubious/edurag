@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDeepgramVoice, AgentState, Source } from '@/lib/voice/useDeepgramVoice';
 import { Button } from '@/components/ui/button';
 import { Persona, PersonaState } from '@/components/ai-elements/persona';
@@ -115,8 +115,10 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
     onClose?.();
   }, [stop, onClose]);
 
+  const autoStartedRef = useRef(false);
   useEffect(() => {
-    if (apiKey && state === 'idle') {
+    if (apiKey && state === 'idle' && !autoStartedRef.current) {
+      autoStartedRef.current = true;
       start();
     }
   }, [apiKey, state, start]);
@@ -137,7 +139,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
           )}
           Voice Assistant
         </span>
-        <Button variant="ghost" size="sm" onClick={() => { handleEnd(); onClose?.(); }} className="text-muted-foreground">
+        <Button variant="ghost" size="sm" onClick={handleEnd} className="text-muted-foreground">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x h-4 w-4 mr-1"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           Close
         </Button>
@@ -212,7 +214,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
           <Button
             variant="destructive"
             size="lg"
-            onClick={() => { handleEnd(); onClose?.(); }}
+            onClick={handleEnd}
             className="rounded-full shadow-lg h-14 w-full max-w-sm text-base gap-2"
           >
             <PhoneOff className="h-5 w-5" />

@@ -34,6 +34,7 @@ export function ChatInput({ onSubmit, status, defaultInput, onVoiceMode }: Props
             <PromptInputButton
               onClick={onVoiceMode}
               title="Voice call"
+              aria-label="Start voice call"
               className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md shadow-sm border-none shadow-black/5 flex items-center justify-center p-2"
             >
               <Phone className="size-4" />

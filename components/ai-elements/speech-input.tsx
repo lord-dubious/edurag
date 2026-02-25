@@ -70,85 +70,81 @@ export function SpeechInput({
   disabled,
 }: SpeechInputProps) {
   const [state, setState] = useState<SpeechState>('idle');
-  const [isSupported, setIsSupported] = useState(false);
-  const [useMediaRecorder, setUseMediaRecorder] = useState(false);
-  
+
+  const SpeechRecognitionAPI = typeof window !== 'undefined'
+    ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+    : undefined;
+  const isSupported = !!(SpeechRecognitionAPI || (typeof navigator !== 'undefined' && navigator.mediaDevices));
+  const useMediaRecorder = !SpeechRecognitionAPI && !!(typeof navigator !== 'undefined' && navigator.mediaDevices);
+
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const stateRef = useRef<SpeechState>(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   useEffect(() => {
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (SpeechRecognitionAPI) {
-      setIsSupported(true);
-      setUseMediaRecorder(false);
-      
-      const recognition = new SpeechRecognitionAPI();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = lang;
-      
-      recognition.onresult = (event) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
-        onTranscriptionChange?.(transcript);
-      };
-      
-      recognition.onerror = (event: Event) => {
-        const errorEvent = event as unknown as { error: string };
-        console.error('Speech recognition error:', errorEvent.error);
-        setState('error');
-        setTimeout(() => setState('idle'), 1000);
-      };
-      
-      recognition.onend = () => {
-        if (state === 'listening') {
-          setState('idle');
-        }
-      };
-      
-      recognitionRef.current = recognition;
-    } else if (navigator.mediaDevices) {
-      setIsSupported(true);
-      setUseMediaRecorder(true);
-    } else {
-      setIsSupported(false);
-    }
-    
-    return () => {
-      recognitionRef.current?.abort();
-      mediaRecorderRef.current?.stop();
-      streamRef.current?.getTracks().forEach(t => t.stop());
+    if (!SpeechRecognitionAPI) return;
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = lang;
+
+    recognition.onresult = (event) => {
+      let transcript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      onTranscriptionChange?.(transcript);
     };
-  }, [lang, onTranscriptionChange, state]);
+
+    recognition.onerror = (event: Event) => {
+      const errorEvent = event as unknown as { error: string };
+      console.error('Speech recognition error:', errorEvent.error);
+      setState('error');
+      setTimeout(() => setState('idle'), 1000);
+    };
+
+    recognition.onend = () => {
+      if (stateRef.current === 'listening') {
+        setState('idle');
+      }
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.abort();
+      mediaRecorderRef.current?.stop();
+      streamRef.current?.getTracks().forEach(t => { t.stop(); });
+    };
+  }, [SpeechRecognitionAPI, lang, onTranscriptionChange]);
 
   const startListening = useCallback(async () => {
     if (!isSupported) return;
-    
+
     setState('listening');
-    
+
     if (useMediaRecorder) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
-        
+
         const recorder = new MediaRecorder(stream);
         chunksRef.current = [];
-        
+
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) {
             chunksRef.current.push(e.data);
           }
         };
-        
+
         recorder.onstop = async () => {
           const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
           stream.getTracks().forEach(t => t.stop());
-          
+
           if (onAudioRecorded) {
             setState('processing');
             try {
@@ -163,7 +159,7 @@ export function SpeechInput({
           }
           setState('idle');
         };
-        
+
         mediaRecorderRef.current = recorder;
         recorder.start();
       } catch (err) {
