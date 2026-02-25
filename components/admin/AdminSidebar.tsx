@@ -15,6 +15,7 @@ import {
   Settings,
   Image as ImageIcon,
   BookOpen,
+  Sparkles
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useBrand } from '@/components/providers/BrandProvider';
@@ -66,25 +67,26 @@ export function AdminSidebar() {
 
     if ((brand?.iconType === 'logo' || brand?.iconType === 'upload') && brand.logoUrl) {
       return (
-        <div className="relative h-5 w-auto max-w-[100px] flex items-center justify-center">
+        <div className="relative h-6 w-auto max-w-[100px] flex items-center justify-center">
           <img 
             src={brand.logoUrl} 
             alt={name}
-            className="h-full w-auto max-h-5 max-w-[100px] object-contain"
+            className="h-full w-auto max-h-6 max-w-[100px] object-contain"
           />
         </div>
       );
     }
 
     if (brand?.emoji) {
-      return <span className="text-lg">{brand.emoji}</span>;
+      return <span className="text-xl">{brand.emoji}</span>;
     }
 
     return (
-      <Database 
-        className="h-5 w-5" 
-        style={{ color: brand?.primaryColor || 'hsl(var(--primary))' }}
-      />
+      <div className="p-1 rounded bg-primary/20">
+        <Sparkles
+          className="h-4 w-4 text-primary"
+        />
+      </div>
     );
   };
 
@@ -92,16 +94,12 @@ export function AdminSidebar() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 h-14 bg-background border-b z-50 flex items-center px-4">
-        <div className="flex items-center gap-2">
+      <header className="fixed top-0 left-0 right-0 h-16 glass-panel border-b border-white/5 z-50 flex items-center px-6">
+        <div className="flex items-center gap-3">
           {renderLogo()}
-          {showTitle && <span className="font-semibold">{name}</span>}
+          {showTitle && <span className="font-heading font-semibold text-lg tracking-tight">{name}</span>}
           <span 
-            className="text-xs px-2 py-0.5 rounded-full font-medium"
-            style={{ 
-              backgroundColor: brand?.primaryColor ? `${brand.primaryColor}20` : 'hsl(var(--primary) / 0.1)',
-              color: brand?.primaryColor || 'hsl(var(--primary))'
-            }}
+            className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary uppercase tracking-wider"
           >
             Admin
           </span>
@@ -110,7 +108,7 @@ export function AdminSidebar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-9 w-9 rounded-full hover:bg-white/5"
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           >
             <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -120,7 +118,7 @@ export function AdminSidebar() {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 text-muted-foreground hover:text-foreground"
+            className="gap-2 text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-full px-4"
             onClick={handleLogout}
           >
             <LogOut className="h-4 w-4" />
@@ -129,14 +127,14 @@ export function AdminSidebar() {
         </div>
       </header>
 
-      <aside className="fixed left-0 top-14 bottom-0 w-56 border-r bg-muted/30 flex flex-col">
-        <nav className="flex-1 p-3">
+      <aside className="fixed left-0 top-16 bottom-0 w-64 glass-panel border-r border-white/5 flex flex-col pt-4">
+        <nav className="flex-1 p-4 space-y-6">
           {navSections.map((section) => (
-            <div key={section.title} className="mb-4">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 py-1.5">
+            <div key={section.title}>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60 px-4 py-2 mb-1">
                 {section.title}
               </div>
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
@@ -146,11 +144,13 @@ export function AdminSidebar() {
                       <Button
                         variant="ghost"
                         className={cn(
-                          'w-full justify-start gap-2',
-                          isActive && 'bg-primary/10 text-primary hover:bg-primary/15'
+                          'w-full justify-start gap-3 h-10 rounded-lg font-medium transition-all duration-200',
+                          isActive
+                            ? 'bg-primary/10 text-primary shadow-[0_0_15px_-5px_var(--color-primary)] hover:bg-primary/20'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
                         )}
                       >
-                        <Icon className="h-4 w-4" />
+                        <Icon className={cn("h-4 w-4", isActive && "text-primary")} />
                         {item.label}
                       </Button>
                     </Link>

@@ -29,7 +29,7 @@ export const ConversationContent = ({
   ...props
 }: ConversationContentProps) => (
   <StickToBottom.Content
-    className={cn("flex flex-col gap-8 p-4", className)}
+    className={cn("flex flex-col gap-6 p-4", className)}
     {...props}
   />
 );
@@ -50,18 +50,22 @@ export const ConversationEmptyState = ({
 }: ConversationEmptyStateProps) => (
   <div
     className={cn(
-      "flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
+      "flex size-full flex-col items-center justify-center gap-4 p-8 text-center animate-in fade-in duration-500",
       className
     )}
     {...props}
   >
     {children ?? (
       <>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
-        <div className="space-y-1">
-          <h3 className="font-medium text-sm">{title}</h3>
+        {icon && (
+          <div className="text-primary/50 bg-primary/10 p-4 rounded-full shadow-[0_0_20px_-5px_var(--color-primary)]">
+            {icon}
+          </div>
+        )}
+        <div className="space-y-2 max-w-sm">
+          <h3 className="font-heading font-medium text-lg tracking-tight">{title}</h3>
           {description && (
-            <p className="text-muted-foreground text-sm">{description}</p>
+            <p className="text-muted-foreground text-sm leading-relaxed">{description}</p>
           )}
         </div>
       </>
@@ -85,7 +89,7 @@ export const ConversationScrollButton = ({
     !isAtBottom && (
       <Button
         className={cn(
-          "absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full dark:bg-background dark:hover:bg-muted",
+          "absolute bottom-20 left-[50%] translate-x-[-50%] rounded-full glass-panel shadow-lg hover:bg-primary/20 transition-all duration-300 animate-in fade-in slide-in-from-bottom-2",
           className
         )}
         onClick={handleScrollToBottom}
@@ -94,7 +98,7 @@ export const ConversationScrollButton = ({
         variant="outline"
         {...props}
       >
-        <ArrowDownIcon className="size-4" />
+        <ArrowDownIcon className="size-4 text-primary" />
       </Button>
     )
   );
@@ -152,7 +156,7 @@ export const ConversationDownload = ({
   return (
     <Button
       className={cn(
-        "absolute top-4 right-4 rounded-full dark:bg-background dark:hover:bg-muted",
+        "absolute top-4 right-4 rounded-full glass hover:bg-primary/10 transition-colors",
         className
       )}
       onClick={handleDownload}

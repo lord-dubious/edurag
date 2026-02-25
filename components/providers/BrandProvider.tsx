@@ -28,17 +28,21 @@ export function useBrand(): BrandContextType {
 }
 
 const DEFAULT_BRAND: BrandSettings = {
-  appName: 'University Knowledge Base',
-  primaryColor: '#3b82f6',
-  secondaryColor: '#1e40af',
+  appName: 'Luminous',
+  primaryColor: '#793ef9', // Electric Indigo
+  secondaryColor: '#2dd4bf', // Teal
   logoUrl: null,
-  emoji: '🎓',
+  emoji: '✦',
   iconType: 'emoji',
   showTitle: true,
   onboarded: false,
 };
 
 function hexToApproxOklch(hex: string): string {
+  // Simple conversion or keep using the existing one if it works reasonably well.
+  // For precise control, we might want to skip conversion if we could,
+  // but the backend sends hex.
+
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;
@@ -66,8 +70,9 @@ function hexToApproxOklch(hex: string): string {
     }
   }
 
+  // Adjusting lightness and chroma to match Luminous vibe
   const oklchL = l * 0.6 + 0.4;
-  const oklchC = c * 0.25;
+  const oklchC = c * 0.25 + 0.1; // Boost chroma slightly
   const oklchH = h * 360;
 
   return `oklch(${oklchL.toFixed(3)} ${oklchC.toFixed(3)} ${oklchH.toFixed(1)})`;
@@ -94,12 +99,19 @@ export function BrandProvider({ children }: { children: ReactNode }) {
             onboarded: data.onboarded ?? false,
           };
           setBrand(brandSettings);
-          applyBrandColors(brandSettings);
+          if (brandSettings.onboarded) {
+             applyBrandColors(brandSettings);
+          } else {
+             // If not onboarded or just using defaults, ensure we set them too
+             applyBrandColors(DEFAULT_BRAND);
+          }
         } else {
           setBrand(DEFAULT_BRAND);
+          applyBrandColors(DEFAULT_BRAND);
         }
       } catch {
         setBrand(DEFAULT_BRAND);
+        applyBrandColors(DEFAULT_BRAND);
       } finally {
         setLoading(false);
       }
@@ -125,6 +137,9 @@ function applyBrandColors(brand: BrandSettings): void {
   root.style.setProperty('--accent', primaryOkLCH);
   root.style.setProperty('--accent-glow', primaryOkLCH);
   root.style.setProperty('--sidebar-primary', primaryOkLCH);
+
+  // Also set ring to match primary
+  root.style.setProperty('--ring', primaryOkLCH);
 
   const lighterPrimary = primaryOkLCH.replace(/oklch\((\d+\.\d+)/, (_, l) => {
     const newL = Math.min(0.98, parseFloat(l) + 0.3);
