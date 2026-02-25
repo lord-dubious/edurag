@@ -30,6 +30,7 @@ export interface UseDeepgramVoiceOptions {
   onError?: (error: Error) => void;
   onSources?: (sources: Source[]) => void;
   onRequestNotes?: (topic: string) => void;
+  institutionName?: string;
 }
 
 export function useDeepgramVoice({
@@ -41,6 +42,7 @@ export function useDeepgramVoice({
   onError,
   onSources,
   onRequestNotes,
+  institutionName,
 }: UseDeepgramVoiceOptions) {
   const [state, setState] = useState<AgentState>('idle');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -52,6 +54,7 @@ export function useDeepgramVoice({
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false);
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const lastSearchResultsRef = useRef<string>('');
 
   const updateState = useCallback((newState: AgentState) => {
     setState(newState);
@@ -144,14 +147,14 @@ export function useDeepgramVoice({
         },
         think: {
           provider: {
-            type: 'open_ai',
-            model: 'gpt-4o-mini',
+            type: 'google',
+            model: 'gemini-2.5-flash',
           },
-          prompt: getSystemPrompt(),
+          prompt: getSystemPrompt(institutionName),
           functions: [
             {
               name: 'vector_search',
-              description: 'Search the university knowledge base for information. Use this when the user asks questions about the university, admissions, programs, etc. You MUST USE this function to answer questions about the university.',
+              description: 'Search the university knowledge base. ONLY call this for a NEW factual question you have not already answered. Do NOT call this for greetings, follow-ups, clarifications, or if you already have the answer from a previous search.',
               parameters: {
                 type: 'object',
                 properties: {
@@ -161,20 +164,6 @@ export function useDeepgramVoice({
                   }
                 },
                 required: ['query']
-              }
-            },
-            {
-              name: "show_detailed_notes",
-              description: "Display rich Markdown documentation, lists, URLs, or tables in the user's chat window. Use this ONLY when you find complex information that is tedious to read aloud.",
-              parameters: {
-                type: "object",
-                properties: {
-                  topic: {
-                    type: "string",
-                    description: "The specific topic or program to show notes for (e.g., 'Computer Science Admissions Requirements')."
-                  }
-                },
-                required: ["topic"]
               }
             }
           ]
@@ -187,7 +176,7 @@ export function useDeepgramVoice({
         },
       }
     }));
-  }, [history]);
+  }, [history, institutionName]);
 
   const handleFunctionCall = useCallback(async (data: { functions: Array<{ id: string; name: string; arguments: string }> }) => {
     const ws = wsRef.current;
@@ -204,16 +193,32 @@ export function useDeepgramVoice({
           });
           const result = await response.json();
 
-          if (result.results) {
+          if (result.results && result.results.length > 0) {
             onSources?.(result.results);
-          }
 
-          ws.send(JSON.stringify({
-            type: 'FunctionCallResponse',
-            id: func.id,
-            name: func.name,
-            content: JSON.stringify(result),
-          }));
+            const plainTextContext = result.results
+              .map((r: { title?: string; content: string }) =>
+                `${r.title ? r.title + ': ' : ''}${stripMarkdownForVoice(r.content)}`
+              )
+              .join('\n\n');
+            lastSearchResultsRef.current = plainTextContext;
+
+            onRequestNotes?.(args.query);
+
+            ws.send(JSON.stringify({
+              type: 'FunctionCallResponse',
+              id: func.id,
+              name: func.name,
+              content: `Use the following information to answer the user's question naturally, as if you already know it. Never mention searching, databases, or results. Just answer their question directly and thoroughly like a knowledgeable person would.\n\n${plainTextContext}`,
+            }));
+          } else {
+            ws.send(JSON.stringify({
+              type: 'FunctionCallResponse',
+              id: func.id,
+              name: func.name,
+              content: 'No results were found in the knowledge base. Let the user know you could not find that specific information and suggest they contact the university directly or check the official website.',
+            }));
+          }
         } catch (error) {
           console.error('Function call error:', error);
           ws.send(JSON.stringify({
@@ -221,32 +226,6 @@ export function useDeepgramVoice({
             id: func.id,
             name: func.name,
             content: JSON.stringify({ error: 'Failed to execute function' }),
-          }));
-        }
-      } else if (func.name === 'show_detailed_notes') {
-        try {
-          console.log(`[Deepgram] Handoff request received: ${func.name}`);
-          const args = JSON.parse(func.arguments);
-          if (args.topic) {
-            console.log(`[Deepgram] Showing notes for topic:`, args.topic);
-            onRequestNotes?.(args.topic);
-          } else {
-            console.warn(`[Deepgram] show_detailed_notes called but missing topic argument.`);
-          }
-
-          ws.send(JSON.stringify({
-            type: 'FunctionCallResponse',
-            id: func.id,
-            name: func.name,
-            content: "The detailed notes are now being displayed in the chat window. VERBALLY ACKNOWLEDGE THIS AND SUMMARIZE THE HIGHLIGHTS FOR THE USER NOW.",
-          }));
-        } catch (error) {
-          console.error('Handoff error:', error);
-          ws.send(JSON.stringify({
-            type: 'FunctionCallResponse',
-            id: func.id,
-            name: func.name,
-            content: "Failed to show notes.",
           }));
         }
       }
@@ -476,16 +455,53 @@ export function useDeepgramVoice({
   };
 }
 
-function getSystemPrompt(): string {
-  return `You are a helpful university assistant. Your role is to help students find information about programs, admissions, tuition, campus life, and more.
+export function stripMarkdownForVoice(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/^\s*>\s*/gm, '')
+    .replace(/\|/g, ' ')
+    .replace(/^[-:| ]+$/gm, '')
+    .replace(/https?:\/\/[^\s)]+/g, '')
+    .replace(/[*#~`\[\]{}()<>]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/  +/g, ' ')
+    .trim();
+}
 
-IMPORTANT GUIDELINES:
-1. IDENTITY: You are a single, unified agent. You speak through voice AND you type rich Markdown in the chat window. NEVER refer to a "text assistant" or "another agent". Use first-person singular ("I", "me", "my").
-2. NO RAW LINKS: NEVER read raw URLs, web links, or file paths aloud. It sounds terrible when spoken.
-3. VERBAL SUMMARIES: If you find relevant information using vector_search, verbally summarize it in a natural, concise, and conversational voice.
-4. RICH DOCUMENTATION: If the information contains lists, complex details, or URLs, invoke the \`show_detailed_notes\` tool to "type" the rich version into the chat for the user.
-5. CONTINUITY: When you use \`show_detailed_notes\`, explicitly tell the user: "I've put those details in the chat for you." Then, ALWAYS follow up with a brief (1-2 sentence) verbal highlight so you remain actively engaged in the answer.
-6. NO MARKDOWN IN VOICE: NEVER use Markdown formatting (like **, _, #, or brackets) and NEVER use emojis in your SPOKEN response. Write in plain text only.
-7. ACCURACY: Do not hallucinate. If no relevant information is found, suggest checking the official university website.
-8. PERSONA: Be friendly, energetic, and helpful while maintaining professionalism.`;
+export function getSystemPrompt(institutionName?: string): string {
+  const name = institutionName || 'the university';
+  return `You are a senior advisor at ${name} on a phone call with a student. You genuinely care about helping them and love talking about the university.
+
+PERSONALITY: Warm, enthusiastic, thorough. You enjoy explaining things in detail. You talk like someone who has worked at ${name} for years and knows everything about it.
+
+WHEN TO SEARCH:
+- Search ONLY when the user asks a NEW factual question you do not already know the answer to.
+- Do NOT search for greetings like "hi" or "hello" or "thanks".
+- Do NOT search again if the user asks a follow-up about something you already discussed. Use what you already know from the previous search.
+- Do NOT search if the user is just acknowledging, agreeing, or asking you to elaborate on what you just said.
+
+HOW TO TALK:
+- Never mention searching, looking up, or finding information. Just answer as if you already know.
+- Never say "based on my search", "I found", "according to the results". Just say it directly: "Oh yeah, tuition for that program is about twelve thousand a year."
+- Be THOROUGH. Do not summarize. Talk through every relevant detail as a real advisor would. If there are three programs that match, walk through each one, explaining what makes each special, what the requirements are, how long they take, and what careers they lead to.
+- Use natural transitions: "And another thing worth knowing...", "Oh and speaking of that...", "Now here is the really important part..."
+- Share your enthusiasm: "That is actually a really popular program" or "A lot of students love that one."
+
+SPEECH RULES:
+- Plain English only. Never say "star", "asterisk", "pound", "hashtag", or "bracket".
+- Never read URLs or links aloud.
+- Never use Markdown formatting.
+- Detailed written notes appear automatically in the user's chat. You can mention this once briefly.`;
 }

@@ -71,6 +71,16 @@ export async function POST(req: Request) {
       parts: convertToUIMessageParts(m.parts),
     }));
 
+    const lastAssistantIdx = uiMessages.findLastIndex(m => m.role === 'assistant');
+    for (let i = 0; i < uiMessages.length; i++) {
+      if (i !== lastAssistantIdx && uiMessages[i].role === 'assistant') {
+        uiMessages[i] = {
+          ...uiMessages[i],
+          parts: uiMessages[i].parts.filter(p => p.type === 'text'),
+        };
+      }
+    }
+
     const settings = await getSettings();
     const universityName = settings?.appName || 'University Knowledge Base';
     const maxSteps = settings?.chatConfig?.maxSteps;

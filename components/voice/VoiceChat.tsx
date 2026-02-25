@@ -18,6 +18,7 @@ interface VoiceChatProps {
   onClose?: () => void;
   onMessageAdded?: (msg: VoiceMessagePayload) => void;
   onShowNotes?: (topic: string) => void;
+  institutionName?: string;
 }
 
 const stateLabels: Record<AgentState, string> = {
@@ -36,7 +37,7 @@ const personaStateMap: Record<AgentState, PersonaState> = {
   speaking: 'speaking',
 };
 
-export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes }: VoiceChatProps) {
+export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, institutionName }: VoiceChatProps) {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
@@ -106,6 +107,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes }: Vo
     onError: handleError,
     onSources: handleSources,
     onRequestNotes: handleShowNotes,
+    institutionName,
   });
 
   const handleEnd = useCallback(() => {
@@ -167,17 +169,17 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes }: Vo
               </p>
             </div>
 
-            <div className="absolute bottom-24 w-full px-6 flex flex-col items-center justify-end min-h-[120px] pointer-events-none">
+            <div className="absolute bottom-24 w-full px-6 flex flex-col items-center justify-end max-h-[30vh] overflow-hidden pointer-events-none">
               {(state === 'listening' && currentTranscript) && (
                 <div className="animate-in slide-in-from-bottom-4 fade-in duration-300 text-center max-w-2xl px-4 mix-blend-plus-lighter">
-                  <p className="text-lg md:text-xl font-medium text-muted-foreground line-clamp-3 drop-shadow-sm">
+                  <p className="text-lg md:text-xl font-medium text-muted-foreground line-clamp-2 drop-shadow-sm">
                     &quot;{currentTranscript}&quot;
                   </p>
                 </div>
               )}
               {(state === 'speaking' && agentResponse) && (
                 <div className="animate-in slide-in-from-bottom-4 fade-in duration-300 text-center max-w-3xl px-4">
-                  <p className="text-xl md:text-2xl font-semibold text-primary line-clamp-4 leading-relaxed drop-shadow-md">
+                  <p className="text-lg md:text-xl font-semibold text-primary line-clamp-3 leading-relaxed drop-shadow-md">
                     {agentResponse}
                   </p>
                 </div>

@@ -135,7 +135,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
 
   const handleShowNotes = useCallback((topic: string) => {
     if (status !== 'ready') return;
-    sendMessage({ text: `I am providing the detailed Markdown notes and source links for "${topic}" now as requested in our conversation.` });
+    sendMessage({ text: `[VOICE_HANDOFF] The user asked about "${topic}" via voice. Search the knowledge base and provide a comprehensive, detailed answer with proper source citations and links.` });
   }, [status, sendMessage]);
 
   const handleSuggestionClick = useCallback(
@@ -248,6 +248,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
                     onClose={() => setVoiceMode(false)}
                     onMessageAdded={handleVoiceMessage}
                     onShowNotes={handleShowNotes}
+                    institutionName={appName}
                   />
                 ) : (
                   <ChatInput onSubmit={handleSubmit} status={status} onVoiceMode={() => setVoiceMode(true)} />

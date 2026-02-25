@@ -12,6 +12,9 @@ const envSchema = z.object({
   EMBEDDING_MODEL: z.string().default('voyage-4-large'),
   EMBEDDING_DIMENSIONS: z.coerce.number().default(2048),
 
+  RERANK_MODEL: z.string().default('rerank-2.5'),
+  RERANK_TOP_K: z.coerce.number().min(1).max(20).default(6),
+
   MONGODB_URI: z.string().min(1).optional(),
   DB_NAME: z.string().default('edurag'),
   COLLECTION1: z.string().default('crawled_index'),
@@ -36,13 +39,13 @@ const envSchema = z.object({
   CRAWL_FORMAT: z.enum(['markdown', 'text']).default('markdown'),
 
   ADMIN_SECRET: z.string().min(16).optional(),
-  
+
   UNIVERSITY_URL: z.string().url().optional().or(z.literal('')),
   AUTO_CRAWL: z.coerce.boolean().default(false),
-  
+
   UPLOADTHING_SECRET: z.string().min(1).optional(),
   UPLOADTHING_APP_ID: z.string().min(1).optional(),
-  
+
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
   DEEPGRAM_API_KEY: z.string().min(1).optional(),

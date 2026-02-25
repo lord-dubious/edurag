@@ -10,24 +10,27 @@ import { LogoUpload } from '@/components/admin/LogoUpload';
 
 async function saveSettings(formData: FormData) {
   'use server';
-  
+
   const appName = formData.get('appName') as string;
   const brandPrimary = formData.get('brandPrimary') as string;
   const brandSecondary = formData.get('brandSecondary') as string;
   const brandLogoUrl = formData.get('brandLogoUrl') as string;
   const emoji = formData.get('emoji') as string;
   const iconType = formData.get('iconType') as 'logo' | 'emoji' | 'upload';
-  
+
   const chatModel = formData.get('chatModel') as string;
   const chatMaxTokens = parseInt(formData.get('chatMaxTokens') as string) || 32000;
   const chatMaxSteps = Math.min(20, Math.max(1, parseInt(formData.get('chatMaxSteps') as string) || 5));
-  
+
   const embeddingModel = formData.get('embeddingModel') as string;
   const embeddingDimensions = parseInt(formData.get('embeddingDimensions') as string) || 2048;
-  
+
+  const rerankModel = formData.get('rerankModel') as string;
+  const rerankTopK = Math.min(20, Math.max(1, parseInt(formData.get('rerankTopK') as string) || 6));
+
   const uploadthingSecret = formData.get('uploadthingSecret') as string;
   const uploadthingAppId = formData.get('uploadthingAppId') as string;
-  
+
   await updateSettings({
     appName,
     brandPrimary,
@@ -43,29 +46,36 @@ async function saveSettings(formData: FormData) {
       model: embeddingModel,
       dimensions: embeddingDimensions,
     },
+    rerankConfig: {
+      model: rerankModel || 'rerank-2.5',
+      topK: rerankTopK,
+    },
     uploadthingSecret: uploadthingSecret || undefined,
     uploadthingAppId: uploadthingAppId || undefined,
   });
-  
+
   revalidatePath('/admin/settings');
 }
 
 export default async function AdminSettingsPage() {
   const settings = await getSettings();
-  
+
   const appName = settings?.appName || 'University Knowledge Base';
   const brandPrimary = settings?.brandPrimary || '#3b82f6';
   const brandSecondary = settings?.brandSecondary || '#1e40af';
   const brandLogoUrl = settings?.brandLogoUrl || '';
   const emoji = settings?.emoji || '🎓';
   const iconType = settings?.iconType || 'emoji';
-  
+
   const chatMaxTokens = settings?.chatConfig?.maxTokens || 32000;
   const chatMaxSteps = settings?.chatConfig?.maxSteps || 5;
-  
+
   const embeddingModel = settings?.embeddingConfig?.model || 'voyage-4-large';
   const embeddingDimensions = settings?.embeddingConfig?.dimensions || 2048;
-  
+
+  const rerankModel = settings?.rerankConfig?.model || 'rerank-2.5';
+  const rerankTopK = settings?.rerankConfig?.topK || 6;
+
   return (
     <div className="space-y-6">
       <div>
@@ -74,7 +84,7 @@ export default async function AdminSettingsPage() {
           Configure your knowledge base appearance and AI models
         </p>
       </div>
-      
+
       <form action={saveSettings} className="space-y-6">
         <Card>
           <CardHeader>
@@ -159,7 +169,7 @@ export default async function AdminSettingsPage() {
             )}
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>AI Models</CardTitle>
@@ -228,9 +238,39 @@ export default async function AdminSettingsPage() {
                 </p>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="rerankModel">Reranking Model</Label>
+                <Input
+                  id="rerankModel"
+                  name="rerankModel"
+                  defaultValue={rerankModel}
+                  placeholder="rerank-2.5"
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Voyage AI reranker for search precision
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rerankTopK">Rerank Top K</Label>
+                <Input
+                  id="rerankTopK"
+                  name="rerankTopK"
+                  type="number"
+                  min={1}
+                  max={20}
+                  defaultValue={rerankTopK}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Number of results after reranking
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Uploadthing (Optional)</CardTitle>
@@ -264,7 +304,7 @@ export default async function AdminSettingsPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <div className="flex justify-end">
           <Button type="submit">
             <Save className="mr-2 h-4 w-4" />
