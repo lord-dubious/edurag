@@ -133,9 +133,19 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     }
   }, [setMessages]);
 
-  const handleShowNotes = useCallback((topic: string) => {
+  const handleShowNotes = useCallback((topic: string, sources?: Source[]) => {
     if (status !== 'ready') return;
-    sendMessage({ text: `I am providing the detailed Markdown notes and source links for "${topic}" now as requested in our conversation.` });
+
+    // If we have sources from voice, pass them as context to prevent re-search
+    if (sources && sources.length > 0) {
+      const contextString = sources.map((s, i) => `Source ${i+1} (${s.title}): ${s.content}`).join('\n\n');
+
+      sendMessage({
+        text: `I am providing the detailed Markdown notes for "${topic}" based on the information I already found. Here is the context from our voice conversation:\n\n${contextString}\n\nDo not search again. Summarize these notes for me now.`
+      });
+    } else {
+      sendMessage({ text: `I am providing the detailed Markdown notes and source links for "${topic}" now as requested in our conversation.` });
+    }
   }, [status, sendMessage]);
 
   const handleSuggestionClick = useCallback(

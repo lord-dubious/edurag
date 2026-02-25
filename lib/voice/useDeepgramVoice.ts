@@ -29,7 +29,34 @@ export interface UseDeepgramVoiceOptions {
   onStateChange?: (state: AgentState) => void;
   onError?: (error: Error) => void;
   onSources?: (sources: Source[]) => void;
-  onRequestNotes?: (topic: string) => void;
+  onRequestNotes?: (topic: string, sources?: Source[]) => void;
+}
+
+function removeMarkdown(text: string): string {
+  if (!text) return '';
+  return text
+    // Remove headers
+    .replace(/^#+\s+/gm, '')
+    // Remove bold/italic
+    .replace(/(\*\*|__)(.*?)\1/g, '')
+    .replace(/(\*|_)(.*?)\1/g, '')
+    // Remove links [text](url) -> text
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '')
+    // Remove code blocks
+    .replace(/\`\`\`[\s\S]*?\`\`\`/g, '')
+    .replace(/\`([^`]+)\`/g, '')
+    // Remove blockquotes
+    .replace(/^>\s+/gm, '')
+    // Remove lists markers
+    .replace(/^[\*\-\+]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
+    // Remove images
+    .replace(/!\[[^\]]*\]\([^\)]+\)/g, '')
+    // Remove HTML tags
+    .replace(/<[^>]*>/g, '')
+    // Collapse whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function useDeepgramVoice({
@@ -52,6 +79,8 @@ export function useDeepgramVoice({
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false);
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  // Store latest sources to pass to notes
+  const latestSourcesRef = useRef<Source[]>([]);
 
   const updateState = useCallback((newState: AgentState) => {
     setState(newState);
@@ -205,15 +234,34 @@ export function useDeepgramVoice({
           const result = await response.json();
 
           if (result.results) {
+            // Keep original rich content for UI
+            latestSourcesRef.current = result.results;
             onSources?.(result.results);
+
+            // Create sanitized version for speech synthesis
+            const sanitizedResults = {
+              ...result,
+              results: result.results.map((r: Source) => ({
+                ...r,
+                content: removeMarkdown(r.content)
+              }))
+            };
+
+            ws.send(JSON.stringify({
+              type: 'FunctionCallResponse',
+              id: func.id,
+              name: func.name,
+              content: JSON.stringify(sanitizedResults),
+            }));
+          } else {
+             ws.send(JSON.stringify({
+              type: 'FunctionCallResponse',
+              id: func.id,
+              name: func.name,
+              content: JSON.stringify(result),
+            }));
           }
 
-          ws.send(JSON.stringify({
-            type: 'FunctionCallResponse',
-            id: func.id,
-            name: func.name,
-            content: JSON.stringify(result),
-          }));
         } catch (error) {
           console.error('Function call error:', error);
           ws.send(JSON.stringify({
@@ -229,7 +277,8 @@ export function useDeepgramVoice({
           const args = JSON.parse(func.arguments);
           if (args.topic) {
             console.log(`[Deepgram] Showing notes for topic:`, args.topic);
-            onRequestNotes?.(args.topic);
+            // Pass current sources so text agent doesn't need to search again
+            onRequestNotes?.(args.topic, latestSourcesRef.current);
           } else {
             console.warn(`[Deepgram] show_detailed_notes called but missing topic argument.`);
           }
@@ -408,7 +457,7 @@ export function useDeepgramVoice({
       ws.onclose = (event) => {
         console.log('WebSocket closed:', event.code, event.reason);
         if (event.code !== 1000 && event.code !== 1005) {
-          onError?.(new Error(`Connection closed: ${event.reason || 'Unknown reason'}`));
+          onError?.(new Error());
         }
         updateState('idle');
       };
@@ -482,10 +531,10 @@ function getSystemPrompt(): string {
 IMPORTANT GUIDELINES:
 1. IDENTITY: You are a single, unified agent. You speak through voice AND you type rich Markdown in the chat window. NEVER refer to a "text assistant" or "another agent". Use first-person singular ("I", "me", "my").
 2. NO RAW LINKS: NEVER read raw URLs, web links, or file paths aloud. It sounds terrible when spoken.
-3. VERBAL SUMMARIES: If you find relevant information using vector_search, verbally summarize it in a natural, concise, and conversational voice.
+3. VERBAL SUMMARIES: If you find relevant information using vector_search, IMMEDIATELY verbally summarize it in a natural, concise, and conversational voice. Start speaking the summary as soon as you have the information.
 4. RICH DOCUMENTATION: If the information contains lists, complex details, or URLs, invoke the \`show_detailed_notes\` tool to "type" the rich version into the chat for the user.
 5. CONTINUITY: When you use \`show_detailed_notes\`, explicitly tell the user: "I've put those details in the chat for you." Then, ALWAYS follow up with a brief (1-2 sentence) verbal highlight so you remain actively engaged in the answer.
-6. NO MARKDOWN IN VOICE: NEVER use Markdown formatting (like **, _, #, or brackets) and NEVER use emojis in your SPOKEN response. Write in plain text only.
+6. NO MARKDOWN IN VOICE: NEVER use Markdown formatting (like **, _, #, or brackets) and NEVER use emojis in your SPOKEN response. Write in plain text only. The content you receive from tools may contain markdown; ignore the special characters and read it as natural text.
 7. ACCURACY: Do not hallucinate. If no relevant information is found, suggest checking the official university website.
 8. PERSONA: Be friendly, energetic, and helpful while maintaining professionalism.`;
 }

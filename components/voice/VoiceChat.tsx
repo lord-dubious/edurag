@@ -17,7 +17,7 @@ interface VoiceChatProps {
   messages?: UIMessage[];
   onClose?: () => void;
   onMessageAdded?: (msg: VoiceMessagePayload) => void;
-  onShowNotes?: (topic: string) => void;
+  onShowNotes?: (topic: string, sources?: Source[]) => void;
 }
 
 const stateLabels: Record<AgentState, string> = {
@@ -59,8 +59,6 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes }: Vo
       });
   }, []);
 
-
-
   const handleUserMessage = useCallback((text: string) => {
     setCurrentTranscript(text);
     if (text.trim()) {
@@ -93,8 +91,9 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes }: Vo
     setCurrentSources(sources);
   }, []);
 
-  const handleShowNotes = useCallback((topic: string) => {
-    onShowNotes?.(topic);
+  const handleShowNotes = useCallback((topic: string, sources?: Source[]) => {
+    // Pass sources to parent if available from the hook callback
+    onShowNotes?.(topic, sources);
   }, [onShowNotes]);
 
   const { state, start, stop } = useDeepgramVoice({
