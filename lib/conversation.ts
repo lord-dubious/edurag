@@ -1,5 +1,5 @@
 import { getMongoCollection } from './vectorstore';
-import { ObjectId, type Collection, type WithId, type Document } from 'mongodb';
+import { ObjectId, type Collection, type Filter } from 'mongodb';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -10,6 +10,7 @@ export interface Message {
 export interface ConversationDocument {
   _id?: ObjectId;
   threadId: string;
+  userId?: string;
   messages: Message[];
   createdAt: Date;
   updatedAt: Date;
@@ -18,6 +19,7 @@ export interface ConversationDocument {
 export interface Conversation {
   _id: ObjectId;
   threadId: string;
+  userId?: string;
   messages: Message[];
   createdAt: Date;
   updatedAt: Date;
@@ -29,13 +31,17 @@ export async function getConversationsCollection(): Promise<Collection<Conversat
   return getMongoCollection<ConversationDocument>(CONVERSATIONS_COLLECTION);
 }
 
-export async function getHistory(threadId: string): Promise<Message[]> {
+export async function getHistory(threadId: string, userId?: string): Promise<Message[]> {
   const collection = await getConversationsCollection();
-  const conversation = await collection.findOne({ threadId });
+  const query: Filter<ConversationDocument> = { threadId };
+  if (userId) {
+    query.userId = userId;
+  }
+  const conversation = await collection.findOne(query);
   return conversation?.messages ?? [];
 }
 
-export async function appendMessage(threadId: string, message: Message): Promise<void> {
+export async function appendMessage(threadId: string, message: Message, userId?: string): Promise<void> {
   const collection = await getConversationsCollection();
   const existing = await collection.findOne({ threadId });
   
@@ -50,6 +56,7 @@ export async function appendMessage(threadId: string, message: Message): Promise
   } else {
     await collection.insertOne({
       threadId,
+      userId,
       messages: [message],
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -57,9 +64,13 @@ export async function appendMessage(threadId: string, message: Message): Promise
   }
 }
 
-export async function clearHistory(threadId: string): Promise<void> {
+export async function clearHistory(threadId: string, userId?: string): Promise<void> {
   const collection = await getConversationsCollection();
-  await collection.deleteOne({ threadId });
+  const query: Filter<ConversationDocument> = { threadId };
+  if (userId) {
+     query.userId = userId;
+  }
+  await collection.deleteOne(query);
 }
 
 export async function listConversations(limit = 20): Promise<Conversation[]> {
@@ -70,4 +81,23 @@ export async function listConversations(limit = 20): Promise<Conversation[]> {
     .limit(limit)
     .toArray();
   return docs as Conversation[];
+}
+
+export async function getUserConversations(userId: string): Promise<Conversation[]> {
+  const collection = await getConversationsCollection();
+  const docs = await collection
+    .find({ userId })
+    .sort({ updatedAt: -1 })
+    .toArray();
+  return docs as Conversation[];
+}
+
+export async function getConversation(threadId: string, userId?: string): Promise<Conversation | null> {
+    const collection = await getConversationsCollection();
+    const query: Filter<ConversationDocument> = { threadId };
+    if (userId) {
+        query.userId = userId;
+    }
+    const doc = await collection.findOne(query);
+    return doc as Conversation | null;
 }
