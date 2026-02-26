@@ -10,7 +10,7 @@ export interface Message {
 export interface ConversationDocument {
   _id?: ObjectId;
   threadId: string;
-  userId?: string;
+  userId?: string | null;
   messages: Message[];
   createdAt: Date;
   updatedAt: Date;
@@ -19,7 +19,7 @@ export interface ConversationDocument {
 export interface Conversation {
   _id: ObjectId;
   threadId: string;
-  userId?: string;
+  userId?: string | null;
   messages: Message[];
   createdAt: Date;
   updatedAt: Date;
@@ -35,7 +35,8 @@ export async function getHistory(threadId: string, userId?: string): Promise<Mes
   const collection = await getConversationsCollection();
   const query: Filter<ConversationDocument> = { threadId };
   if (userId) {
-    query.userId = userId;
+    // Access own threads or anonymous threads
+    query.$or = [{ userId }, { userId: { $exists: false } }, { userId: null }];
   }
   const conversation = await collection.findOne(query);
   return conversation?.messages ?? [];
@@ -46,17 +47,30 @@ export async function appendMessage(threadId: string, message: Message, userId?:
   const existing = await collection.findOne({ threadId });
   
   if (existing) {
+    // Security check: If thread belongs to another user, prevent write.
+    if (existing.userId && userId && existing.userId !== userId) {
+        console.error(`[appendMessage] Unauthorized write attempt to thread ${threadId} by user ${userId}`);
+        throw new Error('Unauthorized: Cannot write to another user\'s thread');
+    }
+
+    const update: any = {
+      $push: { messages: message },
+      $set: { updatedAt: new Date() },
+    };
+
+    // If existing thread has no owner, claim it for current user
+    if (!existing.userId && userId) {
+      update.$set.userId = userId;
+    }
+
     await collection.updateOne(
       { threadId },
-      {
-        $push: { messages: message },
-        $set: { updatedAt: new Date() },
-      },
+      update,
     );
   } else {
     await collection.insertOne({
       threadId,
-      userId,
+      userId: userId || null,
       messages: [message],
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -96,7 +110,7 @@ export async function getConversation(threadId: string, userId?: string): Promis
     const collection = await getConversationsCollection();
     const query: Filter<ConversationDocument> = { threadId };
     if (userId) {
-        query.userId = userId;
+        query.$or = [{ userId }, { userId: { $exists: false } }, { userId: null }];
     }
     const doc = await collection.findOne(query);
     return doc as Conversation | null;

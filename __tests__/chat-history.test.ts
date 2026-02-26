@@ -54,4 +54,48 @@ describe('Chat History with User', () => {
     const conv = await getConversation(thread1, userId2);
     expect(conv).toBeNull();
   });
+
+  it('should claim an anonymous conversation when user logs in and replies', async () => {
+    const threadId = nanoid();
+    const userId = 'user-login';
+
+    // 1. Anonymous chat starts
+    await appendMessage(threadId, { role: 'user', content: 'Anon Hello', timestamp: new Date() });
+
+    // Verify anonymous
+    const anonConv = await getConversation(threadId);
+    expect(anonConv?.userId).toBeNull();
+
+    // 2. User logs in and replies (sends next message with userId)
+    await appendMessage(threadId, { role: 'user', content: 'User Reply', timestamp: new Date() }, userId);
+
+    // 3. Verify conversation is now owned by user
+    const userConv = await getConversation(threadId, userId);
+    expect(userConv?.userId).toBe(userId);
+    expect(userConv?.messages).toHaveLength(2);
+
+    // 4. Verify it appears in user list
+    const list = await getUserConversations(userId);
+    expect(list).toHaveLength(1);
+    expect(list[0].threadId).toBe(threadId);
+  });
+
+  it('should PREVENT appending message to another user thread', async () => {
+    const threadId = nanoid();
+    const ownerId = 'user-owner';
+    const attackerId = 'user-attacker';
+
+    // 1. Owner creates thread
+    await appendMessage(threadId, { role: 'user', content: 'My Secret', timestamp: new Date() }, ownerId);
+
+    // 2. Attacker tries to append
+    await expect(async () => {
+        await appendMessage(threadId, { role: 'user', content: 'Hacked', timestamp: new Date() }, attackerId);
+    }).rejects.toThrow('Unauthorized');
+
+    // 3. Verify message was NOT added
+    const history = await getHistory(threadId, ownerId);
+    expect(history).toHaveLength(1);
+    expect(history[0].content).toBe('My Secret');
+  });
 });
