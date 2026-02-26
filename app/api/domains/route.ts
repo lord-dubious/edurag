@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { verifyAdmin } from '@/lib/auth';
+import { verifyAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { getMongoCollection } from '@/lib/vectorstore';
 import { env } from '@/lib/env';

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { crawlAndVectorize } from '@/lib/crawl';
-import { verifyAdmin } from '@/lib/auth';
+import { verifyAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { NextRequest } from 'next/server';
 import { getMongoCollection } from '@/lib/vectorstore';
