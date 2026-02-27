@@ -1,5 +1,7 @@
 'use client';
 
+import type { JSX } from 'react';
+import { useCallback } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,8 +14,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export function UserMenu() {
+export function UserMenu(): JSX.Element | null {
   const { data: session } = useSession();
+
+  const handleSignOut = useCallback(() => {
+    void signOut({ callbackUrl: '/' });
+  }, []);
 
   if (!session?.user) {
     return null;
@@ -37,7 +43,7 @@ export function UserMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/' })}>
+        <DropdownMenuItem onClick={handleSignOut}>
           Log out
         </DropdownMenuItem>
       </DropdownMenuContent>

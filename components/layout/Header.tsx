@@ -11,7 +11,7 @@ import { ThemeToggle } from '@/components/providers/theme-toggle';
 import { useBrand } from '@/components/providers/BrandProvider';
 
 export function Header(): React.JSX.Element {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { brand, loading } = useBrand();
 
   const name = brand?.appName || 'Knowledge Base';
@@ -71,7 +71,9 @@ export function Header(): React.JSX.Element {
         </Link>
         <div className='flex items-center gap-2'>
           <ThemeToggle />
-          {session?.user ? (
+          {status === 'loading' ? (
+            <div className='h-8 w-[180px] animate-pulse rounded-md bg-muted' />
+          ) : session?.user ? (
             <UserMenu />
           ) : (
             <>

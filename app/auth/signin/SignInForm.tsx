@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { useCallback, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,7 +26,7 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCredentialsLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCredentialsLogin = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
@@ -44,7 +44,7 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
     }
 
     window.location.href = result.url || callbackUrl;
-  };
+  }, [callbackUrl, loginEmail, loginPassword]);
 
 
   const renderSocialButtons = () => {
@@ -68,7 +68,7 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
     );
   };
 
-  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRegister = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
@@ -104,7 +104,7 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
     }
 
     window.location.href = loginResult.url || callbackUrl;
-  };
+  }, [callbackUrl, registerEmail, registerName, registerPassword]);
 
   return (
     <main className='min-h-screen flex items-center justify-center p-4'>

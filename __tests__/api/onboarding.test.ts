@@ -82,7 +82,6 @@ describe('POST /api/onboarding/complete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpdateSettings.mockResolvedValue(undefined);
-    mockUpdateSettings.mockResolvedValue(undefined);
   });
 
   it('saves onboarding settings', async () => {

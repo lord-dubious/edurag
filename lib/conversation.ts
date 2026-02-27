@@ -1,5 +1,6 @@
+import { ObjectId } from 'mongodb';
+import type { Collection, Filter, UpdateFilter } from 'mongodb';
 import { getMongoCollection } from './vectorstore';
-import { ObjectId, type Collection, type Filter, type UpdateFilter } from 'mongodb';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';

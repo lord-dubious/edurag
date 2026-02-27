@@ -369,12 +369,15 @@ export default function SetupPage() {
         }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to complete onboarding');
+        throw new Error(data?.message || 'Failed to complete onboarding');
       }
 
-      await res.json();
+      if (!data?.success) {
+        throw new Error('Invalid onboarding response from server');
+      }
 
       toast.success('Onboarding complete!');
       router.push('/');

@@ -1,11 +1,11 @@
 'use client';
 
+import { useState } from 'react';
+import { ExternalLinkIcon, FileTextIcon, XIcon } from 'lucide-react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ExternalLinkIcon, FileTextIcon, XIcon } from 'lucide-react';
-import { useState } from 'react';
 
 export interface Source {
   url: string;
@@ -32,7 +32,11 @@ function cleanSourcePreview(content: string, maxLength = 150): string {
   return cleaned.slice(0, maxLength).replace(/\s+\S*$/, '...');
 }
 
-function SourceCard({ source }: { source: Source }) {
+interface SourceCardProps {
+  source: Source;
+}
+
+function SourceCard({ source }: SourceCardProps) {
   const hostname = new URL(source.url).hostname;
   const favicon = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
 

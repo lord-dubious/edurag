@@ -156,7 +156,7 @@ export const InlineCitationCarouselIndex = ({
   ...props
 }: InlineCitationCarouselIndexProps) => {
   const api = useCarouselApi();
-  const [current, setCurrent] = useState(0);
+  const [current, setCurrent] = useState(1);
 
   useEffect(() => {
     if (!api) {
@@ -167,6 +167,7 @@ export const InlineCitationCarouselIndex = ({
       setCurrent(api.selectedScrollSnap() + 1);
     };
 
+    setCurrent(api.selectedScrollSnap() + 1);
     api.on("select", handleSelect);
 
     return () => {

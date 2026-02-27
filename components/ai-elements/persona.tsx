@@ -1,5 +1,6 @@
 'use client';
 
+import type { StateMachineInput } from '@rive-app/webgl2';
 import type { RiveParameters } from '@rive-app/react-webgl2';
 import type { FC, ReactNode } from 'react';
 
@@ -195,7 +196,7 @@ export const Persona: FC<PersonaProps> = memo(
     const speakingInput = useStateMachineInput(rive, stateMachine, 'speaking');
     const asleepInput = useStateMachineInput(rive, stateMachine, 'asleep');
 
-    const setInputValue = useCallback((input: unknown, isActive: boolean) => {
+    const setInputValue = useCallback((input: StateMachineInput | null, isActive: boolean) => {
       if (!input || typeof input !== 'object') {
         return;
       }
