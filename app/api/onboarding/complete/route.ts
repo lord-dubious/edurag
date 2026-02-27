@@ -31,6 +31,18 @@ function sanitizeEnvValue(value: string | undefined | null): string | undefined 
   return value.replace(/[\n\r]/g, '');
 }
 
+function isMaskedPlaceholder(value: string | undefined | null): boolean {
+  if (!value) return false;
+  return /^\*+$/.test(value.trim());
+}
+
+function resolveApiKeyValue(value: string | undefined, envValue: string | undefined): string | undefined {
+  if (isMaskedPlaceholder(value)) {
+    return envValue;
+  }
+  return value || envValue;
+}
+
 type EnvEntry = { type: 'comment'; text: string } | { type: 'kv'; key: string; value: string } | { type: 'blank' };
 
 async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>): Promise<{ success: boolean; skipped: boolean; error?: string }> {
@@ -163,27 +175,37 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
 
     const hasAllEnvVars = hasRequiredEnvVars();
+    const resolvedApiKeys = apiKeys
+      ? {
+          ...apiKeys,
+          mongodbUri: resolveApiKeyValue(apiKeys.mongodbUri, process.env.MONGODB_URI) || '',
+          chatApiKey: resolveApiKeyValue(apiKeys.chatApiKey, process.env.CHAT_API_KEY) || '',
+          embeddingApiKey: resolveApiKeyValue(apiKeys.embeddingApiKey, process.env.EMBEDDING_API_KEY) || '',
+          tavilyApiKey: resolveApiKeyValue(apiKeys.tavilyApiKey, process.env.TAVILY_API_KEY) || '',
+          adminSecret: resolveApiKeyValue(apiKeys.adminSecret, process.env.ADMIN_SECRET) || '',
+        }
+      : undefined;
 
     if (!hasAllEnvVars) {
-      if (!apiKeys?.mongodbUri) {
+      if (!resolvedApiKeys?.mongodbUri) {
         return errorResponse('VALIDATION_ERROR', 'MongoDB connection string is required', 400);
       }
-      if (!apiKeys?.chatApiKey) {
+      if (!resolvedApiKeys?.chatApiKey) {
         return errorResponse('VALIDATION_ERROR', 'Chat API key is required', 400);
       }
-      if (!apiKeys?.embeddingApiKey) {
+      if (!resolvedApiKeys?.embeddingApiKey) {
         return errorResponse('VALIDATION_ERROR', 'Embedding API key is required', 400);
       }
-      if (!apiKeys?.tavilyApiKey) {
+      if (!resolvedApiKeys?.tavilyApiKey) {
         return errorResponse('VALIDATION_ERROR', 'Tavily API key is required', 400);
       }
-      if (!apiKeys?.adminSecret) {
+      if (!resolvedApiKeys?.adminSecret) {
         return errorResponse('VALIDATION_ERROR', 'Admin secret is required', 400);
       }
-      if (!apiKeys?.embeddingModel) {
+      if (!resolvedApiKeys?.embeddingModel) {
         return errorResponse('VALIDATION_ERROR', 'Embedding model is required', 400);
       }
-      if (!apiKeys?.embeddingDimensions) {
+      if (!resolvedApiKeys?.embeddingDimensions) {
         return errorResponse('VALIDATION_ERROR', 'Embedding dimensions is required', 400);
       }
     }
@@ -206,23 +228,23 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     await updateSettings(settings);
 
-    if (apiKeys && !hasAllEnvVars) {
-      const writeResult = await writeEnvFile(apiKeys, settings);
+    if (resolvedApiKeys && !hasAllEnvVars) {
+      const writeResult = await writeEnvFile(resolvedApiKeys, settings);
       if (!writeResult.success && !writeResult.skipped) {
         console.error('Failed to write .env.local:', writeResult.error);
       }
     }
 
     const envPreview = [
-      `MONGODB_URI=${maskSecret(apiKeys?.mongodbUri || process.env.MONGODB_URI)}`,
-      `CHAT_API_KEY=${maskSecret(apiKeys?.chatApiKey || process.env.CHAT_API_KEY)}`,
-      apiKeys?.chatBaseUrl || process.env.CHAT_BASE_URL ? `CHAT_BASE_URL=${sanitizeEnvValue(apiKeys?.chatBaseUrl || process.env.CHAT_BASE_URL)}` : null,
-      `CHAT_MODEL=${sanitizeEnvValue(apiKeys?.chatModel) || process.env.CHAT_MODEL || 'gpt-oss-120b'}`,
-      `EMBEDDING_API_KEY=${maskSecret(apiKeys?.embeddingApiKey || process.env.EMBEDDING_API_KEY)}`,
-      `EMBEDDING_MODEL=${apiKeys?.embeddingModel || process.env.EMBEDDING_MODEL || 'voyage-4-large'}`,
-      `EMBEDDING_DIMENSIONS=${apiKeys?.embeddingDimensions || process.env.EMBEDDING_DIMENSIONS || 2048}`,
-      `TAVILY_API_KEY=${maskSecret(apiKeys?.tavilyApiKey || process.env.TAVILY_API_KEY)}`,
-      `ADMIN_SECRET=${maskSecret(apiKeys?.adminSecret || process.env.ADMIN_SECRET)}`,
+      `MONGODB_URI=${maskSecret(resolvedApiKeys?.mongodbUri || process.env.MONGODB_URI)}`,
+      `CHAT_API_KEY=${maskSecret(resolvedApiKeys?.chatApiKey || process.env.CHAT_API_KEY)}`,
+      resolvedApiKeys?.chatBaseUrl || process.env.CHAT_BASE_URL ? `CHAT_BASE_URL=${sanitizeEnvValue(resolvedApiKeys?.chatBaseUrl || process.env.CHAT_BASE_URL)}` : null,
+      `CHAT_MODEL=${sanitizeEnvValue(resolvedApiKeys?.chatModel) || process.env.CHAT_MODEL || 'gpt-oss-120b'}`,
+      `EMBEDDING_API_KEY=${maskSecret(resolvedApiKeys?.embeddingApiKey || process.env.EMBEDDING_API_KEY)}`,
+      `EMBEDDING_MODEL=${resolvedApiKeys?.embeddingModel || process.env.EMBEDDING_MODEL || 'voyage-4-large'}`,
+      `EMBEDDING_DIMENSIONS=${resolvedApiKeys?.embeddingDimensions || process.env.EMBEDDING_DIMENSIONS || 2048}`,
+      `TAVILY_API_KEY=${maskSecret(resolvedApiKeys?.tavilyApiKey || process.env.TAVILY_API_KEY)}`,
+      `ADMIN_SECRET=${maskSecret(resolvedApiKeys?.adminSecret || process.env.ADMIN_SECRET)}`,
       `UNIVERSITY_URL=${sanitizeEnvValue(universityUrl) || ''}`,
     ].filter(Boolean).join('\n');
 

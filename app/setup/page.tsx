@@ -111,6 +111,19 @@ import dynamic from 'next/dynamic';
 
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 
+
+function isMaskedPlaceholder(value: string): boolean {
+  return /^\*+$/.test(value.trim());
+}
+
+function mergeApiKeys(prev: ApiKeys, next: Partial<ApiKeys>): ApiKeys {
+  const merged = { ...prev, ...next };
+  if (next.adminSecret && isMaskedPlaceholder(next.adminSecret)) {
+    merged.adminSecret = prev.adminSecret;
+  }
+  return merged;
+}
+
 interface PasswordInputProps {
   id: string;
   placeholder?: string;
@@ -202,8 +215,8 @@ export default function SetupPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.apiKeys) {
-            const safeKeys = data.apiKeys;
-            setApiKeys(prev => ({ ...prev, ...safeKeys }));
+            const safeKeys = data.apiKeys as Partial<ApiKeys>;
+            setApiKeys(prev => mergeApiKeys(prev, safeKeys));
           }
           if (data.uniUrl) setUniversityUrl(data.uniUrl);
           if (data.appName || data.brandPrimary || data.emoji || data.logoUrl) {

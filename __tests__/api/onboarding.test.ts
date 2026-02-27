@@ -102,6 +102,8 @@ describe('POST /api/onboarding/complete', () => {
         chatBaseUrl: 'https://api.cerebras.ai/v1',
         chatModel: 'llama-3.3-70b',
         embeddingApiKey: 'test-key',
+        embeddingModel: 'voyage-4-large',
+        embeddingDimensions: 2048,
         tavilyApiKey: 'test-key',
         adminSecret: 'test-secret',
       },
