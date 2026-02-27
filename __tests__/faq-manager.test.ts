@@ -71,7 +71,7 @@ describe('FAQ Manager', () => {
   it('should return empty array when no public FAQs', async () => {
     const faqs = await getPublicFaqs(10);
 
-    const testFaqs = faqs.filter((f: any) => testQuestions.includes(f.question));
+    const testFaqs = faqs.filter((f: { question: string }) => testQuestions.includes(f.question));
     expect(testFaqs.length).toBe(0);
   });
 });

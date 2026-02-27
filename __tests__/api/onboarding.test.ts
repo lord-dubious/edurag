@@ -21,11 +21,10 @@ vi.mock('@/lib/vectorstore', () => ({
   }),
 }));
 
-import { updateSettings, getSettings, isOnboarded } from '@/lib/db/settings';
+import { updateSettings, getSettings } from '@/lib/db/settings';
 
 const mockUpdateSettings = vi.mocked(updateSettings);
 const mockGetSettings = vi.mocked(getSettings);
-const mockIsOnboarded = vi.mocked(isOnboarded);
 
 function createRequest(body: Record<string, unknown>): NextRequest {
   return new NextRequest('http://localhost/api/onboarding/test', {

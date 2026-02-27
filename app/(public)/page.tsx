@@ -1,9 +1,7 @@
 import { Hero } from '@/components/landing/Hero';
 import { FaqSection } from '@/components/landing/FaqSection';
 import { SuggestionChipsWrapper } from '@/components/landing/SuggestionChips';
-import { ThemeToggle } from '@/components/providers/theme-toggle';
 import { Header } from '@/components/layout/Header';
-import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 

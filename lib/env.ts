@@ -41,6 +41,13 @@ const envSchema = z.object({
 
   ADMIN_SECRET: z.string().min(16).optional(),
 
+  AUTH_SECRET: z.string().min(1).optional(),
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  MICROSOFT_CLIENT_ID: z.string().min(1).optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
+  MICROSOFT_TENANT_ID: z.string().min(1).optional(),
+
   UNIVERSITY_URL: z.string().url().optional().or(z.literal('')),
   AUTO_CRAWL: z.coerce.boolean().default(false),
 

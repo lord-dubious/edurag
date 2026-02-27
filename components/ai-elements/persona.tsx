@@ -11,7 +11,7 @@ import {
   useViewModelInstance,
   useViewModelInstanceColor,
 } from '@rive-app/react-webgl2';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export type PersonaState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'asleep';
 
@@ -195,12 +195,19 @@ export const Persona: FC<PersonaProps> = memo(
     const speakingInput = useStateMachineInput(rive, stateMachine, 'speaking');
     const asleepInput = useStateMachineInput(rive, stateMachine, 'asleep');
 
+    const setInputValue = useCallback((input: unknown, isActive: boolean) => {
+      if (!input || typeof input !== 'object') {
+        return;
+      }
+      Reflect.set(input, 'value', isActive);
+    }, []);
+
     useEffect(() => {
-      if (listeningInput) listeningInput.value = state === 'listening';
-      if (thinkingInput) thinkingInput.value = state === 'thinking';
-      if (speakingInput) speakingInput.value = state === 'speaking';
-      if (asleepInput) asleepInput.value = state === 'asleep';
-    }, [state, listeningInput, thinkingInput, speakingInput, asleepInput]);
+      setInputValue(listeningInput, state === 'listening');
+      setInputValue(thinkingInput, state === 'thinking');
+      setInputValue(speakingInput, state === 'speaking');
+      setInputValue(asleepInput, state === 'asleep');
+    }, [asleepInput, listeningInput, setInputValue, speakingInput, state, thinkingInput]);
 
     const Component = source.hasModel ? PersonaWithModel : PersonaWithoutModel;
 

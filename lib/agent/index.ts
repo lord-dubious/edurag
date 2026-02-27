@@ -14,6 +14,7 @@ export async function runAgent({
   maxTokens,
   onFinish,
 }: AgentOptions) {
+  void threadId;
   const steps = maxSteps ?? env.CHAT_MAX_STEPS;
   const tokens = maxTokens ?? env.CHAT_MAX_TOKENS;
   const system = AGENT_SYSTEM_PROMPT

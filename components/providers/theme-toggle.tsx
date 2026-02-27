@@ -3,17 +3,11 @@
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { SunIcon, MoonIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
 
 export function ThemeToggle() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const { setTheme, resolvedTheme } = useTheme();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
+  if (!resolvedTheme) {
     return (
       <Button variant="ghost" size="icon" disabled>
         <SunIcon className="size-4" />

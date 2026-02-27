@@ -1,5 +1,5 @@
 import { getMongoCollection } from './vectorstore';
-import { ObjectId, type Collection, type Filter } from 'mongodb';
+import { ObjectId, type Collection, type Filter, type UpdateFilter } from 'mongodb';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -53,15 +53,15 @@ export async function appendMessage(threadId: string, message: Message, userId?:
         throw new Error('Unauthorized: Cannot write to another user\'s thread');
     }
 
-    const update: any = {
-      $push: { messages: message },
-      $set: { updatedAt: new Date() },
-    };
-
-    // If existing thread has no owner, claim it for current user
-    if (!existing.userId && userId) {
-      update.$set.userId = userId;
-    }
+    const update: UpdateFilter<ConversationDocument> = !existing.userId && userId
+      ? {
+        $push: { messages: message },
+        $set: { updatedAt: new Date(), userId },
+      }
+      : {
+        $push: { messages: message },
+        $set: { updatedAt: new Date() },
+      };
 
     await collection.updateOne(
       { threadId },
@@ -89,19 +89,26 @@ export async function clearHistory(threadId: string, userId?: string): Promise<v
 
 export async function listConversations(limit = 20): Promise<Conversation[]> {
   const collection = await getConversationsCollection();
+  const safeLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(Math.floor(limit), 100))
+    : 20;
   const docs = await collection
     .find({})
     .sort({ updatedAt: -1 })
-    .limit(limit)
+    .limit(safeLimit)
     .toArray();
   return docs as Conversation[];
 }
 
-export async function getUserConversations(userId: string): Promise<Conversation[]> {
+export async function getUserConversations(userId: string, limit = 20): Promise<Conversation[]> {
   const collection = await getConversationsCollection();
+  const safeLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(Math.floor(limit), 100))
+    : 20;
   const docs = await collection
     .find({ userId })
     .sort({ updatedAt: -1 })
+    .limit(safeLimit)
     .toArray();
   return docs as Conversation[];
 }

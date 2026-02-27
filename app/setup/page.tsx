@@ -192,8 +192,6 @@ export default function SetupPage() {
     uploadthingAppId: '',
     adminSecret: '',
   });
-  const [envPreview, setEnvPreview] = useState<string>('');
-  const [isVercel, setIsVercel] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [crawlLogs, setCrawlLogs] = useState<CrawlLogEntry[]>([]);
 
@@ -204,7 +202,7 @@ export default function SetupPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.apiKeys) {
-            const { adminSecret, ...safeKeys } = data.apiKeys;
+            const safeKeys = data.apiKeys;
             setApiKeys(prev => ({ ...prev, ...safeKeys }));
           }
           if (data.uniUrl) setUniversityUrl(data.uniUrl);
@@ -363,9 +361,7 @@ export default function SetupPage() {
         throw new Error(data.message || 'Failed to complete onboarding');
       }
 
-      const data = await res.json();
-      setEnvPreview(data.envPreview || '');
-      setIsVercel(data.isVercel || false);
+      await res.json();
 
       toast.success('Onboarding complete!');
       router.push('/');
@@ -682,7 +678,7 @@ ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}
                                   uploadedFileName: data.fileName,
                                 }));
                                 toast.success('Logo uploaded successfully');
-                              } catch (err) {
+                              } catch {
                                 toast.error('Failed to upload logo');
                               } finally {
                                 setUploadingLogo(false);

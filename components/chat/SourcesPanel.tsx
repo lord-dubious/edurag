@@ -1,6 +1,6 @@
 'use client';
 
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ function cleanSourcePreview(content: string, maxLength = 150): string {
   return cleaned.slice(0, maxLength).replace(/\s+\S*$/, '...');
 }
 
-function SourceCard({ source, index }: { source: Source; index: number }) {
+function SourceCard({ source }: { source: Source }) {
   const hostname = new URL(source.url).hostname;
   const favicon = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
 
@@ -114,7 +114,7 @@ export function SourcesPanel({ sources, isOpen: externalIsOpen, onClose }: Sourc
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {sources.map((source, i) => (
-                <SourceCard key={`${source.url}-${i}`} source={source} index={i} />
+                <SourceCard key={`${source.url}-${i}`} source={source} />
               ))}
             </div>
           </div>
@@ -134,7 +134,7 @@ export function SourcesPanel({ sources, isOpen: externalIsOpen, onClose }: Sourc
             </div>
             <div className="overflow-y-auto space-y-3 pb-8">
               {sources.map((source, i) => (
-                <SourceCard key={`${source.url}-${i}`} source={source} index={i} />
+                <SourceCard key={`${source.url}-${i}`} source={source} />
               ))}
             </div>
           </SheetContent>
