@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
       return errorResponse('VALIDATION_ERROR', 'Invalid URL format', 400);
     }
 
-    if (!parsedUrl.hostname.includes('.') || parsedUrl.hostname.split('.').pop()?.length! < 2) {
+    const topLevelDomain = parsedUrl.hostname.split('.').pop();
+    if (!parsedUrl.hostname.includes('.') || !topLevelDomain || topLevelDomain.length < 2) {
       return errorResponse('VALIDATION_ERROR', 'URL must have a valid domain', 400);
     }
 

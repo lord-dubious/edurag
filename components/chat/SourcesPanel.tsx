@@ -1,11 +1,11 @@
 'use client';
 
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useState } from 'react';
+import { ExternalLinkIcon, FileTextIcon, XIcon } from 'lucide-react';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ExternalLinkIcon, FileTextIcon, XIcon } from 'lucide-react';
-import { useState } from 'react';
 
 export interface Source {
   url: string;
@@ -27,27 +27,41 @@ function cleanSourcePreview(content: string, maxLength = 150): string {
     .replace(/[#*_~`]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  
+
   if (cleaned.length <= maxLength) return cleaned;
   return cleaned.slice(0, maxLength).replace(/\s+\S*$/, '...');
 }
 
-function SourceCard({ source, index }: { source: Source; index: number }) {
-  const hostname = new URL(source.url).hostname;
-  const favicon = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+interface SourceCardProps {
+  source: Source;
+}
+
+function SourceCard({ source }: SourceCardProps) {
+  let hostname = '';
+  let favicon: string | undefined = undefined;
+
+  try {
+    const parsedUrl = new URL(source.url);
+    hostname = parsedUrl.hostname;
+    favicon = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+  } catch {
+    hostname = 'unknown';
+  }
 
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
       <CardContent className="p-3">
         <div className="flex items-start gap-3">
-          <img
-            src={favicon}
-            alt=""
-            className="w-5 h-5 rounded mt-0.5 shrink-0"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
+          {favicon && (
+            <img
+              src={favicon}
+              alt=""
+              className="w-5 h-5 rounded mt-0.5 shrink-0"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-medium text-muted-foreground truncate">
@@ -90,9 +104,8 @@ export function SourcesPanel({ sources, isOpen: externalIsOpen, onClose }: Sourc
       {/* Desktop Slide-in Panel */}
       <div className="hidden lg:block">
         <div
-          className={`fixed right-0 top-0 h-full w-80 border-l bg-background shadow-lg z-40 transform transition-transform duration-300 ${
-            open ? 'translate-x-0' : 'translate-x-full'
-          }`}
+          className={`fixed right-0 top-0 h-full w-80 border-l bg-background shadow-lg z-40 transform transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'
+            }`}
         >
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between p-4 border-b">
@@ -114,7 +127,7 @@ export function SourcesPanel({ sources, isOpen: externalIsOpen, onClose }: Sourc
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {sources.map((source, i) => (
-                <SourceCard key={`${source.url}-${i}`} source={source} index={i} />
+                <SourceCard key={`${source.url}-${i}`} source={source} />
               ))}
             </div>
           </div>
@@ -123,7 +136,13 @@ export function SourcesPanel({ sources, isOpen: externalIsOpen, onClose }: Sourc
 
       {/* Mobile Sheet */}
       <div className="lg:hidden">
-        <Sheet open={open} onOpenChange={(v) => (isControlled ? onClose?.() : setInternalIsOpen(v))}>
+        <Sheet open={open} onOpenChange={(v) => {
+          if (isControlled) {
+            if (!v) onClose?.();
+          } else {
+            setInternalIsOpen(v);
+          }
+        }}>
           <SheetContent side="bottom" className="h-[60vh]">
             <div className="flex items-center gap-2 mb-4">
               <FileTextIcon className="size-4 text-primary" />
@@ -134,7 +153,7 @@ export function SourcesPanel({ sources, isOpen: externalIsOpen, onClose }: Sourc
             </div>
             <div className="overflow-y-auto space-y-3 pb-8">
               {sources.map((source, i) => (
-                <SourceCard key={`${source.url}-${i}`} source={source} index={i} />
+                <SourceCard key={`${source.url}-${i}`} source={source} />
               ))}
             </div>
           </SheetContent>

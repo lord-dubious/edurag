@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSettings, updateSettings } from '@/lib/db/settings';
 import { env, hasRequiredEnvVars } from '@/lib/env';
+import { ensureUserEmailIndex } from '@/lib/auth/ensureUserEmailIndex';
 import { errorResponse } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
@@ -12,6 +13,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    await ensureUserEmailIndex();
     const settings = await getSettings();
     
     if (settings?.onboarded) {
@@ -132,6 +134,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
+    await ensureUserEmailIndex();
     const settings = await getSettings();
     
     return NextResponse.json({

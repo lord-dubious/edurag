@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { MongoClient } from 'mongodb';
-import { getHistory, appendMessage, clearHistory, listConversations, Conversation } from '../lib/conversation';
-import { getMongoCollection, closeMongoClient } from '../lib/vectorstore';
+import { getHistory, appendMessage, clearHistory, listConversations } from '../lib/conversation';
+import { closeMongoClient } from '../lib/vectorstore';
 import { env } from '../lib/env';
 
 const TEST_THREAD_ID = 'test-conv-thread-' + Date.now();

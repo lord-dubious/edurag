@@ -4,7 +4,6 @@ import { NextRequest } from 'next/server';
 vi.mock('@/lib/db/settings', () => ({
   updateSettings: vi.fn(),
   getSettings: vi.fn(),
-  isOnboarded: vi.fn(),
 }));
 
 vi.mock('@/lib/providers', () => ({
@@ -21,11 +20,10 @@ vi.mock('@/lib/vectorstore', () => ({
   }),
 }));
 
-import { updateSettings, getSettings, isOnboarded } from '@/lib/db/settings';
+import { updateSettings, getSettings } from '@/lib/db/settings';
 
 const mockUpdateSettings = vi.mocked(updateSettings);
 const mockGetSettings = vi.mocked(getSettings);
-const mockIsOnboarded = vi.mocked(isOnboarded);
 
 function createRequest(body: Record<string, unknown>): NextRequest {
   return new NextRequest('http://localhost/api/onboarding/test', {
@@ -83,7 +81,6 @@ describe('POST /api/onboarding/complete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpdateSettings.mockResolvedValue(undefined);
-    mockUpdateSettings.mockResolvedValue(undefined);
   });
 
   it('saves onboarding settings', async () => {
@@ -103,6 +100,8 @@ describe('POST /api/onboarding/complete', () => {
         chatBaseUrl: 'https://api.cerebras.ai/v1',
         chatModel: 'llama-3.3-70b',
         embeddingApiKey: 'test-key',
+        embeddingModel: 'voyage-4-large',
+        embeddingDimensions: 2048,
         tavilyApiKey: 'test-key',
         adminSecret: 'test-secret',
       },
