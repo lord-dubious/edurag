@@ -1,4 +1,4 @@
-import type { NextRequest } from 'next/server';
+import { NextRequest } from 'next/server';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('fs/promises', () => ({
@@ -15,12 +15,12 @@ import { writeFile, mkdir } from 'fs/promises';
 const mockWriteFile = vi.mocked(writeFile);
 const mockMkdir = vi.mocked(mkdir);
 
-function createUploadRequest(file: File | null): Request {
+function createUploadRequest(file: File | null): NextRequest {
   const formData = new FormData();
   if (file) {
     formData.append('file', file);
   }
-  return new Request('http://localhost/api/upload', {
+  return new NextRequest('http://localhost/api/upload', {
     method: 'POST',
     body: formData,
   });
@@ -46,7 +46,7 @@ describe('POST /api/upload', () => {
     const file = createMockFileWithSignature(pngSignature, 'logo.png', 'image/png');
     const req = createUploadRequest(file);
 
-    const response = await POST(req as unknown as NextRequest);
+    const response = await POST(req);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -62,7 +62,7 @@ describe('POST /api/upload', () => {
     const file = createMockFileWithSignature(jpegSignature, 'logo.jpg', 'image/jpeg');
     const req = createUploadRequest(file);
 
-    const response = await POST(req as unknown as NextRequest);
+    const response = await POST(req);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -74,7 +74,7 @@ describe('POST /api/upload', () => {
     const { POST } = await import('@/app/api/upload/route');
     const req = createUploadRequest(null);
 
-    const response = await POST(req as unknown as NextRequest);
+    const response = await POST(req);
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -86,7 +86,7 @@ describe('POST /api/upload', () => {
     const file = createMockFile('fake content', 'document.pdf', 'application/pdf');
     const req = createUploadRequest(file);
 
-    const response = await POST(req as unknown as NextRequest);
+    const response = await POST(req);
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -98,7 +98,7 @@ describe('POST /api/upload', () => {
     const file = createMockFile('<svg></svg>', 'logo.svg', 'image/svg+xml');
     const req = createUploadRequest(file);
 
-    const response = await POST(req as unknown as NextRequest);
+    const response = await POST(req);
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -110,7 +110,7 @@ describe('POST /api/upload', () => {
     const file = createMockFile('not a real image', 'fake.png', 'image/png');
     const req = createUploadRequest(file);
 
-    const response = await POST(req as unknown as NextRequest);
+    const response = await POST(req);
     const data = await response.json();
 
     expect(response.status).toBe(400);

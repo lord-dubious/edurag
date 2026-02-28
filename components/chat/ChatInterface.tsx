@@ -134,26 +134,27 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     }
   };
 
-  const handleDeleteConversation = async (deleteThreadId: string) => {
-    try {
-      await fetch(`/api/history/${deleteThreadId}`, { method: 'DELETE' });
-    } catch (e) {
-      console.error("Failed to delete conversation", e);
-    }
-    if (deleteThreadId === threadId) {
-      handleNewChat();
-    }
-  };
-
-
-  const handleNewChat = () => {
+  const handleNewChat = useCallback(() => {
     setThreadId(nanoid());
     setMessages([]);
     setSources({});
     if (window.innerWidth < 768) {
       setShowHistory(false);
     }
-  };
+  }, [setThreadId, setMessages, setSources, setShowHistory]);
+
+  const handleDeleteConversation = useCallback(async (deleteThreadId: string) => {
+    try {
+      const res = await fetch(`/api/history/${deleteThreadId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('API delete failed');
+    } catch (e) {
+      console.error("Failed to delete conversation", e);
+      throw e;
+    }
+    if (deleteThreadId === threadId) {
+      handleNewChat();
+    }
+  }, [threadId, handleNewChat]);
 
   useEffect(() => {
     if (!initialQuery) return;

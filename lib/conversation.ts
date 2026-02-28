@@ -79,6 +79,12 @@ export async function appendMessage(threadId: string, message: Message, userId?:
   }
 }
 
+function normalizeLimit(limit: number): number {
+  return Number.isFinite(limit)
+    ? Math.max(1, Math.min(Math.floor(limit), 100))
+    : 20;
+}
+
 export async function clearHistory(threadId: string, userId?: string): Promise<void> {
   const collection = await getConversationsCollection();
   const query: Filter<ConversationDocument> = { threadId };
@@ -90,9 +96,7 @@ export async function clearHistory(threadId: string, userId?: string): Promise<v
 
 export async function listConversations(limit = 20): Promise<Conversation[]> {
   const collection = await getConversationsCollection();
-  const safeLimit = Number.isFinite(limit)
-    ? Math.max(1, Math.min(Math.floor(limit), 100))
-    : 20;
+  const safeLimit = normalizeLimit(limit);
   const docs = await collection
     .find({})
     .sort({ updatedAt: -1 })
@@ -103,9 +107,7 @@ export async function listConversations(limit = 20): Promise<Conversation[]> {
 
 export async function getUserConversations(userId: string, limit = 20): Promise<Conversation[]> {
   const collection = await getConversationsCollection();
-  const safeLimit = Number.isFinite(limit)
-    ? Math.max(1, Math.min(Math.floor(limit), 100))
-    : 20;
+  const safeLimit = normalizeLimit(limit);
   const docs = await collection
     .find({ userId })
     .sort({ updatedAt: -1 })

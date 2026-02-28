@@ -53,9 +53,14 @@ export function HistorySidebar({ currentId, onSelect, onNew, onDelete, isOpen }:
 
   const handleDelete = useCallback(async (e: React.MouseEvent, threadId: string) => {
     e.stopPropagation();
-    setConversations((prev) => prev.filter((c) => c.threadId !== threadId));
-    onDelete(threadId);
-  }, [onDelete]);
+    const prevConversations = [...conversations];
+    try {
+      await onDelete(threadId);
+      setConversations((prev) => prev.filter((c) => c.threadId !== threadId));
+    } catch {
+      setConversations(prevConversations);
+    }
+  }, [onDelete, conversations]);
 
   if (!isOpen) return null;
 

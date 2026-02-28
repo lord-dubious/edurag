@@ -37,10 +37,11 @@ function isMaskedPlaceholder(value: string | undefined | null): boolean {
 }
 
 function resolveApiKeyValue(value: string | undefined, envValue: string | undefined): string | undefined {
-  if (isMaskedPlaceholder(value)) {
-    return envValue;
+  const trimmedValue = value?.trim();
+  if (!trimmedValue || isMaskedPlaceholder(trimmedValue)) {
+    return envValue?.trim();
   }
-  return value || envValue;
+  return trimmedValue;
 }
 
 type EnvEntry = { type: 'comment'; text: string } | { type: 'kv'; key: string; value: string } | { type: 'blank' };
@@ -49,7 +50,7 @@ async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>)
   const isProduction = process.env.NODE_ENV === 'production';
   const isVercel = process.env.VERCEL === '1';
   const isNetlify = process.env.NETLIFY === 'true';
-  
+
   if (isProduction || isVercel || isNetlify) {
     return { success: false, skipped: true };
   }
@@ -177,13 +178,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     const hasAllEnvVars = hasRequiredEnvVars();
     const resolvedApiKeys = apiKeys
       ? {
-          ...apiKeys,
-          mongodbUri: resolveApiKeyValue(apiKeys.mongodbUri, process.env.MONGODB_URI) || '',
-          chatApiKey: resolveApiKeyValue(apiKeys.chatApiKey, process.env.CHAT_API_KEY) || '',
-          embeddingApiKey: resolveApiKeyValue(apiKeys.embeddingApiKey, process.env.EMBEDDING_API_KEY) || '',
-          tavilyApiKey: resolveApiKeyValue(apiKeys.tavilyApiKey, process.env.TAVILY_API_KEY) || '',
-          adminSecret: resolveApiKeyValue(apiKeys.adminSecret, process.env.ADMIN_SECRET) || '',
-        }
+        ...apiKeys,
+        mongodbUri: resolveApiKeyValue(apiKeys.mongodbUri, process.env.MONGODB_URI) || '',
+        chatApiKey: resolveApiKeyValue(apiKeys.chatApiKey, process.env.CHAT_API_KEY) || '',
+        embeddingApiKey: resolveApiKeyValue(apiKeys.embeddingApiKey, process.env.EMBEDDING_API_KEY) || '',
+        tavilyApiKey: resolveApiKeyValue(apiKeys.tavilyApiKey, process.env.TAVILY_API_KEY) || '',
+        adminSecret: resolveApiKeyValue(apiKeys.adminSecret, process.env.ADMIN_SECRET) || '',
+      }
       : undefined;
 
     if (!hasAllEnvVars) {
@@ -205,8 +206,9 @@ export async function POST(request: NextRequest): Promise<Response> {
       if (!resolvedApiKeys?.embeddingModel) {
         return errorResponse('VALIDATION_ERROR', 'Embedding model is required', 400);
       }
-      if (!resolvedApiKeys?.embeddingDimensions) {
-        return errorResponse('VALIDATION_ERROR', 'Embedding dimensions is required', 400);
+      const dim = Number(resolvedApiKeys?.embeddingDimensions);
+      if (!Number.isInteger(dim) || dim <= 0) {
+        return errorResponse('VALIDATION_ERROR', 'Embedding dimensions must be a positive integer', 400);
       }
     }
 
@@ -232,6 +234,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       const writeResult = await writeEnvFile(resolvedApiKeys, settings);
       if (!writeResult.success && !writeResult.skipped) {
         console.error('Failed to write .env.local:', writeResult.error);
+        return errorResponse('INTERNAL_ERROR', 'Failed to save environment variables', 500);
       }
     }
 

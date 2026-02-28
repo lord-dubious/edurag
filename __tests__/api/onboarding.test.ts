@@ -4,7 +4,6 @@ import { NextRequest } from 'next/server';
 vi.mock('@/lib/db/settings', () => ({
   updateSettings: vi.fn(),
   getSettings: vi.fn(),
-  isOnboarded: vi.fn(),
 }));
 
 vi.mock('@/lib/providers', () => ({

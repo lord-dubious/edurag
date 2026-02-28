@@ -16,7 +16,11 @@ interface SignInFormProps {
 
 export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
   const params = useSearchParams();
-  const callbackUrl = params.get('callbackUrl') || '/';
+  const rawCallbackUrl = params.get('callbackUrl');
+  let callbackUrl = rawCallbackUrl || '/';
+  if (!callbackUrl.startsWith('/') || callbackUrl.startsWith('//') || callbackUrl.includes('://')) {
+    callbackUrl = '/';
+  }
   const defaultTab = params.get('tab') === 'register' ? 'register' : 'signin';
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -30,20 +34,25 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-    const result = await signIn('credentials', {
-      email: loginEmail,
-      password: loginPassword,
-      callbackUrl,
-      redirect: false,
-    });
-    setIsLoading(false);
+    try {
+      const result = await signIn('credentials', {
+        email: loginEmail,
+        password: loginPassword,
+        callbackUrl,
+        redirect: false,
+      });
 
-    if (!result?.ok) {
-      setError('Invalid email or password.');
-      return;
+      if (!result?.ok) {
+        setError('Invalid email or password.');
+        return;
+      }
+
+      window.location.href = result.url || callbackUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during sign in.');
+    } finally {
+      setIsLoading(false);
     }
-
-    window.location.href = result.url || callbackUrl;
   }, [callbackUrl, loginEmail, loginPassword]);
 
 
@@ -73,42 +82,45 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
     setError(null);
     setIsLoading(true);
 
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        name: registerName,
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: registerName,
+          email: registerEmail,
+          password: registerPassword,
+        }),
+      });
+
+      if (!res.ok) {
+        try {
+          const errorData = await res.json();
+          setError(errorData.error || 'Unable to create account. Please try another email.');
+        } catch {
+          setError('Unable to create account. Please try another email.');
+        }
+        return;
+      }
+
+      const loginResult = await signIn('credentials', {
         email: registerEmail,
         password: registerPassword,
-      }),
-    });
+        callbackUrl,
+        redirect: false,
+      });
 
-    if (!res.ok) {
-      setIsLoading(false);
-      try {
-        const errorData = await res.json();
-        setError(errorData.error || 'Unable to create account. Please try another email.');
-      } catch {
-        setError('Unable to create account. Please try another email.');
+      if (!loginResult?.ok) {
+        setError('Account created, but sign-in failed. Please sign in manually.');
+        return;
       }
-      return;
+
+      window.location.href = loginResult.url || callbackUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred during registration.');
+    } finally {
+      setIsLoading(false);
     }
-
-    const loginResult = await signIn('credentials', {
-      email: registerEmail,
-      password: registerPassword,
-      callbackUrl,
-      redirect: false,
-    });
-
-    setIsLoading(false);
-
-    if (!loginResult?.ok) {
-      setError('Account created, but sign-in failed. Please sign in manually.');
-      return;
-    }
-
-    window.location.href = loginResult.url || callbackUrl;
   }, [callbackUrl, registerEmail, registerName, registerPassword]);
 
   return (

@@ -11,7 +11,8 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const rawLimit = searchParams.get('limit');
-  const requestedLimit = rawLimit ? Number(rawLimit) : 20;
+  const parsedLimit = rawLimit ? Number(rawLimit) : NaN;
+  const requestedLimit = Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : 20;
 
   const conversations = await getUserConversations(session.user.id, requestedLimit);
   return NextResponse.json(conversations);

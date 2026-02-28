@@ -20,7 +20,10 @@ export async function DELETE(req: Request) {
     return errorResponse('VALIDATION_ERROR', 'Invalid request body', 400, err);
   }
 
-  await clearHistory(body.threadId, session.user.id);
-
-  return Response.json({ success: true });
+  try {
+    await clearHistory(body.threadId, session.user.id);
+    return Response.json({ success: true });
+  } catch (err) {
+    return errorResponse('DB_ERROR', 'Failed to clear thread history', 500, err);
+  }
 }

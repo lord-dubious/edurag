@@ -1,6 +1,6 @@
+import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { deleteConversation, getConversation } from "@/lib/conversation";
-import { NextResponse } from "next/server";
 
 export async function GET(req: Request, { params }: { params: Promise<{ threadId: string }> }) {
   const session = await auth();

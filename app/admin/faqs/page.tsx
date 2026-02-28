@@ -47,17 +47,17 @@ export default function FAQsPage() {
     try {
       const body: { answer?: string } = {};
       if (editedAnswer) body.answer = editedAnswer;
-      
+
       const res = await fetch(`/api/faqs/${id}/approve`, {
         method: 'POST',
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        setFaqs(faqs.map(f => f._id === id ? { ...f, public: true, pendingApproval: false, answer: editedAnswer || f.answer } : f));
+        setFaqs(prev => prev.map(f => f._id === id ? { ...f, public: true, pendingApproval: false, answer: editedAnswer || f.answer } : f));
       }
     } catch (err) {
       console.error('Failed to approve FAQ:', err);
@@ -71,7 +71,7 @@ export default function FAQsPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        setFaqs(faqs.filter(f => f._id !== id));
+        setFaqs(prev => prev.filter(f => f._id !== id));
       }
     } catch (err) {
       console.error('Failed to reject FAQ:', err);
@@ -81,12 +81,12 @@ export default function FAQsPage() {
   const pendingFaqs = faqs.filter(f => f.pendingApproval);
   const approvedFaqs = faqs.filter(f => !f.pendingApproval && f.public);
 
-  const filteredPending = pendingFaqs.filter(f => 
+  const filteredPending = pendingFaqs.filter(f =>
     f.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
     f.answer.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredApproved = approvedFaqs.filter(f => 
+  const filteredApproved = approvedFaqs.filter(f =>
     f.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
     f.answer.toLowerCase().includes(searchQuery.toLowerCase())
   );
