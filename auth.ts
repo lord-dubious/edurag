@@ -77,7 +77,7 @@ if (env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET && env.MICROSOFT_TENA
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: MongoDBAdapter(clientPromise),
+  adapter: MongoDBAdapter(clientPromise, { databaseName: env.DB_NAME }),
   providers,
   pages: {
     signIn: '/auth/signin',

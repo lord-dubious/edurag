@@ -46,12 +46,12 @@ export async function getHistory(threadId: string, userId?: string): Promise<Mes
 export async function appendMessage(threadId: string, message: Message, userId?: string): Promise<void> {
   const collection = await getConversationsCollection();
   const existing = await collection.findOne({ threadId });
-  
+
   if (existing) {
     // Security check: If thread belongs to another user, prevent write.
     if (existing.userId && userId && existing.userId !== userId) {
-        console.error(`[appendMessage] Unauthorized write attempt to thread ${threadId} by user ${userId}`);
-        throw new Error('Unauthorized: Cannot write to another user\'s thread');
+      console.error(`[appendMessage] Unauthorized write attempt to thread ${threadId} by user ${userId}`);
+      throw new Error('Unauthorized: Cannot write to another user\'s thread');
     }
 
     const update: UpdateFilter<ConversationDocument> = !existing.userId && userId
@@ -83,7 +83,7 @@ export async function clearHistory(threadId: string, userId?: string): Promise<v
   const collection = await getConversationsCollection();
   const query: Filter<ConversationDocument> = { threadId };
   if (userId) {
-     query.userId = userId;
+    query.userId = userId;
   }
   await collection.deleteOne(query);
 }
@@ -115,11 +115,17 @@ export async function getUserConversations(userId: string, limit = 20): Promise<
 }
 
 export async function getConversation(threadId: string, userId?: string): Promise<Conversation | null> {
-    const collection = await getConversationsCollection();
-    const query: Filter<ConversationDocument> = { threadId };
-    if (userId) {
-        query.$or = [{ userId }, { userId: { $exists: false } }, { userId: null }];
-    }
-    const doc = await collection.findOne(query);
-    return doc as Conversation | null;
+  const collection = await getConversationsCollection();
+  const query: Filter<ConversationDocument> = { threadId };
+  if (userId) {
+    query.$or = [{ userId }, { userId: { $exists: false } }, { userId: null }];
+  }
+  const doc = await collection.findOne(query);
+  return doc as Conversation | null;
+}
+
+export async function deleteConversation(threadId: string, userId: string): Promise<boolean> {
+  const collection = await getConversationsCollection();
+  const result = await collection.deleteOne({ threadId, userId });
+  return result.deletedCount > 0;
 }

@@ -85,7 +85,12 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
 
     if (!res.ok) {
       setIsLoading(false);
-      setError('Unable to create account. Please try another email.');
+      try {
+        const errorData = await res.json();
+        setError(errorData.error || 'Unable to create account. Please try another email.');
+      } catch {
+        setError('Unable to create account. Please try another email.');
+      }
       return;
     }
 
