@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSettings, type OnboardingSettings } from '@/lib/db/settings';
+import { getSettings } from '@/lib/db/settings';
 
 interface PublicSettings {
   appName: string;

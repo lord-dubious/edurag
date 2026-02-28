@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { appendMessage, getHistory, getUserConversations, getConversation } from '@/lib/conversation';
-import { getConversationsCollection } from '@/lib/conversation';
+// Integration test: requires a real MongoDB instance.
 import { nanoid } from 'nanoid';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { appendMessage, getConversation, getConversationsCollection, getHistory, getUserConversations } from '@/lib/conversation';
 
 describe('Chat History with User', () => {
   beforeEach(async () => {

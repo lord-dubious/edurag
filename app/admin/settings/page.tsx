@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Save } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { LogoUpload } from '@/components/admin/LogoUpload';
 
 async function saveSettings(formData: FormData) {
@@ -18,7 +17,6 @@ async function saveSettings(formData: FormData) {
   const emoji = formData.get('emoji') as string;
   const iconType = formData.get('iconType') as 'logo' | 'emoji' | 'upload';
 
-  const chatModel = formData.get('chatModel') as string;
   const chatMaxTokens = parseInt(formData.get('chatMaxTokens') as string) || 32000;
   const chatMaxSteps = Math.min(20, Math.max(1, parseInt(formData.get('chatMaxSteps') as string) || 5));
 

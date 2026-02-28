@@ -111,6 +111,19 @@ import dynamic from 'next/dynamic';
 
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 
+
+function isMaskedPlaceholder(value: string): boolean {
+  return /^\*+$/.test(value.trim());
+}
+
+function mergeApiKeys(prev: ApiKeys, next: Partial<ApiKeys>): ApiKeys {
+  const merged = { ...prev, ...next };
+  if (next.adminSecret && isMaskedPlaceholder(next.adminSecret)) {
+    merged.adminSecret = prev.adminSecret;
+  }
+  return merged;
+}
+
 interface PasswordInputProps {
   id: string;
   placeholder?: string;
@@ -192,8 +205,6 @@ export default function SetupPage() {
     uploadthingAppId: '',
     adminSecret: '',
   });
-  const [envPreview, setEnvPreview] = useState<string>('');
-  const [isVercel, setIsVercel] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [crawlLogs, setCrawlLogs] = useState<CrawlLogEntry[]>([]);
 
@@ -204,8 +215,8 @@ export default function SetupPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.apiKeys) {
-            const { adminSecret, ...safeKeys } = data.apiKeys;
-            setApiKeys(prev => ({ ...prev, ...safeKeys }));
+            const safeKeys = data.apiKeys as Partial<ApiKeys>;
+            setApiKeys(prev => mergeApiKeys(prev, safeKeys));
           }
           if (data.uniUrl) setUniversityUrl(data.uniUrl);
           if (data.appName || data.brandPrimary || data.emoji || data.logoUrl) {
@@ -358,14 +369,15 @@ export default function SetupPage() {
         }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to complete onboarding');
+        throw new Error(data?.message || 'Failed to complete onboarding');
       }
 
-      const data = await res.json();
-      setEnvPreview(data.envPreview || '');
-      setIsVercel(data.isVercel || false);
+      if (!data?.success) {
+        throw new Error('Invalid onboarding response from server');
+      }
 
       toast.success('Onboarding complete!');
       router.push('/');
@@ -682,7 +694,7 @@ ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}
                                   uploadedFileName: data.fileName,
                                 }));
                                 toast.success('Logo uploaded successfully');
-                              } catch (err) {
+                              } catch {
                                 toast.error('Failed to upload logo');
                               } finally {
                                 setUploadingLogo(false);
