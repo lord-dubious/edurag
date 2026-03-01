@@ -19,9 +19,10 @@ interface HistorySidebarProps {
   onNew: () => void;
   onDelete: (threadId: string) => void;
   isOpen: boolean;
+  refreshKey?: number;
 }
 
-export function HistorySidebar({ currentId, onSelect, onNew, onDelete, isOpen }: HistorySidebarProps) {
+export function HistorySidebar({ currentId, onSelect, onNew, onDelete, isOpen, refreshKey }: HistorySidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -50,7 +51,7 @@ export function HistorySidebar({ currentId, onSelect, onNew, onDelete, isOpen }:
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, refreshKey]);
 
   const handleDelete = useCallback(async (e: React.MouseEvent, threadId: string) => {
     e.stopPropagation();

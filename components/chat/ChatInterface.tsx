@@ -57,6 +57,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   const { data: session } = useSession();
   const [threadId, setThreadId] = useState(() => nanoid());
   const [showHistory, setShowHistory] = useState(true);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const [sources, setSources] = useState<Record<string, Source[]>>({});
   const [showSources, setShowSources] = useState(true);
@@ -142,6 +143,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     setThreadId(nanoid());
     setMessages([]);
     setSources({});
+    setHistoryRefreshKey(k => k + 1);
     if (window.innerWidth < 768) {
       setShowHistory(false);
     }
@@ -155,6 +157,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
       console.error("Failed to delete conversation", e);
       throw e;
     }
+    setHistoryRefreshKey(k => k + 1);
     if (deleteThreadId === threadId) {
       handleNewChat();
     }
@@ -239,6 +242,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
             onNew={handleNewChat}
             onDelete={handleDeleteConversation}
             isOpen={true}
+            refreshKey={historyRefreshKey}
           />
         </div>
       )}
@@ -256,6 +260,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
                 onNew={handleNewChat}
                 onDelete={handleDeleteConversation}
                 isOpen={true}
+                refreshKey={historyRefreshKey}
               />
             </div>
           </div>
