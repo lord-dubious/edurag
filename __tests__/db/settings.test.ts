@@ -139,9 +139,9 @@ describe('settings', () => {
         },
       });
 
-      expect(result).toContain('NEXT_PUBLIC_UNI_URL=https://test.edu');
+      expect(result).toContain('UNIVERSITY_URL=https://test.edu');
       expect(result).toContain('BRAND_PRIMARY=#0066cc');
-      expect(result).toContain('NEXT_PUBLIC_APP_NAME=Test University');
+      expect(result).toContain('APP_NAME=Test University');
       expect(result).toContain('CRAWL_MAX_DEPTH=3');
       expect(result).toContain('CRAWL_LIMIT=100');
       expect(result).toContain('CRAWL_EXCLUDE_PATHS=/admin/*,/login/*');

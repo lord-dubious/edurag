@@ -12,7 +12,9 @@ export async function runAgent({
   extraTools = {},
   maxSteps,
   maxTokens,
+  onFinish,
 }: AgentOptions) {
+  void threadId;
   const steps = maxSteps ?? env.CHAT_MAX_STEPS;
   const tokens = maxTokens ?? env.CHAT_MAX_TOKENS;
   const system = AGENT_SYSTEM_PROMPT
@@ -35,5 +37,6 @@ export async function runAgent({
     },
     stopWhen: stepCountIs(steps),
     experimental_telemetry: { isEnabled: false },
+    onFinish,
   });
 }

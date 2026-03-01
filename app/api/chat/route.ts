@@ -5,6 +5,8 @@ import { trackAndMaybeGenerateFaq } from '@/lib/faq-manager';
 import { getSettings } from '@/lib/db/settings';
 import { errorResponse } from '@/lib/errors';
 import { nanoid } from 'nanoid';
+import { auth } from '@/auth';
+import { appendMessage } from '@/lib/conversation';
 
 const bodySchema = z.object({
   messages: z.array(z.object({
@@ -48,7 +50,11 @@ export async function POST(req: Request) {
     return errorResponse('VALIDATION_ERROR', 'Invalid request body', 400, err);
   }
 
+  const session = await auth();
+  const userId = session?.user?.id;
+
   const { messages, threadId } = body;
+  const currentThreadId = threadId ?? nanoid();
   const lastMessage = messages.at(-1);
 
   if (!lastMessage || lastMessage.role !== 'user') {
@@ -63,6 +69,14 @@ export async function POST(req: Request) {
   trackAndMaybeGenerateFaq(userText).catch(err =>
     console.error('[FAQ] tracking failed:', err),
   );
+
+  if (userId) {
+    await appendMessage(currentThreadId, {
+      role: 'user',
+      content: userText,
+      timestamp: new Date(),
+    }, userId);
+  }
 
   try {
     const uiMessages: UIMessage[] = messages.map((m): UIMessage => ({
@@ -88,10 +102,19 @@ export async function POST(req: Request) {
 
     const result = runAgent({
       messages: uiMessages,
-      threadId: threadId ?? nanoid(),
+      threadId: currentThreadId,
       universityName,
       maxSteps,
       maxTokens,
+      onFinish: async ({ text }) => {
+        if (userId && text) {
+          await appendMessage(currentThreadId, {
+            role: 'assistant',
+            content: text,
+            timestamp: new Date(),
+          }, userId);
+        }
+      }
     });
 
     return (await result).toUIMessageStreamResponse();

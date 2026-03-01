@@ -13,7 +13,6 @@ import {
   Moon,
   Sun,
   Settings,
-  Image as ImageIcon,
   BookOpen,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';

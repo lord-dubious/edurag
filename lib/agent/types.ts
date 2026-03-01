@@ -7,6 +7,8 @@ export interface AgentOptions {
   extraTools?: Record<string, unknown>;
   maxSteps?: number;
   maxTokens?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onFinish?: (result: any) => Promise<void> | void;
 }
 
 export interface Source {
