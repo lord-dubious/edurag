@@ -15,7 +15,7 @@ import { useBrand } from '@/components/providers/BrandProvider';
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { HistorySidebar } from "@/components/chat/HistorySidebar";
-import type { Source } from '@/lib/agent/types';
+import type { Source } from '@edurag/agent/text';
 
 interface VectorSearchResult {
   url: string;

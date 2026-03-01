@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-EduRAG is a self-hostable RAG knowledge base for universities built with Next.js 16, Vercel AI SDK 6, MongoDB Atlas Vector Search, and Tavily. Students chat with an AI that retrieves from crawled university content, with an admin dashboard for domain management and FAQ approval.
+EduRAG is a self-hostable RAG knowledge base for universities built with Next.js 16, Vercel AI SDK 6, MongoDB Atlas Vector Search, and Tavily. 
+
+The core agent logic (text and voice) is encapsulated in a standalone workspace package `@edurag/agent`. The main application acts as a "Thin Wiring Layer," injecting concrete implementations (database, models, search functions) into the agent's orchestration logic.
 
 ---
 
@@ -55,16 +57,20 @@ import { z } from 'zod';
 import { streamText } from 'ai';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 
-// 4. Internal lib imports (use @/ alias for lib/)
-import { getChatModel, getEmbeddings } from '@/lib/providers';
-import { AGENT_SYSTEM_PROMPT } from '@/lib/agent/prompts';
+// 4. Standalone Agent Package (core logic)
+import { runAgent } from '@edurag/agent/text';
+import { AGENT_SYSTEM_PROMPT } from '@edurag/agent/text/prompts';
 
-// 5. Internal components (use @/ alias)
+// 5. Internal lib imports/wiring (use @/ alias for lib/)
+import { getChatModel, getEmbeddings } from '@/lib/providers';
+import { runAgent as localAgent } from '@/lib/agent';
+
+// 6. Internal components (use @/ alias)
 import { Button } from '@/components/ui/button';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 
-// 6. Types (use `type` keyword for type-only imports)
-import type { UIMessage, ToolResult } from '@/lib/agent/types';
+// 7. Types (use `type` keyword for type-only imports)
+import type { UIMessage, ToolResult, Source } from '@edurag/agent/text';
 ```
 
 ### TypeScript Types
@@ -217,9 +223,9 @@ const embeddings = getEmbeddings();
 
 ### System Prompts
 
-Located in `lib/agent/prompts.ts`. Key instruction: "After using tools, ALWAYS generate a text response." 
+Located in `@edurag/agent/text/prompts`. Key instruction: "After using tools, ALWAYS generate a text response." 
 
-For the Voice Agent, the prompt is in `lib/voice/useDeepgramVoice.ts` via `getSystemPrompt()`.
+For the Voice Agent, pure logic (prompt templates) is in `@edurag/agent/voice`, while app-specific rendering and Deepgram integration are in `lib/voice`.
 
 ---
 

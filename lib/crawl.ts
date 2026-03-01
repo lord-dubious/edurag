@@ -5,7 +5,7 @@ import { Document } from '@langchain/core/documents';
 import { env } from './env';
 import { getEmbeddings } from './providers';
 import { getMongoCollection } from './vectorstore';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from './agent/prompts';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 
 interface CrawlOptions {
   url: string;
