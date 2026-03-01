@@ -85,7 +85,9 @@ export async function updateConversationTitle(threadId: string, title: string, u
   const collection = await getConversationsCollection();
   const query: Filter<ConversationDocument> = { threadId };
   if (userId) {
-    query.userId = userId;
+    query.$or = [{ userId }, { userId: null }, { userId: { $exists: false } }];
+  } else {
+    query.$or = [{ userId: null }, { userId: { $exists: false } }];
   }
 
   const result = await collection.updateOne(

@@ -72,17 +72,25 @@ export async function POST(req: Request) {
   );
 
   if (userId) {
-    const existing = await getConversation(currentThreadId, userId);
+    try {
+      const existing = await getConversation(currentThreadId, userId);
 
-    await appendMessage(currentThreadId, {
-      role: 'user',
-      content: userText,
-      timestamp: new Date(),
-    }, userId);
+      await appendMessage(currentThreadId, {
+        role: 'user',
+        content: userText,
+        timestamp: new Date(),
+      }, userId);
 
-    // Trigger title generation only when the conversation has no title yet
-    if (!existing?.title) {
-      void generateAndSaveTitle(currentThreadId, userText, userId);
+      // Trigger title generation only when the conversation has no title yet
+      if (!existing?.title) {
+        try {
+          void generateAndSaveTitle(currentThreadId, userText, userId);
+        } catch (titleErr) {
+          console.error('[Title] Failed to generate title:', titleErr);
+        }
+      }
+    } catch (dbErr) {
+      console.error('[DB] Failed to persist user message or check title:', dbErr);
     }
   }
 

@@ -4,10 +4,10 @@ import { updateConversationTitle } from './conversation';
 
 const TITLE_MODEL = 'llama3.1-8b';
 
-export async function generateAndSaveTitle(threadId: string, userMessage: string, userId?: string) {
+export async function generateAndSaveTitle(threadId: string, userMessage: string, userId?: string): Promise<void> {
     try {
         // Quick bypass for Voice Handoff messages to instantly get the perfect title via regex
-        const handoffMatch = userMessage.match(/^\[VOICE_HANDOFF\] The user asked about "(.*?)" via voice/i);
+        const handoffMatch = userMessage.match(/^\[VOICE_HANDOFF\] I am providing the detailed Markdown notes and source links for (.*?) now as requested in our conversation\./i);
         if (handoffMatch && handoffMatch[1]) {
             await updateConversationTitle(threadId, handoffMatch[1].trim(), userId);
             return;
@@ -22,7 +22,13 @@ Do not include quotation marks, boilerplate, or trailing punctuation. Just the t
         });
 
         if (text) {
-            const cleanTitle = text.trim().replace(/^["']|["']$/g, '');
+            let cleanTitle = text.trim().replace(/^["']|["']$/g, '');
+            // Collapse whitespace
+            cleanTitle = cleanTitle.replace(/\s+/g, ' ');
+            // Truncate to Max Length
+            if (cleanTitle.length > 100) {
+                cleanTitle = cleanTitle.substring(0, 97) + '...';
+            }
             await updateConversationTitle(threadId, cleanTitle, userId);
         }
     } catch (err) {

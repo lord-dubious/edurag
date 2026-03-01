@@ -3,8 +3,10 @@ import { auth } from "@/auth";
 import { deleteConversation, getConversation, appendMessage } from "@/lib/conversation";
 import { z } from 'zod';
 
+import { errorResponse } from '@/lib/errors';
+
 const messageSchema = z.object({
-  role: z.enum(['user', 'assistant', 'system']),
+  role: z.literal('user'),
   content: z.string(),
 });
 
@@ -24,27 +26,39 @@ export async function GET(req: Request, { params }: { params: Promise<{ threadId
 export async function POST(req: Request, { params }: { params: Promise<{ threadId: string }> }) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return errorResponse('VALIDATION_ERROR', 'Invalid JSON', 400);
   }
 
   const parsed = messageSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid message" }, { status: 400 });
+    return errorResponse('VALIDATION_ERROR', 'Invalid message', 400);
   }
 
   const { threadId } = await params;
-  await appendMessage(threadId, {
-    role: parsed.data.role,
-    content: parsed.data.content,
-    timestamp: new Date(),
-  }, session.user.id);
+  try {
+    await appendMessage(threadId, {
+      role: parsed.data.role,
+      content: parsed.data.content,
+      timestamp: new Date(),
+    }, session.user.id);
+  } catch (err) {
+    console.error('[History POST] Error appending message:', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.toLowerCase().includes('authorized') || msg.toLowerCase().includes('forbidden')) {
+      return errorResponse('FORBIDDEN', 'Forbidden', 403);
+    }
+    if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('missing')) {
+      return errorResponse('NOT_FOUND', 'Not Found', 404);
+    }
+    return errorResponse('INTERNAL_ERROR', 'Internal Server Error', 500);
+  }
 
   return NextResponse.json({ success: true });
 }

@@ -180,6 +180,10 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     [sendMessage]
   );
 
+  const formatVoiceHandoffPrompt = useCallback((topic: string) => {
+    return `[VOICE_HANDOFF] I am providing the detailed Markdown notes and source links for ${topic} now as requested in our conversation.`;
+  }, []);
+
   const handleVoiceMessage = useCallback((msg: VoiceMessagePayload) => {
     if (msg.role === 'user') {
       const id = nanoid();
@@ -190,15 +194,16 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
         createdAt: new Date(),
         parts: [{ type: 'text', text: msg.content }],
       }]);
-      // Persist voice user messages to history (they bypass the chat API)
-      fetch(`/api/history/${threadId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'user', content: msg.content }),
-      }).catch(err => console.error('[Voice] Failed to persist user message:', err));
+
+      if (session?.user) {
+        fetch(`/api/history/${threadId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'user', content: msg.content }),
+        }).catch(err => console.error('[Voice] Failed to persist user message:', err));
+      }
     }
-    // Assistant messages come from the text agent via handleShowNotes, not from voice directly
-  }, [setMessages, threadId]);
+  }, [setMessages, threadId, session?.user]);
 
   const pendingNotesRef = useRef<string | null>(null);
 
@@ -207,16 +212,16 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
       pendingNotesRef.current = topic;
       return;
     }
-    sendMessage({ text: `[VOICE_HANDOFF] The user asked about "${topic}" via voice. Search the knowledge base and provide a comprehensive, detailed answer with proper source citations and links.` });
-  }, [status, sendMessage]);
+    sendMessage({ text: formatVoiceHandoffPrompt(topic) });
+  }, [status, sendMessage, formatVoiceHandoffPrompt]);
 
   useEffect(() => {
     if (status === 'ready' && pendingNotesRef.current) {
       const topic = pendingNotesRef.current;
       pendingNotesRef.current = null;
-      sendMessage({ text: `[VOICE_HANDOFF] The user asked about "${topic}" via voice. Search the knowledge base and provide a comprehensive, detailed answer with proper source citations and links.` });
+      sendMessage({ text: formatVoiceHandoffPrompt(topic) });
     }
-  }, [status, sendMessage]);
+  }, [status, sendMessage, formatVoiceHandoffPrompt]);
 
   const handleSuggestionClick = useCallback(
     (query: string) => {
