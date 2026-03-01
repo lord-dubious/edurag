@@ -1,3 +1,5 @@
+import type { VoiceMessage } from './types';
+
 export function stripMarkdownForVoice(text: string): string {
     return text
         .replace(/```[\s\S]*?```/g, ' ')
@@ -53,15 +55,4 @@ SPEECH RULES:
 
 export type AgentState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking';
 
-export interface VoiceSource {
-    url: string;
-    title?: string;
-    content: string;
-}
-
-export interface VoiceMessage {
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: number;
-    sources?: VoiceSource[];
-}
+export type { VoiceMessage };

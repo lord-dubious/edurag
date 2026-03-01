@@ -29,7 +29,7 @@ export async function runAgent(
     const steps = maxSteps ?? deps.maxSteps;
     const tokens = maxTokens ?? deps.maxTokens;
     const system = AGENT_SYSTEM_PROMPT
-        .replace('{UNIVERSITY_NAME}', universityName)
+        .replaceAll('{UNIVERSITY_NAME}', universityName)
         .replace('{CURRENT_DATE}', new Date().toLocaleDateString('en-US', {
             year: 'numeric', month: 'long', day: 'numeric',
         }));
@@ -52,6 +52,6 @@ export async function runAgent(
     });
 }
 
-export { createVectorSearchTool, createPopularFaqsTool } from './tools';
+export { createVectorSearchTool, createPopularFaqsTool, cleanForDisplay } from './tools';
 export type { SimilaritySearchFn, GetPublicFaqsFn } from './tools';
 export type { AgentOptions, Source, ChatMessage, VectorSearchResult, ToolResult } from './types';

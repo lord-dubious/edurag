@@ -18,7 +18,7 @@ export async function runAgent({
   const steps = maxSteps ?? env.CHAT_MAX_STEPS;
   const tokens = maxTokens ?? env.CHAT_MAX_TOKENS;
   const system = AGENT_SYSTEM_PROMPT
-    .replace('{UNIVERSITY_NAME}', universityName)
+    .replaceAll('{UNIVERSITY_NAME}', universityName)
     .replace('{CURRENT_DATE}', new Date().toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric',
     }));
@@ -32,7 +32,7 @@ export async function runAgent({
     maxOutputTokens: tokens,
     tools: {
       vector_search: createVectorSearchTool(),
-      get_popular_faqs: getPopularFaqsTool,
+      get_popular_faqs: getPopularFaqsTool(),
       ...extraTools,
     },
     stopWhen: stepCountIs(steps),

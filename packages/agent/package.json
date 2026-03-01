@@ -12,5 +12,8 @@
         "./voice": "./src/voice/index.ts",
         "./voice/*": "./src/voice/*.ts"
     },
-    "dependencies": {}
+    "peerDependencies": {
+        "ai": ">=6.0.0",
+        "zod": ">=4.0.0"
+    }
 }

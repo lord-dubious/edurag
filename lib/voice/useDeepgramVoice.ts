@@ -7,21 +7,10 @@ import {
 import type { UIMessage } from '@ai-sdk/react';
 import { env } from '@/lib/env';
 import { stripMarkdownForVoice, getSystemPrompt } from '@edurag/agent/voice';
+import type { AgentState } from '@edurag/agent/voice';
+import type { Source } from '@edurag/agent/text';
 
-export type AgentState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking';
-
-export interface Source {
-  url: string;
-  title?: string;
-  content: string;
-}
-
-export interface VoiceMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-  sources?: Source[];
-}
+export type { AgentState, Source };
 
 export interface UseDeepgramVoiceOptions {
   apiKey: string | null;
