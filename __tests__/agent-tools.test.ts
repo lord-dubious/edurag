@@ -1,13 +1,15 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { generateText } from 'ai';
-import { stepCountIs } from 'ai';
 import { MongoClient } from 'mongodb';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+
+import { generateText, stepCountIs } from 'ai';
 import { Document } from '@langchain/core/documents';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
-import { getMongoCollection, closeMongoClient, similaritySearchWithScore } from '../lib/vectorstore';
-import { getChatModel, getEmbeddings } from '../lib/providers';
-import { createVectorSearchTool } from '../lib/agent/tools';
+
+import { createVectorSearchTool } from '@edurag/agent/text';
+
 import { env } from '../lib/env';
+import { getChatModel, getEmbeddings } from '../lib/providers';
+import { getMongoCollection, closeMongoClient, similaritySearchWithScore } from '../lib/vectorstore';
 
 const TEST_THREAD_ID = 'test-agent-thread-' + Date.now();
 
@@ -17,10 +19,10 @@ describe('Agent Tools', () => {
   beforeAll(async () => {
     client = new MongoClient(env.MONGODB_URI!);
     await client.connect();
-    
+
     const collection = await getMongoCollection(env.VECTOR_COLLECTION!);
     const embeddingsInstance = getEmbeddings();
-    
+
     const docs = [
       new Document({
         pageContent: 'The MBA program requires a bachelor\'s degree, GMAT score of 600+, and 2 years of work experience.',
@@ -38,7 +40,7 @@ describe('Agent Tools', () => {
       textKey: 'text',
       embeddingKey: 'embedding',
     });
-    
+
     console.log('Waiting 20s for Atlas Vector Search index refresh...');
     await new Promise(r => setTimeout(r, 20000));
     console.log('Index refresh wait complete');
@@ -68,7 +70,7 @@ describe('Agent Tools', () => {
 
   describe('Agent with Tools', () => {
     it('should use vector_search tool to answer question', async () => {
-      const vectorSearchTool = createVectorSearchTool();
+      const vectorSearchTool = createVectorSearchTool(similaritySearchWithScore);
 
       const result = await generateText({
         model: getChatModel(),
@@ -81,7 +83,7 @@ describe('Agent Tools', () => {
 
       console.log('Agent response:', result.text);
       console.log(`Steps completed: ${result.steps.length}`);
-      
+
       const toolCalls = result.steps.flatMap(s => s.toolCalls || []);
       console.log(`Tool calls made: ${toolCalls.length}`);
 
@@ -89,7 +91,7 @@ describe('Agent Tools', () => {
     }, 60000);
 
     it('should cite sources when using vector_search', async () => {
-      const vectorSearchTool = createVectorSearchTool();
+      const vectorSearchTool = createVectorSearchTool(similaritySearchWithScore);
 
       const result = await generateText({
         model: getChatModel(),
@@ -101,7 +103,7 @@ describe('Agent Tools', () => {
       });
 
       console.log('Response:', result.text);
-      
+
       const toolResults = result.steps.flatMap(s => s.toolResults || []);
       if (toolResults.length > 0) {
         console.log('Tool results:', JSON.stringify(toolResults, null, 2));
@@ -109,3 +111,4 @@ describe('Agent Tools', () => {
     }, 60000);
   });
 });
+

@@ -1,4 +1,4 @@
-import { AGENT_SYSTEM_PROMPT } from '@/lib/agent/prompts';
+import { AGENT_SYSTEM_PROMPT } from '@edurag/agent/text/prompts';
 import { env } from '@/lib/env';
 
 export function getVoiceAgentInstructions(): string {

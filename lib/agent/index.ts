@@ -1,42 +1,22 @@
-import { streamText, convertToModelMessages, stepCountIs } from 'ai';
+import { runAgent as _runAgent } from '@edurag/agent/text';
 import { chatModel } from '../providers';
-import { AGENT_SYSTEM_PROMPT } from './prompts';
-import { createVectorSearchTool, getPopularFaqsTool } from './tools';
+import { similaritySearchWithScore } from '../vectorstore';
+import { getPublicFaqs } from '../faq-manager';
 import { env } from '../env';
-import type { AgentOptions } from './types';
+import type { AgentOptions } from '@edurag/agent/text';
 
-export async function runAgent({
-  messages,
-  threadId,
-  universityName = 'University Knowledge Base',
-  extraTools = {},
-  maxSteps,
-  maxTokens,
-  onFinish,
-}: AgentOptions) {
-  void threadId;
-  const steps = maxSteps ?? env.CHAT_MAX_STEPS;
-  const tokens = maxTokens ?? env.CHAT_MAX_TOKENS;
-  const system = AGENT_SYSTEM_PROMPT
-    .replaceAll('{UNIVERSITY_NAME}', universityName)
-    .replace('{CURRENT_DATE}', new Date().toLocaleDateString('en-US', {
-      year: 'numeric', month: 'long', day: 'numeric',
-    }));
-
-  console.log('[agent] Running agent with', messages.length, 'messages, maxSteps:', steps);
-
-  return streamText({
-    model: chatModel,
-    system,
-    messages: await convertToModelMessages(messages),
-    maxOutputTokens: tokens,
-    tools: {
-      vector_search: createVectorSearchTool(),
-      get_popular_faqs: getPopularFaqsTool(),
-      ...extraTools,
+export async function runAgent(options: AgentOptions) {
+  return _runAgent(
+    {
+      model: chatModel,
+      searchFn: similaritySearchWithScore,
+      getFaqsFn: async (limit: number) => {
+        const faqs = await getPublicFaqs(limit);
+        return faqs.map(f => ({ question: f.question, answer: f.answer || '' }));
+      },
+      maxSteps: env.CHAT_MAX_STEPS,
+      maxTokens: env.CHAT_MAX_TOKENS,
     },
-    stopWhen: stepCountIs(steps),
-    experimental_telemetry: { isEnabled: false },
-    onFinish,
-  });
+    options,
+  );
 }
