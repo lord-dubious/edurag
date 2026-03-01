@@ -12,6 +12,7 @@ export interface ConversationDocument {
   _id?: ObjectId;
   threadId: string;
   userId?: string | null;
+  title?: string;
   messages: Message[];
   createdAt: Date;
   updatedAt: Date;
@@ -21,6 +22,7 @@ export interface Conversation {
   _id: ObjectId;
   threadId: string;
   userId?: string | null;
+  title?: string;
   messages: Message[];
   createdAt: Date;
   updatedAt: Date;
@@ -77,6 +79,23 @@ export async function appendMessage(threadId: string, message: Message, userId?:
       updatedAt: new Date(),
     });
   }
+}
+
+export async function updateConversationTitle(threadId: string, title: string, userId?: string): Promise<boolean> {
+  const collection = await getConversationsCollection();
+  const query: Filter<ConversationDocument> = { threadId };
+  if (userId) {
+    query.userId = userId;
+  }
+
+  const result = await collection.updateOne(
+    query,
+    {
+      $set: { title, updatedAt: new Date() }
+    }
+  );
+
+  return result.modifiedCount > 0;
 }
 
 function normalizeLimit(limit: number): number {

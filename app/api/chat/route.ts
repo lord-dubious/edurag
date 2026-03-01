@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { type UIMessage, type TextUIPart, type ToolUIPart } from 'ai';
 import { runAgent } from '@/lib/agent';
 import { trackAndMaybeGenerateFaq } from '@/lib/faq-manager';
+import { generateAndSaveTitle } from '@/lib/title-generator';
 import { getSettings } from '@/lib/db/settings';
 import { errorResponse } from '@/lib/errors';
 import { nanoid } from 'nanoid';
@@ -76,6 +77,11 @@ export async function POST(req: Request) {
       content: userText,
       timestamp: new Date(),
     }, userId);
+
+    // If this is the first message in the thread, trigger dynamic title generation
+    if (messages.length === 1) {
+      void generateAndSaveTitle(currentThreadId, userText, userId);
+    }
   }
 
   try {

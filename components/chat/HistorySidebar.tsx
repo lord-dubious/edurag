@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 interface Conversation {
   threadId: string;
+  title?: string;
   messages: { role: string; content: string; timestamp: string }[];
   updatedAt: string;
 }
@@ -93,7 +94,7 @@ export function HistorySidebar({ currentId, onSelect, onNew, onDelete, isOpen }:
                 <MessageSquare className="h-4 w-4 mt-0.5 shrink-0 opacity-70" />
                 <div className="flex flex-col items-start overflow-hidden flex-1 min-w-0 pr-7">
                   <span className="line-clamp-2 w-full font-medium whitespace-normal break-words leading-snug">
-                    {conv.messages[0]?.content?.substring(0, 100) || "New Chat"}
+                    {conv.title || conv.messages[0]?.content?.substring(0, 100) || "New Chat"}
                   </span>
                   <span className="text-xs text-muted-foreground mt-1">
                     {new Date(conv.updatedAt).toLocaleDateString()}
