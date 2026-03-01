@@ -1,25 +1,21 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-
-import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import { useSession } from "next-auth/react";
-import { useTheme } from 'next-themes';
-
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-
-import type { Source } from '@edurag/agent/text';
-
+import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { useSession } from "next-auth/react";
+import { ChatMessages } from './ChatMessages';
+import { ChatInput } from './ChatInput';
+import { CitationPanel } from './CitationPanel';
+import { VoiceChat, VoiceMessagePayload } from '@/components/voice/VoiceChat';
+import { useBrand } from '@/components/providers/BrandProvider';
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { HistorySidebar } from "@/components/chat/HistorySidebar";
-import { useBrand } from '@/components/providers/BrandProvider';
-import { VoiceChat, VoiceMessagePayload } from '@/components/voice/VoiceChat';
-import { ChatInput } from './ChatInput';
-import { ChatMessages } from './ChatMessages';
-import { CitationPanel } from './CitationPanel';
+import type { Source } from '@edurag/agent/text';
 
 interface VectorSearchResult {
   url: string;
@@ -177,27 +173,39 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     [sendMessage]
   );
 
+  // Only mirror user messages from voice into the chat.
+  // Assistant responses come exclusively from the text agent via handleShowNotes.
   const handleVoiceMessage = useCallback((msg: VoiceMessagePayload) => {
-    const id = nanoid();
-    setMessages(prev => [...prev, {
-      id,
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content,
-      createdAt: new Date(),
-      parts: [{ type: 'text', text: msg.content }],
-    }]);
-
-    if (msg.sources && msg.sources.length > 0) {
-      setSources(prev => ({
-        ...prev,
-        [id]: msg.sources!
-      }));
+    if (msg.role === 'user') {
+      const id = nanoid();
+      setMessages(prev => [...prev, {
+        id,
+        role: 'user',
+        content: msg.content,
+        createdAt: new Date(),
+        parts: [{ type: 'text', text: msg.content }],
+      }]);
     }
   }, [setMessages]);
 
+  // Queue for voice handoff topics that arrive while the text agent is busy.
+  const pendingNotesRef = useRef<string | null>(null);
+
   const handleShowNotes = useCallback((topic: string) => {
-    if (status !== 'ready') return;
+    if (status !== 'ready') {
+      pendingNotesRef.current = topic;
+      return;
+    }
     sendMessage({ text: `[VOICE_HANDOFF] The user asked about "${topic}" via voice. Search the knowledge base and provide a comprehensive, detailed answer with proper source citations and links.` });
+  }, [status, sendMessage]);
+
+  // Flush queued voice handoff once the text agent becomes ready.
+  useEffect(() => {
+    if (status === 'ready' && pendingNotesRef.current) {
+      const topic = pendingNotesRef.current;
+      pendingNotesRef.current = null;
+      sendMessage({ text: `[VOICE_HANDOFF] The user asked about "${topic}" via voice. Search the knowledge base and provide a comprehensive, detailed answer with proper source citations and links.` });
+    }
   }, [status, sendMessage]);
 
   const handleSuggestionClick = useCallback(
@@ -215,7 +223,6 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar for History */}
       {session?.user && showHistory && (
         <div className="w-80 shrink-0 hidden md:flex flex-col border-r h-full">
           <HistorySidebar

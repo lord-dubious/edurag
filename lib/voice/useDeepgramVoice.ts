@@ -282,7 +282,9 @@ export function useDeepgramVoice({
         if (data.role === 'user') {
           onUserMessage?.(data.content);
         } else if (data.role === 'assistant') {
-          onAgentMessage?.(data.content);
+          // Strip markdown as a safety net — the system prompt prevents it
+          // in most cases but Gemini can still slip through occasionally.
+          onAgentMessage?.(stripMarkdownForVoice(data.content));
         }
         break;
 
@@ -468,7 +470,6 @@ export function useDeepgramVoice({
     }
   }, [apiKey, updateState, onError, startAudioCapture, cleanupAudioResources]);
 
-
   const interrupt = useCallback(() => {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -498,4 +499,3 @@ export function useDeepgramVoice({
 }
 
 export { stripMarkdownForVoice, getSystemPrompt } from '@edurag/agent/voice';
-
