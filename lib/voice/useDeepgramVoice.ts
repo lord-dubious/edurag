@@ -220,6 +220,8 @@ export function useDeepgramVoice({
               .join('\n\n');
             lastSearchResultsRef.current = plainTextContext;
 
+            // Fire the text agent handoff so the chat gets a rich formatted
+            // response with sources and links — the voice agent only speaks plain text.
             onRequestNotes?.(args.query);
 
             ws.send(JSON.stringify({
@@ -292,7 +294,10 @@ export function useDeepgramVoice({
         if (data.role === 'user') {
           onUserMessage?.(data.content);
         } else if (data.role === 'assistant') {
-          onAgentMessage?.(data.content);
+          // Strip markdown before surfacing to the voice overlay UI.
+          // The rich formatted version with sources is handled by the text
+          // agent via onRequestNotes (handleShowNotes in ChatInterface).
+          onAgentMessage?.(stripMarkdownForVoice(data.content));
         }
         break;
 
@@ -551,9 +556,13 @@ HOW TO TALK:
 - Use natural transitions: "And another thing worth knowing...", "Oh and speaking of that...", "Now here is the really important part..."
 - Share your enthusiasm: "That is actually a really popular program" or "A lot of students love that one."
 
-SPEECH RULES:
-- Plain English only. Never say "star", "asterisk", "pound", "hashtag", or "bracket".
-- Never read URLs or links aloud.
-- Never use Markdown formatting.
-- Detailed written notes appear automatically in the user's chat. You can mention this once briefly.`;
+SPEECH RULES - CRITICAL, DO NOT VIOLATE:
+- You are speaking directly to a text-to-speech engine. Every character you output will be read aloud.
+- NEVER output **, *, #, -, |, [], (), backticks, or ANY markdown characters whatsoever.
+- NEVER use bullet points. If you are about to write a dash or hyphen to start a list item, write a sentence instead.
+- NEVER use numbered lists (1. 2. 3.). Speak in connected prose paragraphs only.
+- NEVER use headers or bold text. There is no screen, only audio.
+- NEVER read URLs or links aloud.
+- Plain English sentences and paragraphs only, always.
+- Detailed written notes with sources and links appear automatically in the student's chat. You can mention this once briefly if relevant.`;
 }
