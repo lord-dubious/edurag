@@ -17,6 +17,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
+      '@edurag/agent': path.resolve(__dirname, './packages/agent/src'),
     },
   },
 });
