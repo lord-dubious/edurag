@@ -6,6 +6,7 @@ import {
 } from 'react';
 import type { UIMessage } from '@ai-sdk/react';
 import { env } from '@/lib/env';
+import { stripMarkdownForVoice, getSystemPrompt } from '@edurag/agent/voice';
 
 export type AgentState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking';
 
@@ -226,7 +227,7 @@ export function useDeepgramVoice({
               type: 'FunctionCallResponse',
               id: func.id,
               name: func.name,
-              content: `Use the following information to answer the user's question naturally, as if you already know it. Never mention searching, databases, or results. Just answer their question directly and thoroughly like a knowledgeable person would.\n\n${plainTextContext}`,
+              content: `Use the following information to answer the user's question naturally, as if you already know it. Never mention searching, databases, or results. Just answer their question directly and thoroughly like a knowledgeable person would. ABSOLUTELY NO MARKDOWN. Do not use asterisks, bolding, italics, or bullet points in your response. Answer in plain spoken English.\n\n${plainTextContext}`,
             }));
           } else {
             ws.send(JSON.stringify({
@@ -507,53 +508,5 @@ export function useDeepgramVoice({
   };
 }
 
-export function stripMarkdownForVoice(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`([^`]*)`/g, '$1')
-    .replace(/^#{1,6}\s*/gm, '')
-    .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/__([^_]+)__/g, '$1')
-    .replace(/_([^_]+)_/g, '$1')
-    .replace(/~~([^~]+)~~/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '')
-    .replace(/^\s*[-*+]\s+/gm, '')
-    .replace(/^\s*\d+\.\s+/gm, '')
-    .replace(/^\s*>\s*/gm, '')
-    .replace(/\|/g, ' ')
-    .replace(/^[-:| ]+$/gm, '')
-    .replace(/https?:\/\/[^\s)]+/g, '')
-    .replace(/[*#~`\[\]{}()<>]/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/  +/g, ' ')
-    .trim();
-}
+export { stripMarkdownForVoice, getSystemPrompt } from '@edurag/agent/voice';
 
-export function getSystemPrompt(institutionName?: string): string {
-  const name = institutionName || 'the university';
-  return `You are a senior advisor at ${name} on a phone call with a student. You genuinely care about helping them and love talking about the university.
-
-PERSONALITY: Warm, enthusiastic, thorough. You enjoy explaining things in detail. You talk like someone who has worked at ${name} for years and knows everything about it.
-
-WHEN TO SEARCH:
-- Search ONLY when the user asks a NEW factual question you do not already know the answer to.
-- Do NOT search for greetings like "hi" or "hello" or "thanks".
-- Do NOT search again if the user asks a follow-up about something you already discussed. Use what you already know from the previous search.
-- Do NOT search if the user is just acknowledging, agreeing, or asking you to elaborate on what you just said.
-
-HOW TO TALK:
-- Never mention searching, looking up, or finding information. Just answer as if you already know.
-- Never say "based on my search", "I found", "according to the results". Just say it directly: "Oh yeah, tuition for that program is about twelve thousand a year."
-- Be THOROUGH. Do not summarize. Talk through every relevant detail as a real advisor would. If there are three programs that match, walk through each one, explaining what makes each special, what the requirements are, how long they take, and what careers they lead to.
-- Use natural transitions: "And another thing worth knowing...", "Oh and speaking of that...", "Now here is the really important part..."
-- Share your enthusiasm: "That is actually a really popular program" or "A lot of students love that one."
-
-SPEECH RULES:
-- Plain English only. Never say "star", "asterisk", "pound", "hashtag", or "bracket".
-- Never read URLs or links aloud.
-- Never use Markdown formatting.
-- Detailed written notes appear automatically in the user's chat. You can mention this once briefly.`;
-}

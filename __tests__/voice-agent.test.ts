@@ -55,7 +55,7 @@ describe('Voice Agent Utilities', () => {
             const prompt = getSystemPrompt();
             expect(prompt).toContain('Never mention searching');
             expect(prompt).toContain('based on my search');
-            expect(prompt).toContain('Never use Markdown');
+            expect(prompt).toContain('ABSOLUTELY NO MARKDOWN');
         });
     });
 });
