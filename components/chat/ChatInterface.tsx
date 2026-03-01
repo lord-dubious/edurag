@@ -1,21 +1,25 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+
+import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { nanoid } from 'nanoid';
+import { useSession } from "next-auth/react";
+import { useTheme } from 'next-themes';
+
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { useSession } from "next-auth/react";
-import { ChatMessages } from './ChatMessages';
-import { ChatInput } from './ChatInput';
-import { CitationPanel } from './CitationPanel';
-import { VoiceChat, VoiceMessagePayload } from '@/components/voice/VoiceChat';
-import { useBrand } from '@/components/providers/BrandProvider';
+
+import type { Source } from '@edurag/agent/text';
+
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { HistorySidebar } from "@/components/chat/HistorySidebar";
-import type { Source } from '@edurag/agent/text';
+import { useBrand } from '@/components/providers/BrandProvider';
+import { VoiceChat, VoiceMessagePayload } from '@/components/voice/VoiceChat';
+import { ChatInput } from './ChatInput';
+import { ChatMessages } from './ChatMessages';
+import { CitationPanel } from './CitationPanel';
 
 interface VectorSearchResult {
   url: string;

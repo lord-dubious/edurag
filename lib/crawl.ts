@@ -1,11 +1,13 @@
-import { tavily } from '@tavily/core';
+import { Document } from '@langchain/core/documents';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { Document } from '@langchain/core/documents';
+import { tavily } from '@tavily/core';
+
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
+
 import { env } from './env';
 import { getEmbeddings } from './providers';
 import { getMongoCollection } from './vectorstore';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 
 interface CrawlOptions {
   url: string;

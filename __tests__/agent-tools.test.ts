@@ -1,13 +1,15 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { generateText } from 'ai';
-import { stepCountIs } from 'ai';
 import { MongoClient } from 'mongodb';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+
+import { generateText, stepCountIs } from 'ai';
 import { Document } from '@langchain/core/documents';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
-import { getMongoCollection, closeMongoClient, similaritySearchWithScore } from '../lib/vectorstore';
-import { getChatModel, getEmbeddings } from '../lib/providers';
+
 import { createVectorSearchTool } from '@edurag/agent/text';
+
 import { env } from '../lib/env';
+import { getChatModel, getEmbeddings } from '../lib/providers';
+import { getMongoCollection, closeMongoClient, similaritySearchWithScore } from '../lib/vectorstore';
 
 const TEST_THREAD_ID = 'test-agent-thread-' + Date.now();
 
