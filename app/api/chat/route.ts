@@ -2,11 +2,12 @@ import { z } from 'zod';
 import { type UIMessage, type TextUIPart, type ToolUIPart } from 'ai';
 import { runAgent } from '@/lib/agent';
 import { trackAndMaybeGenerateFaq } from '@/lib/faq-manager';
+import { generateAndSaveTitle } from '@/lib/title-generator';
 import { getSettings } from '@/lib/db/settings';
 import { errorResponse } from '@/lib/errors';
 import { nanoid } from 'nanoid';
 import { auth } from '@/auth';
-import { appendMessage } from '@/lib/conversation';
+import { appendMessage, getConversation } from '@/lib/conversation';
 
 const bodySchema = z.object({
   messages: z.array(z.object({
@@ -71,11 +72,26 @@ export async function POST(req: Request) {
   );
 
   if (userId) {
-    await appendMessage(currentThreadId, {
-      role: 'user',
-      content: userText,
-      timestamp: new Date(),
-    }, userId);
+    try {
+      const existing = await getConversation(currentThreadId, userId);
+
+      await appendMessage(currentThreadId, {
+        role: 'user',
+        content: userText,
+        timestamp: new Date(),
+      }, userId);
+
+      // Trigger title generation only when the conversation has no title yet
+      if (!existing?.title) {
+        try {
+          void generateAndSaveTitle(currentThreadId, userText, userId);
+        } catch (titleErr) {
+          console.error('[Title] Failed to generate title:', titleErr);
+        }
+      }
+    } catch (dbErr) {
+      console.error('[DB] Failed to persist user message or check title:', dbErr);
+    }
   }
 
   try {

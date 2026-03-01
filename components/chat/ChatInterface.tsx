@@ -57,6 +57,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   const { data: session } = useSession();
   const [threadId, setThreadId] = useState(() => nanoid());
   const [showHistory, setShowHistory] = useState(true);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const [sources, setSources] = useState<Record<string, Source[]>>({});
   const [showSources, setShowSources] = useState(true);
@@ -142,6 +143,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     setThreadId(nanoid());
     setMessages([]);
     setSources({});
+    setHistoryRefreshKey(k => k + 1);
     if (window.innerWidth < 768) {
       setShowHistory(false);
     }
@@ -155,6 +157,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
       console.error("Failed to delete conversation", e);
       throw e;
     }
+    setHistoryRefreshKey(k => k + 1);
     if (deleteThreadId === threadId) {
       handleNewChat();
     }
@@ -177,28 +180,48 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     [sendMessage]
   );
 
-  const handleVoiceMessage = useCallback((msg: VoiceMessagePayload) => {
-    const id = nanoid();
-    setMessages(prev => [...prev, {
-      id,
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content,
-      createdAt: new Date(),
-      parts: [{ type: 'text', text: msg.content }],
-    }]);
+  const formatVoiceHandoffPrompt = useCallback((topic: string) => {
+    return `[VOICE_HANDOFF] I am providing the detailed Markdown notes and source links for ${topic} now as requested in our conversation.`;
+  }, []);
 
-    if (msg.sources && msg.sources.length > 0) {
-      setSources(prev => ({
-        ...prev,
-        [id]: msg.sources!
-      }));
+  const handleVoiceMessage = useCallback((msg: VoiceMessagePayload) => {
+    if (msg.role === 'user') {
+      const id = nanoid();
+      setMessages(prev => [...prev, {
+        id,
+        role: 'user',
+        content: msg.content,
+        createdAt: new Date(),
+        parts: [{ type: 'text', text: msg.content }],
+      }]);
+
+      if (session?.user) {
+        fetch(`/api/history/${threadId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'user', content: msg.content }),
+        }).catch(err => console.error('[Voice] Failed to persist user message:', err));
+      }
     }
-  }, [setMessages]);
+  }, [setMessages, threadId, session?.user]);
+
+  const pendingNotesRef = useRef<string | null>(null);
 
   const handleShowNotes = useCallback((topic: string) => {
-    if (status !== 'ready') return;
-    sendMessage({ text: `[VOICE_HANDOFF] The user asked about "${topic}" via voice. Search the knowledge base and provide a comprehensive, detailed answer with proper source citations and links.` });
-  }, [status, sendMessage]);
+    if (status !== 'ready') {
+      pendingNotesRef.current = topic;
+      return;
+    }
+    sendMessage({ text: formatVoiceHandoffPrompt(topic) });
+  }, [status, sendMessage, formatVoiceHandoffPrompt]);
+
+  useEffect(() => {
+    if (status === 'ready' && pendingNotesRef.current) {
+      const topic = pendingNotesRef.current;
+      pendingNotesRef.current = null;
+      sendMessage({ text: formatVoiceHandoffPrompt(topic) });
+    }
+  }, [status, sendMessage, formatVoiceHandoffPrompt]);
 
   const handleSuggestionClick = useCallback(
     (query: string) => {
@@ -224,6 +247,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
             onNew={handleNewChat}
             onDelete={handleDeleteConversation}
             isOpen={true}
+            refreshKey={historyRefreshKey}
           />
         </div>
       )}
@@ -241,6 +265,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
                 onNew={handleNewChat}
                 onDelete={handleDeleteConversation}
                 isOpen={true}
+                refreshKey={historyRefreshKey}
               />
             </div>
           </div>
