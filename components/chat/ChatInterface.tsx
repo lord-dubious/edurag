@@ -187,9 +187,15 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
         createdAt: new Date(),
         parts: [{ type: 'text', text: msg.content }],
       }]);
+      // Persist voice user messages to history (they bypass the chat API)
+      fetch(`/api/history/${threadId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'user', content: msg.content }),
+      }).catch(err => console.error('[Voice] Failed to persist user message:', err));
     }
     // Assistant messages come from the text agent via handleShowNotes, not from voice directly
-  }, [setMessages]);
+  }, [setMessages, threadId]);
 
   const pendingNotesRef = useRef<string | null>(null);
 

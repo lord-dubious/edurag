@@ -7,7 +7,7 @@ import { getSettings } from '@/lib/db/settings';
 import { errorResponse } from '@/lib/errors';
 import { nanoid } from 'nanoid';
 import { auth } from '@/auth';
-import { appendMessage } from '@/lib/conversation';
+import { appendMessage, getConversation } from '@/lib/conversation';
 
 const bodySchema = z.object({
   messages: z.array(z.object({
@@ -72,14 +72,16 @@ export async function POST(req: Request) {
   );
 
   if (userId) {
+    const existing = await getConversation(currentThreadId, userId);
+
     await appendMessage(currentThreadId, {
       role: 'user',
       content: userText,
       timestamp: new Date(),
     }, userId);
 
-    // If this is the first message in the thread, trigger dynamic title generation
-    if (messages.length === 1) {
+    // Trigger title generation only when the conversation has no title yet
+    if (!existing?.title) {
       void generateAndSaveTitle(currentThreadId, userText, userId);
     }
   }
