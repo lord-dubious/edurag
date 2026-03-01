@@ -8,7 +8,6 @@ export type { SimilaritySearchFn, GetPublicFaqsFn } from './text/tools';
 export { stripMarkdownForVoice, getSystemPrompt } from './voice';
 export type {
     AgentState,
-    VoiceSource,
     VoiceMessage,
 } from './voice';
 

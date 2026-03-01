@@ -39,10 +39,12 @@ export const createVectorSearchTool = (searchFn: SimilaritySearchFn) =>
 
             const cleanedResults = results.map(([doc, score]) => {
                 const cleaned = cleanForDisplay(doc.pageContent);
+                const metadata = doc.metadata ?? {};
+
                 return {
                     content: cleaned.length > 1200 ? cleaned.slice(0, 1200) + '...' : cleaned,
-                    url: doc.metadata.url as string,
-                    title: doc.metadata.title as string | undefined,
+                    url: typeof metadata.url === 'string' ? metadata.url : '',
+                    title: typeof metadata.title === 'string' ? metadata.title : undefined,
                     score: Math.round(score * 100) / 100,
                 };
             });
