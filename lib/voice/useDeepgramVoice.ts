@@ -282,7 +282,7 @@ export function useDeepgramVoice({
         if (data.role === 'user') {
           onUserMessage?.(data.content);
         } else if (data.role === 'assistant') {
-          onAgentMessage?.(data.content);
+          onAgentMessage?.(stripMarkdownForVoice(data.content));
         }
         break;
 

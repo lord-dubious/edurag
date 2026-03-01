@@ -178,26 +178,35 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
   );
 
   const handleVoiceMessage = useCallback((msg: VoiceMessagePayload) => {
-    const id = nanoid();
-    setMessages(prev => [...prev, {
-      id,
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content,
-      createdAt: new Date(),
-      parts: [{ type: 'text', text: msg.content }],
-    }]);
-
-    if (msg.sources && msg.sources.length > 0) {
-      setSources(prev => ({
-        ...prev,
-        [id]: msg.sources!
-      }));
+    if (msg.role === 'user') {
+      const id = nanoid();
+      setMessages(prev => [...prev, {
+        id,
+        role: 'user',
+        content: msg.content,
+        createdAt: new Date(),
+        parts: [{ type: 'text', text: msg.content }],
+      }]);
     }
+    // Assistant messages come from the text agent via handleShowNotes, not from voice directly
   }, [setMessages]);
 
+  const pendingNotesRef = useRef<string | null>(null);
+
   const handleShowNotes = useCallback((topic: string) => {
-    if (status !== 'ready') return;
+    if (status !== 'ready') {
+      pendingNotesRef.current = topic;
+      return;
+    }
     sendMessage({ text: `[VOICE_HANDOFF] The user asked about "${topic}" via voice. Search the knowledge base and provide a comprehensive, detailed answer with proper source citations and links.` });
+  }, [status, sendMessage]);
+
+  useEffect(() => {
+    if (status === 'ready' && pendingNotesRef.current) {
+      const topic = pendingNotesRef.current;
+      pendingNotesRef.current = null;
+      sendMessage({ text: `[VOICE_HANDOFF] The user asked about "${topic}" via voice. Search the knowledge base and provide a comprehensive, detailed answer with proper source citations and links.` });
+    }
   }, [status, sendMessage]);
 
   const handleSuggestionClick = useCallback(
