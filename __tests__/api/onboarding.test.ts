@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db/settings', () => ({
@@ -78,9 +78,21 @@ describe('POST /api/onboarding/detect', () => {
 });
 
 describe('POST /api/onboarding/complete', () => {
+  const originalEnv = process.env;
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpdateSettings.mockResolvedValue(undefined);
+    process.env = { ...originalEnv };
+    delete process.env.MONGODB_URI;
+    delete process.env.CHAT_API_KEY;
+    delete process.env.EMBEDDING_API_KEY;
+    delete process.env.TAVILY_API_KEY;
+    delete process.env.ADMIN_SECRET;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   it('saves onboarding settings', async () => {
@@ -103,7 +115,7 @@ describe('POST /api/onboarding/complete', () => {
         embeddingModel: 'voyage-4-large',
         embeddingDimensions: 2048,
         tavilyApiKey: 'test-key',
-        adminSecret: 'test-secret',
+        adminSecret: 'test-secret-123456',
       },
     });
 
@@ -123,7 +135,7 @@ describe('POST /api/onboarding/complete', () => {
         chatApiKey: 'test-key',
         embeddingApiKey: 'test-key',
         tavilyApiKey: 'test-key',
-        adminSecret: 'test-secret',
+        adminSecret: 'test-secret-123456',
       },
     });
 

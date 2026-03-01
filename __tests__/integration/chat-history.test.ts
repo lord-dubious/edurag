@@ -1,17 +1,14 @@
 // Integration test: requires a real MongoDB instance.
 import { nanoid } from 'nanoid';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { appendMessage, getConversation, getConversationsCollection, getHistory, getUserConversations } from '@/lib/conversation';
+import { appendMessage, getConversation, getHistory, getUserConversations } from '@/lib/conversation';
 
 describe('Chat History with User', () => {
-  beforeEach(async () => {
-    const collection = await getConversationsCollection();
-    await collection.deleteMany({});
-  });
+
 
   it('should save and retrieve messages for a user', async () => {
     const threadId = nanoid();
-    const userId = 'user-123';
+    const userId = 'user-' + nanoid();
     const message = {
       role: 'user' as const,
       content: 'Hello',
@@ -30,7 +27,7 @@ describe('Chat History with User', () => {
   });
 
   it('should list user conversations', async () => {
-    const userId = 'user-123';
+    const userId = 'user-' + nanoid();
     const thread1 = nanoid();
     const thread2 = nanoid();
 
@@ -42,8 +39,8 @@ describe('Chat History with User', () => {
   });
 
   it('should not return other users conversations', async () => {
-    const userId1 = 'user-1';
-    const userId2 = 'user-2';
+    const userId1 = 'user-' + nanoid();
+    const userId2 = 'user-' + nanoid();
     const thread1 = nanoid();
 
     await appendMessage(thread1, { role: 'user', content: 'Msg 1', timestamp: new Date() }, userId1);
@@ -57,7 +54,7 @@ describe('Chat History with User', () => {
 
   it('should claim an anonymous conversation when user logs in and replies', async () => {
     const threadId = nanoid();
-    const userId = 'user-login';
+    const userId = 'user-' + nanoid();
 
     // 1. Anonymous chat starts
     await appendMessage(threadId, { role: 'user', content: 'Anon Hello', timestamp: new Date() });
@@ -82,15 +79,15 @@ describe('Chat History with User', () => {
 
   it('should PREVENT appending message to another user thread', async () => {
     const threadId = nanoid();
-    const ownerId = 'user-owner';
-    const attackerId = 'user-attacker';
+    const ownerId = 'user-' + nanoid();
+    const attackerId = 'user-' + nanoid();
 
     // 1. Owner creates thread
     await appendMessage(threadId, { role: 'user', content: 'My Secret', timestamp: new Date() }, ownerId);
 
     // 2. Attacker tries to append
     await expect(async () => {
-        await appendMessage(threadId, { role: 'user', content: 'Hacked', timestamp: new Date() }, attackerId);
+      await appendMessage(threadId, { role: 'user', content: 'Hacked', timestamp: new Date() }, attackerId);
     }).rejects.toThrow('Unauthorized');
 
     // 3. Verify message was NOT added

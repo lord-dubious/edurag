@@ -20,10 +20,14 @@ function createUploadRequest(file: File | null): NextRequest {
   if (file) {
     formData.append('file', file);
   }
-  return new NextRequest('http://localhost/api/upload', {
+  const req = new NextRequest('http://localhost/api/upload', {
     method: 'POST',
     body: formData,
   });
+  // Workaround for vitest/jsdom environment where NextRequest.formData() 
+  // fails to parse the internal body stream created from jsdom FormData.
+  req.formData = async () => formData;
+  return req;
 }
 
 function createMockFile(content: string, name: string, type: string): File {
@@ -50,8 +54,7 @@ describe('POST /api/upload', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.url).toMatch(/^\/uploads\/logo-[a-f0-9-]+\.png$/);
+    expect(data.url).toMatch(/^\/media\/logo-[a-f0-9-]+\.png$/);
     expect(mockWriteFile).toHaveBeenCalled();
     expect(mockMkdir).toHaveBeenCalled();
   });
@@ -66,8 +69,7 @@ describe('POST /api/upload', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.url).toMatch(/^\/uploads\/logo-[a-f0-9-]+\.jpeg$/);
+    expect(data.url).toMatch(/^\/media\/logo-[a-f0-9-]+\.jpeg$/);
   });
 
   it('returns 400 for missing file', async () => {

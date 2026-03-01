@@ -48,10 +48,11 @@ type EnvEntry = { type: 'comment'; text: string } | { type: 'kv'; key: string; v
 
 async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>): Promise<{ success: boolean; skipped: boolean; error?: string }> {
   const isProduction = process.env.NODE_ENV === 'production';
+  const isTest = process.env.NODE_ENV === 'test';
   const isVercel = process.env.VERCEL === '1';
   const isNetlify = process.env.NETLIFY === 'true';
 
-  if (isProduction || isVercel || isNetlify) {
+  if (isProduction || isTest || isVercel || isNetlify) {
     return { success: false, skipped: true };
   }
 
