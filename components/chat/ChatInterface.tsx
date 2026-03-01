@@ -173,27 +173,46 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     [sendMessage]
   );
 
+  // Only mirror user messages from voice into the chat.
+  // Assistant responses are handled exclusively by the text agent via
+  // handleShowNotes, which produces rich markdown with sources and links.
+  // This prevents the raw LLM voice output (potentially containing markdown)
+  // from appearing as a duplicate unformatted message in the chat.
   const handleVoiceMessage = useCallback((msg: VoiceMessagePayload) => {
-    const id = nanoid();
-    setMessages(prev => [...prev, {
-      id,
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content,
-      createdAt: new Date(),
-      parts: [{ type: 'text', text: msg.content }],
-    }]);
-
-    if (msg.sources && msg.sources.length > 0) {
-      setSources(prev => ({
-        ...prev,
-        [id]: msg.sources!
-      }));
+    if (msg.role === 'user') {
+      const id = nanoid();
+      setMessages(prev => [...prev, {
+        id,
+        role: 'user',
+        content: msg.content,
+        createdAt: new Date(),
+        parts: [{ type: 'text', text: msg.content }],
+      }]);
     }
+    // Assistant voice messages are intentionally not added here.
+    // The text agent (triggered by handleShowNotes) writes the formatted
+    // assistant response with citations into the chat instead.
   }, [setMessages]);
 
+  // Queue for voice handoff topics that arrive while the text agent is busy.
+  const pendingNotesRef = useRef<string | null>(null);
+
   const handleShowNotes = useCallback((topic: string) => {
-    if (status !== 'ready') return;
+    if (status !== 'ready') {
+      // Text agent is busy — queue it and flush when ready.
+      pendingNotesRef.current = topic;
+      return;
+    }
     sendMessage({ text: `[VOICE_HANDOFF] The user asked about "${topic}" via voice. Search the knowledge base and provide a comprehensive, detailed answer with proper source citations and links.` });
+  }, [status, sendMessage]);
+
+  // Flush any queued voice handoff once the text agent becomes ready.
+  useEffect(() => {
+    if (status === 'ready' && pendingNotesRef.current) {
+      const topic = pendingNotesRef.current;
+      pendingNotesRef.current = null;
+      sendMessage({ text: `[VOICE_HANDOFF] The user asked about "${topic}" via voice. Search the knowledge base and provide a comprehensive, detailed answer with proper source citations and links.` });
+    }
   }, [status, sendMessage]);
 
   const handleSuggestionClick = useCallback(
@@ -270,10 +289,11 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
             {lastSources.length > 0 && (
               <button
                 onClick={() => setShowSources(!showSources)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${showSources
-                  ? 'border-primary text-primary bg-primary/10'
-                  : 'border-border hover:border-primary hover:text-primary'
-                  }`}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                  showSources
+                    ? 'border-primary text-primary bg-primary/10'
+                    : 'border-border hover:border-primary hover:text-primary'
+                }`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                 Sources {lastSources.length}
