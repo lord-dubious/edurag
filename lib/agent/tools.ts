@@ -6,7 +6,7 @@ export { cleanForDisplay };
 
 export const createVectorSearchTool = () => _createVectorSearchTool(similaritySearchWithScore);
 
-export const getPopularFaqsTool = () => _createPopularFaqsTool(
+export const getPopularFaqsTool = (): ReturnType<typeof _createPopularFaqsTool> => _createPopularFaqsTool(
   async (limit: number) => {
     const faqs = await getPublicFaqs(limit);
     return faqs.map(f => ({ question: f.question, answer: f.answer || '' }));
