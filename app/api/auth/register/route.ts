@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import clientPromise from '@/lib/mongodb';

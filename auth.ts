@@ -9,6 +9,7 @@ import { z } from 'zod';
 import clientPromise from './lib/mongodb';
 import { env } from './lib/env';
 import { verifyPassword } from './lib/auth/password';
+import { authConfig } from './auth.config';
 
 interface AuthUserDocument {
   _id: ObjectId;
@@ -79,28 +80,10 @@ if (env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET && env.MICROSOFT_TENA
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: MongoDBAdapter(clientPromise, { databaseName: env.DB_NAME }),
   providers,
-  pages: {
-    signIn: '/auth/signin',
-  },
   secret: env.AUTH_SECRET,
-  callbacks: {
-    session({ session, token }) {
-      if (session.user && token.sub) {
-        session.user.id = token.sub;
-        session.user.role = token.role as string | undefined;
-      }
-      return session;
-    },
-    jwt({ token, user }) {
-      if (user) {
-        token.sub = user.id;
-        token.role = (user as { role?: string }).role;
-      }
-      return token;
-    },
-  },
   session: {
     strategy: 'jwt',
   },
