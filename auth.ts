@@ -6,7 +6,7 @@ import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 import MicrosoftEntraID from 'next-auth/providers/microsoft-entra-id';
 import { z } from 'zod';
-import clientPromise from './lib/auth-client';
+import clientPromise from './lib/mongodb';
 import { env } from './lib/env';
 import { verifyPassword } from './lib/auth/password';
 
@@ -17,6 +17,7 @@ interface AuthUserDocument {
   image?: string | null;
   passwordHash?: string;
   passwordSalt?: string;
+  role?: string;
 }
 
 const credentialsSchema = z.object({
@@ -56,6 +57,7 @@ const providers: Provider[] = [
         name: user.name ?? user.email,
         email: user.email,
         image: user.image ?? null,
+        role: user.role,
       };
     },
   }),
@@ -87,12 +89,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
+        session.user.role = token.role as string | undefined;
       }
       return session;
     },
     jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
+        token.role = (user as { role?: string }).role;
       }
       return token;
     },

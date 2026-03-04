@@ -279,23 +279,11 @@ export async function GET(): Promise<Response> {
       uniUrl: settings?.uniUrl,
       brandPrimary: settings?.brandPrimary,
       brandSecondary: settings?.brandSecondary,
-      logoUrl: settings?.brandLogoUrl,
       emoji: settings?.emoji,
       iconType: settings?.iconType,
       showTitle: settings?.showTitle,
       appName: settings?.appName,
       hasAllEnvVars: hasRequiredEnvVars(),
-      apiKeys: {
-        mongodbUri: process.env.MONGODB_URI || '',
-        chatApiKey: process.env.CHAT_API_KEY || '',
-        chatBaseUrl: process.env.CHAT_BASE_URL || '',
-        chatModel: process.env.CHAT_MODEL || '',
-        embeddingApiKey: process.env.EMBEDDING_API_KEY || '',
-        embeddingModel: process.env.EMBEDDING_MODEL || '',
-        embeddingDimensions: process.env.EMBEDDING_DIMENSIONS || '',
-        tavilyApiKey: process.env.TAVILY_API_KEY || '',
-        adminSecret: process.env.ADMIN_SECRET ? '****' : '',
-      },
     });
   } catch (error) {
     return errorResponse('DB_ERROR', 'Failed to get onboarding status', 500, error);

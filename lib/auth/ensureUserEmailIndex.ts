@@ -1,4 +1,4 @@
-import clientPromise from '@/lib/auth-client';
+import clientPromise from '@/lib/mongodb';
 import { env } from '@/lib/env';
 
 let ensureUserEmailIndexPromise: Promise<void> | null = null;

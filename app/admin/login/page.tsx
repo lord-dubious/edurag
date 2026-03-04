@@ -19,13 +19,15 @@ export default function AdminLoginPage() {
     setError('');
 
     try {
-      const res = await fetch('/api/domains', {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
       });
 
       if (res.ok) {
-        document.cookie = `admin_token=${token}; path=/; max-age=86400`;
         router.push('/admin');
+        router.refresh();
       } else {
         setError('Invalid token');
       }

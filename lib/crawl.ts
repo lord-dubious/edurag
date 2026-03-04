@@ -9,6 +9,25 @@ import { env } from './env';
 import { getEmbeddings } from './providers';
 import { getMongoCollection } from './vectorstore';
 
+function assertSafeCrawlUrl(urlString: string) {
+  const url = new URL(urlString);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('Only HTTP/HTTPS URLs are allowed');
+  }
+  const hostname = url.hostname.toLowerCase();
+
+  if (
+    hostname === 'localhost' ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.local') ||
+    hostname === '169.254.169.254' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1'
+  ) {
+    throw new Error('Blocked hostname for crawling');
+  }
+}
+
 interface CrawlOptions {
   url: string;
   threadId: string;
@@ -22,6 +41,7 @@ interface CrawlOptions {
   allowExternal?: boolean;
   format?: 'markdown' | 'text';
   onProgress?: (page: number, total: number) => void;
+  signal?: AbortSignal;
 }
 
 export function cleanContent(raw: string | null | undefined): string {
@@ -96,6 +116,8 @@ function isQualityChunk(content: string): boolean {
 }
 
 export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
+  assertSafeCrawlUrl(opts.url);
+
   const client = tavily({ apiKey: env.TAVILY_API_KEY });
 
   const selectPaths = opts.selectPaths
@@ -130,6 +152,7 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
   const total = uniqueResults.length;
 
   for (let i = 0; i < total; i++) {
+    opts.signal?.throwIfAborted();
     const result = uniqueResults[i];
     opts.onProgress?.(i + 1, total);
 
@@ -159,6 +182,12 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
     textKey: 'text',
     embeddingKey: 'embedding',
   });
+
+  opts.signal?.throwIfAborted();
+  const urls = Array.from(seenUrls);
+  if (urls.length > 0) {
+    await collection.deleteMany({ url: { $in: urls }, threadId: opts.threadId });
+  }
 
   await vectorStore.addDocuments(documents);
 

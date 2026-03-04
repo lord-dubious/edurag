@@ -1,11 +1,37 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
 import { env } from '@/lib/env';
 import { errorResponse } from '@/lib/errors';
 
 export async function GET() {
-  if (!env.DEEPGRAM_API_KEY) {
-    return errorResponse('INTERNAL_ERROR', 'Deepgram API key not configured', 500);
+  const session = await auth();
+  if (!session?.user) {
+    return errorResponse('UNAUTHORIZED', 'Authentication required', 401);
   }
-
-  return NextResponse.json({ apiKey: env.DEEPGRAM_API_KEY });
+  if (!env.DEEPGRAM_API_KEY || !env.DEEPGRAM_PROJECT_ID) {
+    return errorResponse('INTERNAL_ERROR', 'Voice not configured', 500);
+  }
+  try {
+    const res = await fetch(
+      `https://api.deepgram.com/v1/projects/${env.DEEPGRAM_PROJECT_ID}/keys`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${env.DEEPGRAM_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          comment: `session-${session.user.id}-${Date.now()}`,
+          scopes: ['usage:write'],
+          time_to_live_in_seconds: 90,
+        }),
+      },
+    );
+    if (!res.ok) throw new Error(`Deepgram key API returned ${res.status}`);
+    const { key } = await res.json();
+    return NextResponse.json({ apiKey: key });
+  } catch (err) {
+    console.error('[VoiceToken]', err);
+    return errorResponse('INTERNAL_ERROR', 'Failed to issue voice token', 500);
+  }
 }

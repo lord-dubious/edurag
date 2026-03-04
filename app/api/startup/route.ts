@@ -1,21 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getSettings, updateSettings } from '@/lib/db/settings';
 import { env, hasRequiredEnvVars } from '@/lib/env';
-import { ensureUserEmailIndex } from '@/lib/auth/ensureUserEmailIndex';
+import { ensureIndexes } from '@/lib/db/ensureIndexes';
 import { errorResponse } from '@/lib/errors';
+import { verifyAdmin } from '@/lib/admin-auth';
+import { runOnboardingCrawl } from '@/lib/onboarding-crawl';
 
-export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  const token = authHeader?.replace(/^Bearer\s+/i, '');
-  
-  if (token !== process.env.ADMIN_SECRET && token !== process.env.ADMIN_TOKEN) {
+export async function POST() {
+  if (!(await verifyAdmin())) {
     return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
 
   try {
-    await ensureUserEmailIndex();
+    await ensureIndexes();
     const settings = await getSettings();
-    
+
     if (settings?.onboarded) {
       return NextResponse.json({
         success: true,
@@ -25,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     const universityUrl = env.UNIVERSITY_URL || settings?.uniUrl;
-    
+
     if (!universityUrl) {
       return NextResponse.json({
         success: true,
@@ -50,7 +49,6 @@ export async function POST(request: NextRequest) {
       CHAT_API_KEY: !!process.env.CHAT_API_KEY,
       EMBEDDING_API_KEY: !!process.env.EMBEDDING_API_KEY,
       TAVILY_API_KEY: !!process.env.TAVILY_API_KEY,
-      ADMIN_SECRET: !!(process.env.ADMIN_SECRET || process.env.ADMIN_TOKEN),
     };
 
     const missingVars = Object.entries(requiredEnvVars)
@@ -84,13 +82,9 @@ export async function POST(request: NextRequest) {
       crawlStatus: 'pending',
     });
 
-    const crawlResponse = await fetch(new URL('/api/onboarding/crawl', request.url), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
+
+    try {
+      await runOnboardingCrawl({
         universityUrl,
         crawlConfig: {
           maxDepth: env.CRAWL_MAX_DEPTH,
@@ -98,23 +92,12 @@ export async function POST(request: NextRequest) {
           limit: env.CRAWL_LIMIT,
         },
         crawlerInstructions: env.CRAWL_INSTRUCTIONS,
-        fileTypeRules: { pdf: 'index', docx: 'index', csv: 'skip' },
-        apiKeys: {
-          embeddingApiKey: process.env.EMBEDDING_API_KEY,
-          embeddingModel: process.env.EMBEDDING_MODEL,
-          embeddingDimensions: parseInt(process.env.EMBEDDING_DIMENSIONS || '2048'),
-          tavilyApiKey: process.env.TAVILY_API_KEY,
-          mongodbUri: process.env.MONGODB_URI,
-        },
-      }),
-    });
-
-    if (!crawlResponse.ok) {
-      const errorText = await crawlResponse.text();
+      });
+    } catch (err) {
       return NextResponse.json({
         success: false,
         message: 'Auto-crawl failed',
-        error: errorText,
+        error: err instanceof Error ? err.message : String(err),
         onboarded: true,
       }, { status: 500 });
     }
@@ -134,9 +117,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    await ensureUserEmailIndex();
+    await ensureIndexes();
     const settings = await getSettings();
-    
+
     return NextResponse.json({
       onboarded: settings?.onboarded ?? false,
       autoCrawl: env.AUTO_CRAWL,

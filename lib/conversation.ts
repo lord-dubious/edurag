@@ -49,36 +49,31 @@ export async function appendMessage(threadId: string, message: Message, userId?:
   const collection = await getConversationsCollection();
   const existing = await collection.findOne({ threadId });
 
-  if (existing) {
-    // Security check: If thread belongs to another user, prevent write.
-    if (existing.userId && userId && existing.userId !== userId) {
-      console.error(`[appendMessage] Unauthorized write attempt to thread ${threadId} by user ${userId}`);
-      throw new Error('Unauthorized: Cannot write to another user\'s thread');
-    }
-
-    const update: UpdateFilter<ConversationDocument> = !existing.userId && userId
-      ? {
-        $push: { messages: message },
-        $set: { updatedAt: new Date(), userId },
-      }
-      : {
-        $push: { messages: message },
-        $set: { updatedAt: new Date() },
-      };
-
-    await collection.updateOne(
-      { threadId },
-      update,
-    );
-  } else {
-    await collection.insertOne({
-      threadId,
-      userId: userId || null,
-      messages: [message],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  if (existing && existing.userId && userId && existing.userId !== userId) {
+    console.error(`[appendMessage] Unauthorized write attempt to thread ${threadId} by user ${userId}`);
+    throw new Error('Unauthorized: Cannot write to another user\'s thread');
   }
+
+  const update: any = {
+    $push: { messages: message },
+    $set: { updatedAt: new Date() },
+    $setOnInsert: {
+      threadId,
+      createdAt: new Date(),
+    }
+  };
+
+  if (userId && (!existing || !existing.userId)) {
+    update.$set.userId = userId;
+  } else if (!existing && !userId) {
+    update.$setOnInsert.userId = null;
+  }
+
+  await collection.updateOne(
+    { threadId },
+    update,
+    { upsert: true }
+  );
 }
 
 export async function updateConversationTitle(threadId: string, title: string, userId?: string): Promise<boolean> {
@@ -115,16 +110,7 @@ export async function clearHistory(threadId: string, userId?: string): Promise<v
   await collection.deleteOne(query);
 }
 
-export async function listConversations(limit = 20): Promise<Conversation[]> {
-  const collection = await getConversationsCollection();
-  const safeLimit = normalizeLimit(limit);
-  const docs = await collection
-    .find({})
-    .sort({ updatedAt: -1 })
-    .limit(safeLimit)
-    .toArray();
-  return docs as Conversation[];
-}
+
 
 export async function getUserConversations(userId: string, limit = 20): Promise<Conversation[]> {
   const collection = await getConversationsCollection();

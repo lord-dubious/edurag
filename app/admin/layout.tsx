@@ -1,18 +1,15 @@
-import { cookies } from 'next/headers';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { ThemeProvider } from 'next-themes';
 import { BrandProvider } from '@/components/providers/BrandProvider';
 import { Toaster } from '@/components/ui/sonner';
+import { verifyAdmin } from '@/lib/admin-auth';
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
-
-  if (!token || token !== process.env.ADMIN_SECRET) {
+  if (!(await verifyAdmin())) {
     return <>{children}</>;
   }
 

@@ -6,9 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Save } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
 import { LogoUpload } from '@/components/admin/LogoUpload';
+import { verifyAdmin } from '@/lib/admin-auth';
 
 async function saveSettings(formData: FormData) {
   'use server';
+
+  if (!(await verifyAdmin())) {
+    throw new Error('Unauthorized');
+  }
 
   const appName = formData.get('appName') as string;
   const brandPrimary = formData.get('brandPrimary') as string;

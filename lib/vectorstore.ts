@@ -2,36 +2,30 @@ import { MongoClient, type Collection, type Document as MongoDocument, type With
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { env } from './env';
 import { getEmbeddings, getVoyageClient } from './providers';
+import clientPromise from './mongodb';
 
-declare global {
-  var mongoClient: MongoClient | undefined;
-}
-
-export async function getMongoClient(customUri?: string): Promise<MongoClient> {
-  if (!customUri && globalThis.mongoClient) {
-    return globalThis.mongoClient;
-  }
-
-  const uri = customUri || env.MONGODB_URI;
-  if (!uri) {
-    throw new Error('MONGODB_URI environment variable is required');
-  }
-
-  const client = new MongoClient(uri);
-  await client.connect();
-
-  if (!customUri) {
-    globalThis.mongoClient = client;
-  }
-  return client;
+export async function getMongoClient(): Promise<MongoClient> {
+  return await clientPromise;
 }
 
 export async function getMongoCollection<TSchema extends MongoDocument = MongoDocument>(
-  collectionName: string,
-  customUri?: string
+  collectionName: string
 ): Promise<Collection<TSchema>> {
-  const client = await getMongoClient(customUri);
+  const client = await getMongoClient();
   return client.db(env.DB_NAME).collection<TSchema>(collectionName);
+}
+
+export interface VectorDocument {
+  _id?: import('mongodb').ObjectId;
+  content: string;
+  url: string;
+  title: string;
+  sourceType: string;
+  chunkIndex: number;
+  totalChunks: number;
+  embedding: number[];
+  crawledAt: Date;
+  updatedAt: Date;
 }
 
 export type { MongoDocument, WithId, OptionalId };
@@ -67,7 +61,7 @@ export async function similaritySearchWithScore(
 
   const queryEmbedding = await embeddingsInstance.embedQuery(query);
 
-  const broadK = Math.max(k * 4, 25);
+  const broadK = Math.min(Math.max(k * 4, 25), 100);
   const allResults = await vectorStore.similaritySearchVectorWithScore(
     queryEmbedding,
     broadK
@@ -149,8 +143,6 @@ export async function similaritySearchWithScore(
 }
 
 export async function closeMongoClient() {
-  if (globalThis.mongoClient) {
-    await globalThis.mongoClient.close();
-    globalThis.mongoClient = undefined;
-  }
+  const client = await clientPromise;
+  await client.close();
 }

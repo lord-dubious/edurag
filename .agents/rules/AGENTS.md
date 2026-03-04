@@ -226,6 +226,10 @@ Located in `@edurag/agent/text/prompts`. Key instruction: "After using tools, AL
 
 For the Voice Agent, pure logic (prompt templates) is in `@edurag/agent/voice`, while app-specific rendering and Deepgram integration are in `lib/voice`.
 
+### Voice Integration 
+
+**Warning:** The application relies on the `@deepgram/sdk`. This SDK and its API can sometimes be unstable across minor versions. If you encounter issues with websocket connections or audio streaming, consider pinning the SDK version and double-checking their official changelog.
+
 ---
 
 ## Component Guidelines
@@ -266,7 +270,7 @@ CHAT_API_KEY=...              # Cerebras API key
 CHAT_BASE_URL=...             # Cerebras base URL (optional)
 TAVILY_API_KEY=...
 EMBEDDING_API_KEY=...         # Voyage AI key
-ADMIN_TOKEN=...               # Bearer token for admin access
+NEXTAUTH_SECRET=...           # Secret for NextAuth session
 
 # Optional with defaults
 EMBEDDING_MODEL=voyage-4-large

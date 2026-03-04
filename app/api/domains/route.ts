@@ -11,8 +11,8 @@ const createSchema = z.object({
   name: z.string().optional(),
 });
 
-export async function GET(req: NextRequest) {
-  if (!verifyAdmin(req)) return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
+export async function GET() {
+  if (!(await verifyAdmin())) return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
 
   const collection = await getMongoCollection(env.DOMAINS_COLLECTION);
   const domains = await collection.find({}).sort({ createdAt: -1 }).toArray();
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!verifyAdmin(req)) return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
+  if (!(await verifyAdmin())) return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
 
   let body: z.infer<typeof createSchema>;
   try {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   const collection = await getMongoCollection(env.DOMAINS_COLLECTION);
-  
+
   const existing = await collection.findOne({ url: body.url });
   if (existing) {
     return errorResponse('VALIDATION_ERROR', 'Domain already exists', 400);
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!verifyAdmin(req)) return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
+  if (!(await verifyAdmin())) return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
 
   const { searchParams } = new URL(req.url);
   const threadId = searchParams.get('threadId');

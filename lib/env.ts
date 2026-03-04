@@ -18,9 +18,6 @@ const envSchema = z.object({
 
   MONGODB_URI: z.string().min(1).optional(),
   DB_NAME: z.string().default('edurag'),
-  COLLECTION1: z.string().default('crawled_index'),
-  COLLECTION2: z.string().default('checkpoints_aio'),
-  COLLECTION3: z.string().default('checkpoint_writes_aio'),
   VECTOR_COLLECTION: z.string().default('crawled_index'),
   VECTOR_INDEX_NAME: z.string().default('index'),
   FAQ_COLLECTION: z.string().default('faqs'),
@@ -39,7 +36,7 @@ const envSchema = z.object({
   CRAWL_ALLOW_EXTERNAL: z.coerce.boolean().default(false),
   CRAWL_FORMAT: z.enum(['markdown', 'text']).default('markdown'),
 
-  ADMIN_SECRET: z.string().min(16).optional(),
+  ALLOW_REGISTRATION: z.coerce.boolean().default(false),
 
   // Note: AUTH_SECRET is optional globally but is required by NextAuth for session encryption (used at auth.ts) when authentication is enabled.
   AUTH_SECRET: z.string().min(1).optional(),
@@ -58,6 +55,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
   DEEPGRAM_API_KEY: z.string().min(1).optional(),
+  DEEPGRAM_PROJECT_ID: z.string().min(1).optional(),
   DEEPGRAM_STT_MODEL: z.string().default('nova-3'),
   DEEPGRAM_TTS_MODEL: z.string().default('aura-2-thalia-en'),
   DEEPGRAM_THINK_MODEL: z.string().default('gemini-2.5-flash'),
@@ -84,9 +82,6 @@ export function hasRequiredEnvVars(): boolean {
   return !!(
     process.env.MONGODB_URI &&
     process.env.CHAT_API_KEY &&
-    process.env.EMBEDDING_API_KEY &&
-    process.env.TAVILY_API_KEY &&
-    process.env.ADMIN_SECRET &&
-    process.env.ADMIN_SECRET.length >= 16
+    process.env.TAVILY_API_KEY
   );
 }

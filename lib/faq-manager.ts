@@ -15,6 +15,7 @@ interface FaqDocument {
   answer: string | null;
   public: boolean;
   pendingApproval?: boolean;
+  synthesisInProgress?: boolean;
   count: number;
   createdAt: Date;
   updatedAt: Date;
@@ -34,8 +35,23 @@ export async function trackAndMaybeGenerateFaq(question: string): Promise<void> 
     { upsert: true, returnDocument: 'after' },
   );
 
-  if (result && result.count >= env.FAQ_THRESHOLD && !result.answer) {
-    await synthesizeFaqAnswer(result._id.toString(), question);
+  if (result && result.count >= env.FAQ_THRESHOLD && !result.answer && !result.synthesisInProgress) {
+    const claim = await col.findOneAndUpdate(
+      { _id: result._id, synthesisInProgress: { $ne: true }, answer: null },
+      { $set: { synthesisInProgress: true, updatedAt: new Date() } }
+    );
+
+    if (claim) {
+      try {
+        await synthesizeFaqAnswer(result._id.toString(), question);
+      } catch (err) {
+        console.error('[FAQ] Synthesis failed:', err);
+        await col.updateOne(
+          { _id: result._id },
+          { $set: { synthesisInProgress: false } }
+        );
+      }
+    }
   }
 }
 
@@ -48,7 +64,7 @@ async function synthesizeFaqAnswer(faqId: string, question: string) {
   const col = await getMongoCollection(env.FAQ_COLLECTION);
   await col.updateOne(
     { _id: new ObjectId(faqId) },
-    { $set: { answer: text, public: false, pendingApproval: true } },
+    { $set: { answer: text, public: false, pendingApproval: true, synthesisInProgress: false } },
   );
 }
 

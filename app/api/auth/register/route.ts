@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
-import clientPromise from '@/lib/auth-client';
+import clientPromise from '@/lib/mongodb';
 import { env } from '@/lib/env';
 import { errorResponse } from '@/lib/errors';
 import { hashPassword } from '@/lib/auth/password';
@@ -23,6 +23,10 @@ const registerSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  if (!env.ALLOW_REGISTRATION) {
+    return errorResponse('FORBIDDEN', 'Registration is currently disabled', 403);
+  }
+
   let body: z.infer<typeof registerSchema>;
   try {
     body = registerSchema.parse(await req.json());

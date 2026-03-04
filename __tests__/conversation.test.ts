@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { MongoClient } from 'mongodb';
-import { getHistory, appendMessage, clearHistory, listConversations } from '../lib/conversation';
+import { getHistory, appendMessage, clearHistory } from '../lib/conversation';
 import { closeMongoClient } from '../lib/vectorstore';
 import { env } from '../lib/env';
 
@@ -65,22 +65,8 @@ describe('Conversation Management', () => {
 
   it('should clear history', async () => {
     await clearHistory(TEST_THREAD_ID);
-    
+
     const history = await getHistory(TEST_THREAD_ID);
     expect(history).toEqual([]);
-  });
-
-  it('should list conversations', async () => {
-    await appendMessage(TEST_THREAD_ID, {
-      role: 'user',
-      content: 'Test message for listing',
-      timestamp: new Date(),
-    });
-
-    const conversations = await listConversations(10);
-    const testConv = conversations.find(c => c.threadId === TEST_THREAD_ID);
-    
-    expect(testConv).toBeDefined();
-    expect(testConv?.messages.length).toBe(1);
   });
 });

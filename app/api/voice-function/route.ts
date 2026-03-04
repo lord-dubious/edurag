@@ -8,7 +8,14 @@ const VectorSearchArgsSchema = z.object({
   topK: z.number().min(1).max(20).optional().default(5),
 });
 
+import { auth } from '@/auth';
+
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return errorResponse('UNAUTHORIZED', 'Authentication required', 401);
+  }
+
   let body: { name?: string; arguments?: unknown };
   try {
     body = await request.json() as { name?: string; arguments?: unknown };

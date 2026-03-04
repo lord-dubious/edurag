@@ -21,7 +21,7 @@ const bodySchema = z.object({
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
-  if (!verifyAdmin(req)) return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
+  if (!(await verifyAdmin())) return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
 
   let body: z.infer<typeof bodySchema>;
   try {
@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
         const count = await crawlAndVectorize({
           ...body,
           onProgress: (page, total) => send({ type: 'progress', page, total }),
+          signal: req.signal,
         });
 
         // Update domain with document count

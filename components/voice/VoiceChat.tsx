@@ -46,7 +46,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   const [agentResponse, setAgentResponse] = useState('');
   const currentSourcesRef = useRef<Source[]>([]);
 
-  useEffect(() => {
+  const handleStart = useCallback(() => {
     const controller = new AbortController();
     fetch('/api/voice-token', { signal: controller.signal })
       .then(res => {
@@ -65,7 +65,6 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
         setError('Failed to get API key');
         console.error(err);
       });
-    return () => { controller.abort(); };
   }, []);
 
 
@@ -211,8 +210,8 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
       <footer className="flex justify-center items-center p-6 gap-4 border-t bg-background/50">
         {!isInCall ? (
           <Button
-            onClick={start}
-            disabled={!apiKey}
+            onClick={handleStart}
+            disabled={apiKey !== null}
             size="lg"
             className="rounded-full shadow-lg h-14 w-full max-w-sm text-base gap-2"
           >

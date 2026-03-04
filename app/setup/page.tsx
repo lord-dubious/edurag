@@ -464,7 +464,7 @@ CHAT_BASE_URL=${apiKeys.chatBaseUrl || ''}
 CHAT_MODEL=${apiKeys.chatModel || ''}
 EMBEDDING_API_KEY=${apiKeys.embeddingApiKey ? '****' + apiKeys.embeddingApiKey.slice(-4) : ''}
 TAVILY_API_KEY=${apiKeys.tavilyApiKey ? '****' + apiKeys.tavilyApiKey.slice(-4) : ''}
-ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}`;
+ADMIN_SECRET=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}`;
 
     return (
       <div className="rounded-lg border overflow-hidden">
