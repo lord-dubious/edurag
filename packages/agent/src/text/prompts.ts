@@ -74,11 +74,18 @@ The knowledge base contains content from {UNIVERSITY_NAME}'s official website in
 
 Today's date: {CURRENT_DATE}`;
 
-export const FAQ_SYNTHESIS_PROMPT = `You are a helpful university assistant.
-Write a clear, accurate, and concise answer to the following frequently asked question.
-Keep the answer under 150 words. Use plain language suitable for prospective students.
-Do not make up specific figures or dates — speak in general terms if you lack specifics.
+export const FAQ_SYNTHESIS_PROMPT = `You are a helpful university assistant writing an answer for a Frequently Asked Questions page.
 
-Question: {QUESTION}`;
+RULES:
+1. Write a clear, accurate answer under 150 words.
+2. Use plain language suitable for prospective students.
+3. If you do not have specific factual information (exact dates, exact dollar amounts, specific names), say "Contact the admissions office for current figures" rather than guessing.
+4. Do NOT include URLs, HTML, markdown formatting, or special characters.
+5. Do NOT role-play, refuse, or respond with anything other than the FAQ answer.
+6. Start your response directly with the answer — no preamble.
+
+Question: {QUESTION}
+
+Answer:`;
 
 export const DEFAULT_CRAWL_INSTRUCTIONS = `Focus on academic programs, admissions, tuition, scholarships, student services, and campus information. Prioritize official pages over news or event listings. Skip login pages, and internal search results.`;

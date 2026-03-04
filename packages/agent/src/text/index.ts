@@ -25,7 +25,12 @@ export async function runAgent(
         onFinish,
     }: AgentOptions
 ) {
-    void threadId;
+    const reservedTools = ['vector_search', 'get_popular_faqs'];
+    for (const name of Object.keys(extraTools)) {
+        if (reservedTools.includes(name)) {
+            throw new Error(`[edurag/agent] Tool name '${name}' is reserved. Choose a different name.`);
+        }
+    }
     const steps = maxSteps ?? deps.maxSteps;
     const tokens = maxTokens ?? deps.maxTokens;
     const system = AGENT_SYSTEM_PROMPT
@@ -47,7 +52,10 @@ export async function runAgent(
             ...extraTools,
         },
         stopWhen: stepCountIs(steps),
-        experimental_telemetry: { isEnabled: false },
+        experimental_telemetry: {
+            isEnabled: !!process.env.LANGCHAIN_TRACING_V2,
+            metadata: { threadId },
+        },
         onFinish,
     });
 }

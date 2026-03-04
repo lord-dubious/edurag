@@ -1,28 +1,39 @@
 import type { VoiceMessage } from './types';
 
+import { marked, Renderer } from 'marked';
+
 export function stripMarkdownForVoice(text: string): string {
-    return text
-        .replace(/```[\s\S]*?```/g, ' ')
-        .replace(/`([^`]*)`/g, '$1')
-        .replace(/^#{1,6}\s*/gm, '')
-        .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
-        .replace(/\*\*([^*]+)\*\*/g, '$1')
-        .replace(/\*([^*]+)\*/g, '$1')
-        .replace(/__([^_]+)__/g, '$1')
-        .replace(/_([^_]+)_/g, '$1')
-        .replace(/~~([^~]+)~~/g, '$1')
-        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-        .replace(/!\[([^\]]*)\]\([^)]*\)/g, '')
-        .replace(/^\s*[-*+]\s+/gm, '')
-        .replace(/^\s*\d+\.\s+/gm, '')
-        .replace(/^\s*>\s*/gm, '')
-        .replace(/\|/g, ' ')
-        .replace(/^[-:| ]+$/gm, '')
-        .replace(/https?:\/\/[^\s)]+/g, '')
-        .replace(/[*#~`\[\]{}()<>]/g, '')
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/  +/g, ' ')
-        .trim();
+    const renderer = new Renderer();
+
+    renderer.heading = (token: any) => `${token.text}. `;
+    renderer.paragraph = (token: any) => `${token.text} `;
+    renderer.strong = (token: any) => token.text;
+    renderer.em = (token: any) => token.text;
+    renderer.codespan = (token: any) => token.text;
+    renderer.code = () => ' ';  // Drop code blocks entirely
+    renderer.link = (token: any) => token.text; // Keep link text, drop URL
+    renderer.image = () => ''; // Drop images
+    renderer.list = (token: any) => token.body || '';
+    renderer.listitem = (token: any) => `${token.text}. `;
+    renderer.blockquote = (token: any) => token.text;
+    renderer.hr = () => '. ';
+    renderer.br = () => ' ';
+    renderer.table = (token: any) => `${token.header} ${token.rows}`;
+    renderer.tablerow = (token: any) => `${token.content} `;
+    renderer.tablecell = (token: any) => `${token.text}. `;
+    renderer.del = (token: any) => token.text;
+
+    try {
+        const html = marked(text, { renderer, async: false }) as string;
+        return html
+            .replace(/<[^>]+>/g, ' ')  // Strip any residual HTML tags
+            .replace(/https?:\/\/\S+/g, '')  // Remove bare URLs
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    } catch {
+        // Fallback to simple strip on parse failure
+        return text.replace(/[#*`_~\[\]()>|]/g, '').replace(/\s{2,}/g, ' ').trim();
+    }
 }
 
 export function getSystemPrompt(institutionName?: string): string {
