@@ -68,5 +68,5 @@ export default auth((request) => {
 });
 
 export const config = {
-  matcher: ['/admin/:path*', '/api/crawl/:path*', '/api/domains/:path*', '/setup', '/((?!api|_next/static|_next/image|favicon.ico|public).*)'],
+  matcher: ['/admin/:path*', '/api/chat', '/api/crawl/:path*', '/api/domains/:path*', '/setup', '/((?!api|_next/static|_next/image|favicon.ico|public).*)'],
 };

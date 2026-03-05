@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { similaritySearchWithScore } from '@/lib/vectorstore';
-import { errorResponse } from '@/lib/errors';
+
 import { z } from 'zod';
+
+import { auth } from '@/auth';
+import { errorResponse } from '@/lib/errors';
+import { similaritySearchWithScore } from '@/lib/vectorstore';
 
 const VectorSearchArgsSchema = z.object({
   query: z.string().min(1),
   topK: z.number().min(1).max(20).optional().default(5),
 });
-
-import { auth } from '@/auth';
 
 export async function POST(request: NextRequest) {
   const session = await auth();

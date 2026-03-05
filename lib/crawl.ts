@@ -9,6 +9,15 @@ import { env } from './env';
 import { getEmbeddings } from './providers';
 import { getMongoCollection } from './vectorstore';
 
+/**
+ * Advisory SSRF check — validates hostname strings against known-unsafe patterns.
+ *
+ * Limitation: This is a hostname-string check only and is vulnerable to
+ * TOCTOU / DNS-rebinding attacks (the hostname could resolve to a private IP
+ * after this check passes). For full protection, use network-level egress
+ * filtering to block RFC-1918 / reserved ranges and validate the actual
+ * resolved IPs returned by the HTTP client after the request completes.
+ */
 function assertSafeCrawlUrl(urlString: string) {
   const url = new URL(urlString);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {

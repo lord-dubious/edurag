@@ -15,22 +15,23 @@ export function ensureIndexes(): Promise<void> {
 
                 await db.collection('conversations').createIndex(
                     { threadId: 1 },
-                    { unique: true, background: true }
-                ).catch(console.warn);
+                    { unique: true }
+                );
 
                 await db.collection(env.DOMAINS_COLLECTION).createIndex(
                     { url: 1 },
-                    { unique: true, background: true }
-                ).catch(console.warn);
+                    { unique: true }
+                );
 
                 await db.collection(env.FAQ_COLLECTION).createIndex(
                     { normalized: 1 },
-                    { unique: true, background: true }
-                ).catch(console.warn);
+                    { unique: true }
+                );
 
             } catch (err) {
                 console.error('[ensureIndexes] Error creating indexes:', err);
                 ensureIndexesPromise = null;
+                throw err;
             }
         })();
     }

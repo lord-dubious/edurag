@@ -6,7 +6,7 @@ import { cleanContent, extractTitle } from '@/lib/crawl';
 import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
 
 export interface OnboardingCrawlProgress {
-    phase: 'preparing' | 'crawling' | 'chunking' | 'embedding' | 'storing' | 'complete' | 'error';
+    phase: 'preparing' | 'crawling' | 'embedding' | 'storing' | 'complete' | 'error';
     message: string;
     pagesFound: number;
     pagesProcessed: number;
@@ -43,13 +43,17 @@ function shouldSkipFile(url: string, fileTypeRules: FileTypeRules): boolean {
     return false;
 }
 
+const BINARY_EXTENSIONS = new Set([
+    '.zip', '.exe', '.dmg', '.apk', '.iso',
+    '.tar', '.gz', '.tgz', '.rar', '.7z', '.bin', '.dll', '.so',
+    '.mp3', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm',
+    '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico',
+    '.woff', '.woff2', '.ttf', '.eot',
+]);
+
 function isBinaryFile(url: string): boolean {
     const lowerUrl = url.toLowerCase();
-    return lowerUrl.endsWith('.zip') ||
-        lowerUrl.endsWith('.exe') ||
-        lowerUrl.endsWith('.dmg') ||
-        lowerUrl.endsWith('.apk') ||
-        lowerUrl.endsWith('.iso');
+    return [...BINARY_EXTENSIONS].some(ext => lowerUrl.endsWith(ext));
 }
 
 export interface OnboardingCrawlOptions {
@@ -209,7 +213,7 @@ export async function runOnboardingCrawl(opts: OnboardingCrawlOptions): Promise<
                 }
 
                 if (documents.length > 0) {
-                    await collection.insertMany(documents);
+                    await collection.insertMany(documents, { ordered: false });
                     totalDocs += documents.length;
                     totalPages++;
 

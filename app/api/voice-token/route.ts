@@ -12,6 +12,8 @@ export async function GET() {
     return errorResponse('INTERNAL_ERROR', 'Voice not configured', 500);
   }
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(
       `https://api.deepgram.com/v1/projects/${env.DEEPGRAM_PROJECT_ID}/keys`,
       {
@@ -21,12 +23,14 @@ export async function GET() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          comment: `session-${session.user.id}-${Date.now()}`,
+          comment: `session-${Date.now()}`,
           scopes: ['usage:write'],
           time_to_live_in_seconds: 90,
         }),
+        signal: controller.signal,
       },
     );
+    clearTimeout(timeout);
     if (!res.ok) throw new Error(`Deepgram key API returned ${res.status}`);
     const { key } = await res.json();
     return NextResponse.json({ apiKey: key });

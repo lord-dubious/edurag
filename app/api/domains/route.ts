@@ -1,10 +1,12 @@
+import { NextRequest } from 'next/server';
+
+import { ObjectId } from 'mongodb';
 import { z } from 'zod';
+
 import { verifyAdmin } from '@/lib/admin-auth';
 import { errorResponse } from '@/lib/errors';
 import { getMongoCollection } from '@/lib/vectorstore';
 import { env } from '@/lib/env';
-import { NextRequest } from 'next/server';
-import { ObjectId } from 'mongodb';
 
 const createSchema = z.object({
   url: z.string().url(),

@@ -83,24 +83,22 @@ export async function POST() {
     });
 
 
-    try {
-      await runOnboardingCrawl({
-        universityUrl,
-        crawlConfig: {
-          maxDepth: env.CRAWL_MAX_DEPTH,
-          maxBreadth: env.CRAWL_MAX_BREADTH,
-          limit: env.CRAWL_LIMIT,
-        },
-        crawlerInstructions: env.CRAWL_INSTRUCTIONS,
-      });
-    } catch (err) {
-      return NextResponse.json({
-        success: false,
-        message: 'Auto-crawl failed',
-        error: err instanceof Error ? err.message : String(err),
-        onboarded: true,
-      }, { status: 500 });
-    }
+    runOnboardingCrawl({
+      universityUrl,
+      crawlConfig: {
+        maxDepth: env.CRAWL_MAX_DEPTH,
+        maxBreadth: env.CRAWL_MAX_BREADTH,
+        limit: env.CRAWL_LIMIT,
+      },
+      crawlerInstructions: env.CRAWL_INSTRUCTIONS,
+    }).catch(async (err) => {
+      console.error('[Startup] Auto-crawl failed:', err);
+      try {
+        await updateSettings({ crawlStatus: 'failed' });
+      } catch (settingsErr) {
+        console.error('[Startup] Failed to update crawlStatus:', settingsErr);
+      }
+    });
 
     return NextResponse.json({
       success: true,
@@ -108,7 +106,7 @@ export async function POST() {
       onboarded: true,
       autoCrawl: true,
       universityUrl,
-    });
+    }, { status: 202 });
   } catch (error) {
     console.error('[Startup] Error:', error);
     return errorResponse('DB_ERROR', 'Startup check failed', 500, error);
