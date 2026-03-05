@@ -22,7 +22,7 @@ import {
 import { toast, Toaster } from 'sonner';
 import { Check, X, Shield, Loader2, Palette, ImageUp, Smile, Upload, Eye, EyeOff } from 'lucide-react';
 import { ColorPicker } from '@/components/ui/color-picker';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 
 interface BrandData {
   universityName: string;

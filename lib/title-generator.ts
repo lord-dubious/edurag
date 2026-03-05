@@ -1,8 +1,7 @@
 import { generateText } from 'ai';
-import { getChatProvider } from './providers';
+import { getChatProvider, getChatModel } from './providers';
 import { updateConversationTitle } from './conversation';
-
-const TITLE_MODEL = 'llama3.1-8b';
+import { env } from './env';
 
 export async function generateAndSaveTitle(threadId: string, userMessage: string, userId?: string): Promise<void> {
     try {
@@ -13,8 +12,12 @@ export async function generateAndSaveTitle(threadId: string, userMessage: string
             return;
         }
 
+        const titleModel = env.TITLE_MODEL
+            ? getChatProvider().chat(env.TITLE_MODEL)
+            : getChatModel();
+
         const { text } = await generateText({
-            model: getChatProvider().chat(TITLE_MODEL),
+            model: titleModel,
             system: `You are an expert title generator. Create a concise, 3-5 word title for the following user message. 
 If it is a voice handoff message, ignore the system wrapper and focus only on the topic the user asked about.
 Do not include quotation marks, boilerplate, or trailing punctuation. Just the title text.`,

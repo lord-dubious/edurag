@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { extractToken } from '@/lib/admin-auth';
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  
+
   const onboardedCookie = request.cookies.get('edurag_onboarded')?.value;
   const isOnboarded = onboardedCookie === 'true';
   const hasRequiredEnv = !!(
@@ -26,9 +27,8 @@ export function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith('/admin')) {
-    const token = request.cookies.get('admin_token')?.value
-      ?? request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-    
+    const token = extractToken(request);
+
     if (!token || token !== process.env.ADMIN_SECRET) {
       if (pathname === '/admin/login') {
         return NextResponse.next();
@@ -38,9 +38,8 @@ export function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith('/api/crawl') || pathname.startsWith('/api/domains')) {
-    const token = request.cookies.get('admin_token')?.value
-      ?? request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-    
+    const token = extractToken(request);
+
     if (!token || token !== process.env.ADMIN_SECRET) {
       return NextResponse.json(
         { error: 'Unauthorized', code: 'UNAUTHORIZED' },

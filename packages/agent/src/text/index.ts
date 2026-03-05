@@ -17,7 +17,8 @@ export async function runAgent(
     deps: AgentDependencies,
     {
         messages,
-        threadId,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        threadId: _threadId,
         universityName = 'University Knowledge Base',
         extraTools = {},
         maxSteps,
@@ -25,7 +26,7 @@ export async function runAgent(
         onFinish,
     }: AgentOptions
 ) {
-    void threadId;
+    // threadId reserved for future per-thread context (e.g., scoped search filters)
     const steps = maxSteps ?? deps.maxSteps;
     const tokens = maxTokens ?? deps.maxTokens;
     const system = AGENT_SYSTEM_PROMPT

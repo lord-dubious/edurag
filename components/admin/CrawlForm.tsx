@@ -17,7 +17,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ChevronDown, Globe } from 'lucide-react';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 
 interface CrawlFormData {
   url: string;
