@@ -33,6 +33,9 @@ export async function GET(): Promise<Response> {
       );
       if (!res.ok) throw new Error(`Deepgram key API returned ${res.status}`);
       const { key } = await res.json();
+      if (typeof key !== 'string' || key.trim() === '') {
+        return errorResponse('INTERNAL_ERROR', 'Invalid Deepgram response', 502);
+      }
       return NextResponse.json({ apiKey: key });
     } finally {
       clearTimeout(timeout);

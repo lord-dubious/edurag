@@ -54,13 +54,22 @@ export async function appendMessage(threadId: string, message: Message, userId?:
     throw new Error('Unauthorized: Cannot write to another user\'s thread');
   }
 
+  let filter: Filter<ConversationDocument>;
+  if (existing && existing.userId) {
+    filter = { threadId, userId: existing.userId };
+  } else if (!existing && userId) {
+    filter = { threadId };
+  } else {
+    filter = { threadId };
+  }
+
   const update: Record<string, Record<string, unknown>> = {
     $push: { messages: message },
     $set: { updatedAt: new Date() },
     $setOnInsert: {
       threadId,
       createdAt: new Date(),
-    }
+    },
   };
 
   if (userId && (!existing || !existing.userId)) {
@@ -70,9 +79,9 @@ export async function appendMessage(threadId: string, message: Message, userId?:
   }
 
   await collection.updateOne(
-    { threadId },
+    filter,
     update,
-    { upsert: true }
+    { upsert: true },
   );
 }
 

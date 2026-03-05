@@ -9,7 +9,7 @@ import { env } from './env';
 import { getEmbeddings } from './providers';
 import { getMongoCollection } from './vectorstore';
 
-function assertSafeCrawlUrl(urlString: string) {
+function assertSafeCrawlUrl(urlString: string): void {
   const url = new URL(urlString);
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new Error('Only HTTP/HTTPS URLs are allowed');

@@ -1,6 +1,6 @@
-import type { VoiceMessage } from './types';
-
 import { Lexer, type Token, type Tokens } from 'marked';
+
+import type { VoiceMessage } from './types';
 
 function extractText(tokens: Token[]): string {
     const parts: string[] = [];

@@ -58,10 +58,14 @@ export default auth((request) => {
   if (
     (pathname.startsWith('/api/crawl') ||
       pathname.startsWith('/api/domains') ||
-      (pathname.startsWith('/api/faqs') && request.method !== 'GET')) &&
-    session?.user?.role !== 'admin'
+      (pathname.startsWith('/api/faqs') && request.method !== 'GET'))
   ) {
-    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 });
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 });
+    }
+    if (session.user.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 });
+    }
   }
 
   return NextResponse.next();

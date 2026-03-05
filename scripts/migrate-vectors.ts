@@ -30,7 +30,7 @@ async function main(): Promise<void> {
                 changed = true;
             }
 
-            if (doc.text && !doc.content) {
+            if (typeof doc.text === 'string' && !doc.content) {
                 update.$set.content = doc.text;
                 changed = true;
             }
@@ -46,7 +46,7 @@ async function main(): Promise<void> {
             }
 
             if (!doc.title) {
-                update.$set.title = doc.url ? doc.url.split('/').pop() || 'Untitled' : 'Untitled';
+                update.$set.title = typeof doc.url === 'string' ? doc.url.split('/').pop() || 'Untitled' : 'Untitled';
                 changed = true;
             }
 
