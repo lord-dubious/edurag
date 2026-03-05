@@ -18,20 +18,22 @@ describe('FAQ Manager', () => {
     'What are the admission requirements?',
   ];
 
+  const normalizedQuestions = [...new Set(testQuestions.map(q => q.toLowerCase().trim()))];
+
   beforeAll(async () => {
     client = new MongoClient(env.MONGODB_URI!);
     await client.connect();
 
     const collection = await getMongoCollection(env.FAQ_COLLECTION);
     await collection.deleteMany({
-      question: { $in: [...new Set(testQuestions)] },
+      normalized: { $in: normalizedQuestions },
     });
   });
 
   afterAll(async () => {
     const collection = await getMongoCollection(env.FAQ_COLLECTION);
     await collection.deleteMany({
-      question: { $in: [...new Set(testQuestions)] },
+      normalized: { $in: normalizedQuestions },
     });
     await closeMongoClient();
     await client.close();

@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import type { Collection, Filter, UpdateFilter } from 'mongodb';
+import type { Collection, Filter } from 'mongodb';
 import { getMongoCollection } from './vectorstore';
 
 export interface Message {
@@ -54,7 +54,7 @@ export async function appendMessage(threadId: string, message: Message, userId?:
     throw new Error('Unauthorized: Cannot write to another user\'s thread');
   }
 
-  const update: any = {
+  const update: Record<string, Record<string, unknown>> = {
     $push: { messages: message },
     $set: { updatedAt: new Date() },
     $setOnInsert: {

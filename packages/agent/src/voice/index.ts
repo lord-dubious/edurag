@@ -1,38 +1,78 @@
 import type { VoiceMessage } from './types';
 
-import { marked, Renderer } from 'marked';
+import { Lexer, type Token, type Tokens } from 'marked';
+
+function extractText(tokens: Token[]): string {
+    const parts: string[] = [];
+    for (const token of tokens) {
+        switch (token.type) {
+            case 'heading':
+            case 'paragraph':
+            case 'strong':
+            case 'em':
+            case 'del':
+            case 'link':
+            case 'blockquote':
+                parts.push(extractText((token as Tokens.Heading).tokens));
+                break;
+            case 'text':
+                if ((token as Tokens.Text).tokens) {
+                    parts.push(extractText((token as Tokens.Text).tokens!));
+                } else {
+                    parts.push((token as Tokens.Text).text);
+                }
+                break;
+            case 'codespan':
+                parts.push((token as Tokens.Codespan).text);
+                break;
+            case 'list':
+                for (const item of (token as Tokens.List).items) {
+                    parts.push(extractText(item.tokens));
+                }
+                break;
+            case 'table': {
+                const table = token as Tokens.Table;
+                for (const cell of table.header) {
+                    parts.push(extractText(cell.tokens));
+                }
+                for (const row of table.rows) {
+                    for (const cell of row) {
+                        parts.push(extractText(cell.tokens));
+                    }
+                }
+                break;
+            }
+            case 'space':
+            case 'hr':
+            case 'br':
+                break;
+            case 'code':
+                parts.push((token as Tokens.Code).text);
+                break;
+            case 'image':
+            case 'html':
+                break;
+            default:
+                if ('text' in token && typeof token.text === 'string') {
+                    parts.push(token.text);
+                }
+                break;
+        }
+    }
+    return parts.join(' ');
+}
 
 export function stripMarkdownForVoice(text: string): string {
-    const renderer = new Renderer();
-
-    renderer.heading = (token: any) => `${token.text}. `;
-    renderer.paragraph = (token: any) => `${token.text} `;
-    renderer.strong = (token: any) => token.text;
-    renderer.em = (token: any) => token.text;
-    renderer.codespan = (token: any) => token.text;
-    renderer.code = () => ' ';  // Drop code blocks entirely
-    renderer.link = (token: any) => token.text; // Keep link text, drop URL
-    renderer.image = () => ''; // Drop images
-    renderer.list = (token: any) => token.body || '';
-    renderer.listitem = (token: any) => `${token.text}. `;
-    renderer.blockquote = (token: any) => token.text;
-    renderer.hr = () => '. ';
-    renderer.br = () => ' ';
-    renderer.table = (token: any) => `${token.header} ${token.rows}`;
-    renderer.tablerow = (token: any) => `${token.content} `;
-    renderer.tablecell = (token: any) => `${token.text}. `;
-    renderer.del = (token: any) => token.text;
-
     try {
-        const html = marked(text, { renderer, async: false }) as string;
-        return html
-            .replace(/<[^>]+>/g, ' ')  // Strip any residual HTML tags
-            .replace(/https?:\/\/\S+/g, '')  // Remove bare URLs
+        const dedented = text.replace(/^[ \t]+/gm, '');
+        const tokens = Lexer.lex(dedented);
+        return extractText(tokens)
+            .replace(/https?:\/\/\S+/g, '')
+            .replace(/[{}]/g, '')
             .replace(/\s{2,}/g, ' ')
             .trim();
     } catch {
-        // Fallback to simple strip on parse failure
-        return text.replace(/[#*`_~\[\]()>|]/g, '').replace(/\s{2,}/g, ' ').trim();
+        return text.replace(/[#*`_~\[\]()>|{}]/g, '').replace(/\s{2,}/g, ' ').trim();
     }
 }
 

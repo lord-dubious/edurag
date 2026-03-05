@@ -58,3 +58,8 @@ next-env.d.ts
 
 # keep committed env template
 !/.env.example
+EduRAG_Code_Review_X.md
+test_errors2.txt
+test_errors.txt
+ts-errors.txt
+package-lock.json

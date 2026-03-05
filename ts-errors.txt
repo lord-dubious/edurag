@@ -1,4 +1,0 @@
-.next/types/validator.ts(143,39): error TS2307: Cannot find module '../../app/api/admin/login/route.js' or its corresponding type declarations.
-__tests__/conversation.test.ts(3,51): error TS2724: '"../lib/conversation"' has no exported member named 'listConversations'. Did you mean 'Conversation'?
-__tests__/conversation.test.ts(81,41): error TS7006: Parameter 'c' implicitly has an 'any' type.
-lib/onboarding-crawl.ts(149,74): error TS2554: Expected 1 arguments, but got 2.

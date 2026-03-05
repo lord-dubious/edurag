@@ -13,7 +13,7 @@ async function main() {
 
     for (const doc of docs) {
         let changed = false;
-        const update: any = { $set: {} };
+        const update: Record<string, Record<string, unknown>> = { $set: {} };
 
         if (!doc.crawledAt && !doc.createdAt) {
             update.$set.crawledAt = new Date();
