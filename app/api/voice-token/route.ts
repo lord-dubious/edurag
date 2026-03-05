@@ -18,6 +18,9 @@ export async function GET() {
 
   const ttl = env.DEEPGRAM_TOKEN_TTL ?? DEFAULT_TOKEN_TTL;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+
   try {
     const res = await fetch(DEEPGRAM_GRANT_URL, {
       method: 'POST',
@@ -26,7 +29,9 @@ export async function GET() {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ time_to_live_in_seconds: ttl }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     if (!res.ok) {
       const body = await res.text();
@@ -35,11 +40,26 @@ export async function GET() {
     }
 
     const data: { access_token: string; expires_in: number } = await res.json();
+
+    if (
+      typeof data.access_token !== 'string' ||
+      !data.access_token.trim() ||
+      !Number.isFinite(data.expires_in)
+    ) {
+      console.error('[voice-token] Invalid grant response:', JSON.stringify(data));
+      return errorResponse('INTERNAL_ERROR', 'Deepgram returned an invalid token response', 502);
+    }
+
     return NextResponse.json({
       token: data.access_token,
       expiresIn: data.expires_in,
     });
   } catch (err) {
+    clearTimeout(timeout);
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      console.error('[voice-token] Deepgram grant request timed out');
+      return errorResponse('INTERNAL_ERROR', 'Deepgram token request timed out', 504);
+    }
     console.error('[voice-token] Deepgram grant request error:', err);
     return errorResponse('INTERNAL_ERROR', 'Failed to contact Deepgram', 502);
   }
