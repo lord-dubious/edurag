@@ -1,3 +1,7 @@
+import { revalidatePath } from 'next/cache';
+import Link from 'next/link';
+import { Save, RefreshCw, Loader2 } from 'lucide-react';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 import { getSettings, updateSettings } from '@/lib/db/settings';
 import { env } from '@/lib/env';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -6,10 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Save, RefreshCw, Loader2 } from 'lucide-react';
-import { revalidatePath } from 'next/cache';
-import Link from 'next/link';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 
 async function saveCrawlSettings(formData: FormData) {
   'use server';

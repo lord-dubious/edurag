@@ -1,10 +1,10 @@
 import { tavily } from '@tavily/core';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 import { env } from '@/lib/env';
 import { getMongoCollection } from '@/lib/vectorstore';
 import { getEmbeddings } from '@/lib/providers';
 import { cleanContent, extractTitle } from '@/lib/crawl';
 import { errorResponse } from '@/lib/errors';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 import type { NextRequest } from 'next/server';
 
 interface CrawlProgress {
