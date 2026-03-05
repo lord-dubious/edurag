@@ -8,7 +8,7 @@ const DEFAULT_TOKEN_TTL = 3600;
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user) {
+  if (!session?.user?.id) {
     return errorResponse('UNAUTHORIZED', 'Authentication required', 401);
   }
 
