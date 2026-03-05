@@ -1,10 +1,14 @@
 import { beforeAll, afterAll } from 'vitest';
 import { config } from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 
 beforeAll(async () => {
-  config({ path: path.resolve(process.cwd(), '.env.local') });
-  console.log('Test environment loaded. AUTH_SECRET:', process.env.AUTH_SECRET?.length, process.env.AUTH_SECRET?.substring(0, 5));
+  const envLocalPath = path.resolve(process.cwd(), '.env.local');
+  if (fs.existsSync(envLocalPath)) {
+    config({ path: envLocalPath });
+  }
+  config({ path: path.resolve(process.cwd(), '.env.test') });
 });
 
 afterAll(async () => {

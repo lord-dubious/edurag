@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck · Lint · Build · Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          SKIP_ENV_VALIDATION: 1
+
+      - name: Unit Tests
+        run: npx vitest run --exclude "**/agent-tools.test.ts" --exclude "**/vectorstore.test.ts" --exclude "**/crawl.test.ts" --exclude "**/conversation.test.ts" --exclude "**/faq-manager.test.ts" --exclude "**/integration/**"
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Integration Tests
+        run: npx vitest run __tests__/conversation.test.ts __tests__/faq-manager.test.ts __tests__/integration/
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          DB_NAME: ${{ secrets.DB_NAME || 'edurag' }}
+          VECTOR_COLLECTION: ${{ secrets.VECTOR_COLLECTION || 'crawled_index' }}
+          VECTOR_INDEX_NAME: ${{ secrets.VECTOR_INDEX_NAME || 'index' }}
+          FAQ_COLLECTION: ${{ secrets.FAQ_COLLECTION || 'faqs' }}
+          DOMAINS_COLLECTION: ${{ secrets.DOMAINS_COLLECTION || 'domains' }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          CHAT_API_KEY: ${{ secrets.CHAT_API_KEY }}
+          EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          DEEPGRAM_PROJECT_ID: test-project-ci
+          NODE_ENV: test
