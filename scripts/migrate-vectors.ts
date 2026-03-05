@@ -24,9 +24,9 @@ async function main(): Promise<void> {
                 changed = true;
             }
 
-            if (typeof doc.chunkIndex !== 'number') {
-                update.$set.chunkIndex = 0;
-                update.$set.totalChunks = 1;
+            if (typeof doc.chunkIndex !== 'number' || typeof doc.totalChunks !== 'number') {
+                update.$set.chunkIndex = typeof doc.chunkIndex === 'number' ? doc.chunkIndex : 0;
+                update.$set.totalChunks = typeof doc.totalChunks === 'number' ? doc.totalChunks : 1;
                 changed = true;
             }
 

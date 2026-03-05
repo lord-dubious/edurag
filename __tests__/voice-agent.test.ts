@@ -58,6 +58,9 @@ For more details, visit the [admissions page](https://university.edu/mba/admissi
             expect(output).not.toContain('https://');
             expect(output).not.toContain('[');
             expect(output).not.toContain(']');
+            expect(output).not.toContain('【');
+            expect(output).not.toContain('】');
+            expect(output).not.toContain('†');
         });
 
         it('should handle markdown tables for voice output', () => {

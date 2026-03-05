@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import NextAuth from 'next-auth';
 import { authConfig } from './auth.config';
+import { checkRateLimit } from '@/lib/rate-limiter';
 
 const { auth } = NextAuth(authConfig);
-import { checkRateLimit } from '@/lib/rate-limiter';
 
 export default auth((request) => {
   const { pathname } = request.nextUrl;
@@ -20,7 +20,7 @@ export default auth((request) => {
   }
   if (pathname === '/api/chat') {
     const ip = request.headers.get('x-real-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown';
-    const allowed = checkRateLimit(`chat:${ip}`, 20, 60_000); // 20 per minute
+    const allowed = checkRateLimit(`chat:${ip}`, 20, 60_000);
     if (!allowed) {
       return new Response(
         JSON.stringify({ error: 'Too many requests', code: 'RATE_LIMITED' }),
@@ -68,5 +68,5 @@ export default auth((request) => {
 });
 
 export const config = {
-  matcher: ['/admin/:path*', '/api/chat', '/api/crawl/:path*', '/api/domains/:path*', '/setup', '/((?!api|_next/static|_next/image|favicon.ico|public).*)'],
+  matcher: ['/admin/:path*', '/api/chat', '/api/crawl/:path*', '/api/domains/:path*', '/api/faqs/:path*', '/setup', '/((?!api|_next/static|_next/image|favicon.ico|public).*)'],
 };

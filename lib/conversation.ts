@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
-import type { Collection, Filter } from 'mongodb';
 import { getMongoCollection } from './vectorstore';
+import type { Collection, Filter } from 'mongodb';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -49,8 +49,8 @@ export async function appendMessage(threadId: string, message: Message, userId?:
   const collection = await getConversationsCollection();
   const existing = await collection.findOne({ threadId });
 
-  if (existing && existing.userId && userId && existing.userId !== userId) {
-    console.error(`[appendMessage] Unauthorized write attempt to thread ${threadId} by user ${userId}`);
+  if (existing && existing.userId && (!userId || existing.userId !== userId)) {
+    console.error('[appendMessage] Unauthorized write attempt to thread ***masked*** by user ***masked***');
     throw new Error('Unauthorized: Cannot write to another user\'s thread');
   }
 

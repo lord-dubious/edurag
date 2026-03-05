@@ -67,12 +67,13 @@ export function stripMarkdownForVoice(text: string): string {
         const dedented = text.replace(/^[ \t]+/gm, '');
         const tokens = Lexer.lex(dedented);
         return extractText(tokens)
+            .replace(/【[^】]*】/g, '')
             .replace(/https?:\/\/\S+/g, '')
-            .replace(/[{}]/g, '')
+            .replace(/[{}【】†]/g, '')
             .replace(/\s{2,}/g, ' ')
             .trim();
     } catch {
-        return text.replace(/[#*`_~\[\]()>|{}]/g, '').replace(/\s{2,}/g, ' ').trim();
+        return text.replace(/【[^】]*】/g, '').replace(/https?:\/\/\S+/g, '').replace(/[#*`_~\[\]()>|{}【】†]/g, '').replace(/\s{2,}/g, ' ').trim();
     }
 }
 

@@ -150,7 +150,7 @@ export async function runOnboardingCrawl(opts: OnboardingCrawlOptions): Promise<
                 continue;
             }
 
-            const collection = await getMongoCollection('crawled_index');
+            const collection = await getMongoCollection(env.VECTOR_COLLECTION);
 
             for (const page of crawlResult.results) {
                 signal?.throwIfAborted();
@@ -200,7 +200,7 @@ export async function runOnboardingCrawl(opts: OnboardingCrawlOptions): Promise<
 
                 for (let j = 0; j < chunks.length; j++) {
                     documents.push({
-                        content: chunks[j],
+                        text: chunks[j],
                         url: page.url,
                         title,
                         sourceType: isExternal ? 'external' : 'university',

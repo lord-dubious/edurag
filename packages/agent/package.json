@@ -12,9 +12,11 @@
         "./voice": "./src/voice/index.ts",
         "./voice/*": "./src/voice/*.ts"
     },
+    "dependencies": {
+        "marked": ">=9.0.0"
+    },
     "peerDependencies": {
         "ai": ">=6.0.0",
-        "marked": ">=9.0.0",
         "zod": ">=4.0.0"
     }
 }
