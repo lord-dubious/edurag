@@ -8,7 +8,7 @@ beforeAll(async () => {
   if (fs.existsSync(envLocalPath)) {
     config({ path: envLocalPath });
   }
-  config({ path: path.resolve(process.cwd(), '.env.test') });
+  config({ path: path.resolve(process.cwd(), '.env.test'), override: true });
 });
 
 afterAll(async () => {

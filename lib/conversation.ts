@@ -58,7 +58,7 @@ export async function appendMessage(threadId: string, message: Message, userId?:
   if (existing && existing.userId) {
     filter = { threadId, userId: existing.userId };
   } else if (!existing && userId) {
-    filter = { threadId };
+    filter = { threadId, $or: [{ userId: null }, { userId: { $exists: false } }] };
   } else {
     filter = { threadId };
   }

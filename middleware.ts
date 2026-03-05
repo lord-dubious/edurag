@@ -10,12 +10,11 @@ export default auth((request) => {
   const session = request.auth;
 
   if (process.env.NODE_ENV === 'production') {
-    const proto = request.headers.get('x-forwarded-proto');
-    if (proto && !proto.includes('https')) {
-      const host = request.headers.get('host');
-      if (host) {
-        return NextResponse.redirect(`https://${host}${request.nextUrl.pathname}${request.nextUrl.search}`);
-      }
+    const proto = request.headers.get('x-forwarded-proto')?.split(',')[0].trim();
+    if (proto && proto !== 'https') {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.protocol = 'https:';
+      return NextResponse.redirect(redirectUrl);
     }
   }
   if (pathname === '/api/chat') {
