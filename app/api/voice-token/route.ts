@@ -46,7 +46,7 @@ export async function GET() {
       !data.access_token.trim() ||
       !Number.isFinite(data.expires_in)
     ) {
-      console.error('[voice-token] Invalid grant response:', JSON.stringify(data));
+      console.error('[voice-token] Invalid grant response:', JSON.stringify({ ...data, access_token: '<REDACTED>' }));
       return errorResponse('INTERNAL_ERROR', 'Deepgram returned an invalid token response', 502);
     }
 
