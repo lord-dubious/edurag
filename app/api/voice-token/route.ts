@@ -31,7 +31,6 @@ export async function GET() {
       body: JSON.stringify({ time_to_live_in_seconds: ttl }),
       signal: controller.signal,
     });
-    clearTimeout(timeout);
 
     if (!res.ok) {
       const body = await res.text();
@@ -55,12 +54,13 @@ export async function GET() {
       expiresIn: data.expires_in,
     });
   } catch (err) {
-    clearTimeout(timeout);
     if (err instanceof DOMException && err.name === 'AbortError') {
       console.error('[voice-token] Deepgram grant request timed out');
       return errorResponse('INTERNAL_ERROR', 'Deepgram token request timed out', 504);
     }
     console.error('[voice-token] Deepgram grant request error:', err);
     return errorResponse('INTERNAL_ERROR', 'Failed to contact Deepgram', 502);
+  } finally {
+    clearTimeout(timeout);
   }
 }
