@@ -11,7 +11,7 @@ async function generateTestAudio() {
     }
 
     const text = "Hello! Could you tell me a little bit about this university?";
-    const response = await fetch('https://api.deepgram.com/v1/speak?model=aura-2-thalia-en&encoding=linear16&sample_rate=16000', {
+    const response = await fetch('https://api.deepgram.com/v1/speak?model=aura-2-thalia-en&encoding=linear16&sample_rate=24000', {
         method: 'POST',
         headers: {
             Authorization: `Token ${apiKey}`,
@@ -30,4 +30,7 @@ async function generateTestAudio() {
     console.log('Successfully generated test-audio.wav');
 }
 
-generateTestAudio().catch(console.error);
+generateTestAudio().catch(err => {
+    console.error(err);
+    process.exit(1);
+});
