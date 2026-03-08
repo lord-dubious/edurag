@@ -189,6 +189,8 @@ export function useDeepgramVoice({
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
+    updateState('thinking');
+
     for (const func of data.functions) {
       if (func.name === 'vector_search') {
         try {
@@ -237,7 +239,7 @@ export function useDeepgramVoice({
         }
       }
     }
-  }, [onSources, onRequestNotes]);
+  }, [onSources, onRequestNotes, updateState]);
 
   const handleMessage = useCallback((event: MessageEvent) => {
     if (event.data instanceof ArrayBuffer) {
