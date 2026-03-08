@@ -57,7 +57,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
         if (data.error) {
           setError(data.error);
         } else {
-          setApiKey(data.apiKey);
+          setApiKey(data.token);
         }
       })
       .catch(err => {

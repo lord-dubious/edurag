@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast, Toaster } from 'sonner';
+import { Check, X, Shield, Loader2, Palette, ImageUp, Smile, Upload, Eye, EyeOff } from 'lucide-react';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,10 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast, Toaster } from 'sonner';
-import { Check, X, Shield, Loader2, Palette, ImageUp, Smile, Upload, Eye, EyeOff } from 'lucide-react';
 import { ColorPicker } from '@/components/ui/color-picker';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
 
 interface BrandData {
   universityName: string;

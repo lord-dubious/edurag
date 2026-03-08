@@ -1,4 +1,4 @@
-import type { Source } from '../text/types';
+import type { Source, VectorSearchResult } from '../text/types';
 
 export interface VoiceMessage {
     role: 'user' | 'assistant';
@@ -19,9 +19,4 @@ export interface VectorSearchFunctionArgs {
     topK?: number;
 }
 
-export interface VoiceVectorSearchResult {
-    content: string;
-    url: string;
-    title?: string;
-    score: number;
-}
+export type VoiceVectorSearchResult = VectorSearchResult;

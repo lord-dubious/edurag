@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { ChevronDown, Globe } from 'lucide-react';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,8 +18,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { ChevronDown, Globe } from 'lucide-react';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
 
 interface CrawlFormData {
   url: string;

@@ -1,3 +1,7 @@
+import { revalidatePath } from 'next/cache';
+import Link from 'next/link';
+import { Save, RefreshCw, Loader2 } from 'lucide-react';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 import { getSettings, updateSettings } from '@/lib/db/settings';
 import { env } from '@/lib/env';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -6,20 +10,16 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Save, RefreshCw, Loader2 } from 'lucide-react';
-import { revalidatePath } from 'next/cache';
-import Link from 'next/link';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
 
 async function saveCrawlSettings(formData: FormData) {
   'use server';
-  
+
   const uniUrl = formData.get('uniUrl') as string;
   const maxDepth = Math.min(5, Math.max(1, parseInt(formData.get('maxDepth') as string) || 3));
   const maxBreadth = Math.max(1, parseInt(formData.get('maxBreadth') as string) || 50);
   const limit = Math.max(1, parseInt(formData.get('limit') as string) || 300);
   const crawlerInstructions = formData.get('crawlerInstructions') as string;
-  
+
   await updateSettings({
     uniUrl,
     crawlConfig: {
@@ -29,34 +29,34 @@ async function saveCrawlSettings(formData: FormData) {
     },
     crawlerInstructions: crawlerInstructions || undefined,
   });
-  
+
   revalidatePath('/admin/knowledge-base');
 }
 
 export default async function KnowledgeBasePage() {
   const settings = await getSettings();
-  
+
   const uniUrl = settings?.uniUrl || env.UNIVERSITY_URL || '';
   const maxDepth = settings?.crawlConfig?.maxDepth || env.CRAWL_MAX_DEPTH;
   const maxBreadth = settings?.crawlConfig?.maxBreadth || env.CRAWL_MAX_BREADTH;
   const limit = settings?.crawlConfig?.limit || env.CRAWL_LIMIT;
   const crawlerInstructions = settings?.crawlerInstructions || DEFAULT_CRAWL_INSTRUCTIONS;
   const crawlStatus = settings?.crawlStatus || 'complete';
-  
+
   const statusColors: Record<string, string> = {
     pending: 'bg-yellow-500',
     running: 'bg-blue-500 animate-pulse',
     complete: 'bg-green-500',
     failed: 'bg-red-500',
   };
-  
+
   const statusLabels: Record<string, string> = {
     pending: 'Pending',
     running: 'Running...',
     complete: 'Complete',
     failed: 'Failed',
   };
-  
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -73,7 +73,7 @@ export default async function KnowledgeBasePage() {
           </Badge>
         </div>
       </div>
-      
+
       <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
@@ -102,7 +102,7 @@ export default async function KnowledgeBasePage() {
           </CardContent>
         </Card>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Trigger Re-Crawl</CardTitle>
@@ -126,7 +126,7 @@ export default async function KnowledgeBasePage() {
           )}
         </CardContent>
       </Card>
-      
+
       <form action={saveCrawlSettings} className="space-y-6">
         <Card>
           <CardHeader>
@@ -202,7 +202,7 @@ export default async function KnowledgeBasePage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <div className="flex justify-end">
           <Button type="submit">
             <Save className="mr-2 h-4 w-4" />

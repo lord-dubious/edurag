@@ -12,7 +12,7 @@ import { appendMessage, getConversation } from '@/lib/conversation';
 const bodySchema = z.object({
   messages: z.array(z.object({
     id: z.string(),
-    role: z.enum(['user', 'assistant', 'system']),
+    role: z.enum(['user', 'assistant']),
     parts: z.array(z.record(z.string(), z.unknown())),
     content: z.string().optional(),
   })),
@@ -83,11 +83,8 @@ export async function POST(req: Request) {
 
       // Trigger title generation only when the conversation has no title yet
       if (!existing?.title) {
-        try {
-          void generateAndSaveTitle(currentThreadId, userText, userId);
-        } catch (titleErr) {
-          console.error('[Title] Failed to generate title:', titleErr);
-        }
+        generateAndSaveTitle(currentThreadId, userText, userId)
+          .catch(err => console.error('[Title] Failed to generate title:', err));
       }
     } catch (dbErr) {
       console.error('[DB] Failed to persist user message or check title:', dbErr);

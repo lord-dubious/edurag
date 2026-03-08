@@ -57,7 +57,10 @@ const envSchema = z.object({
 
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
+  TITLE_MODEL: z.string().optional(),
+
   DEEPGRAM_API_KEY: z.string().min(1).optional(),
+  DEEPGRAM_TOKEN_TTL: z.coerce.number().min(30).max(3600).default(3600),
   DEEPGRAM_STT_MODEL: z.string().default('nova-3'),
   DEEPGRAM_TTS_MODEL: z.string().default('aura-2-thalia-en'),
   DEEPGRAM_THINK_MODEL: z.string().default('gemini-2.5-flash'),

@@ -1,10 +1,10 @@
 import { tavily } from '@tavily/core';
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 import { env } from '@/lib/env';
 import { getMongoCollection } from '@/lib/vectorstore';
 import { getEmbeddings } from '@/lib/providers';
 import { cleanContent, extractTitle } from '@/lib/crawl';
 import { errorResponse } from '@/lib/errors';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from '@/lib/constants';
 import type { NextRequest } from 'next/server';
 
 interface CrawlProgress {
@@ -53,10 +53,10 @@ function shouldSkipFile(url: string, fileTypeRules: FileTypeRules): boolean {
 function isBinaryFile(url: string): boolean {
   const lowerUrl = url.toLowerCase();
   return lowerUrl.endsWith('.zip') ||
-         lowerUrl.endsWith('.exe') ||
-         lowerUrl.endsWith('.dmg') ||
-         lowerUrl.endsWith('.apk') ||
-         lowerUrl.endsWith('.iso');
+    lowerUrl.endsWith('.exe') ||
+    lowerUrl.endsWith('.dmg') ||
+    lowerUrl.endsWith('.apk') ||
+    lowerUrl.endsWith('.iso');
 }
 
 interface CrawlRequestBody {
@@ -83,20 +83,20 @@ export async function POST(request: NextRequest): Promise<Response> {
     console.error('[Crawl] Failed to parse JSON:', error);
     return errorResponse('VALIDATION_ERROR', 'Invalid JSON in request body', 400);
   }
-  
+
   if (typeof rawBody !== 'object' || rawBody === null) {
     return errorResponse('VALIDATION_ERROR', 'Request body must be an object', 400);
   }
-  
+
   const body = rawBody as Record<string, unknown>;
-  
+
   if (!body.universityUrl || typeof body.universityUrl !== 'string') {
     return errorResponse('VALIDATION_ERROR', 'universityUrl is required', 400);
   }
-  
-  const { 
-    universityUrl, 
-    externalUrls = [], 
+
+  const {
+    universityUrl,
+    externalUrls = [],
     excludePaths = [],
     crawlConfig = { maxDepth: 3, limit: 300 },
     fileTypeRules = { pdf: 'index', docx: 'index', csv: 'skip' },
@@ -132,15 +132,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     async start(controller) {
       const tvly = tavily({ apiKey: tavilyApiKey });
       const embeddingsInstance = getEmbeddings(embeddingApiKey, embeddingModel, embeddingDimensions);
-      
+
       let totalChunks = 0;
       let totalDocs = 0;
       let totalPages = 0;
       const allUrls = [universityUrl, ...externalUrls];
 
       try {
-        sendProgress(controller, { 
-          phase: 'preparing', 
+        sendProgress(controller, {
+          phase: 'preparing',
           message: 'Starting crawl...',
           pagesFound: allUrls.length,
           pagesProcessed: 0,
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         for (let i = 0; i < allUrls.length; i++) {
           const baseUrl = allUrls[i];
           const isExternal = i > 0;
-          
+
           sendProgress(controller, {
             phase: 'crawling',
             message: `Crawling ${isExternal ? 'external source' : 'university site'}...`,
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           });
 
           try {
-            const excludePatterns = excludePaths.map((p: string) => 
+            const excludePatterns = excludePaths.map((p: string) =>
               p.startsWith('/') ? `${baseUrl}${p}` : p
             );
 
@@ -193,15 +193,15 @@ export async function POST(request: NextRequest): Promise<Response> {
             }
 
             const collection = await getMongoCollection('crawled_index', mongodbUri);
-            
+
             for (const page of crawlResult.results) {
               if (!page.url || !page.rawContent) continue;
-              
+
               if (isBinaryFile(page.url)) {
                 console.log(`Skipping binary file: ${page.url}`);
                 continue;
               }
-              
+
               if (shouldSkipFile(page.url, fileTypeRules)) {
                 continue;
               }
@@ -212,12 +212,12 @@ export async function POST(request: NextRequest): Promise<Response> {
               const title = extractTitle(page.rawContent, page.url) || page.url.split('/').pop() || 'Untitled';
               const rawChunks = chunkText(cleaned, 1500, 300);
               const chunks = rawChunks.filter((c: string) => c.trim().length > 50);
-              
+
               if (chunks.length === 0) {
                 console.log(`No valid chunks for ${page.url}`);
                 continue;
               }
-              
+
               totalChunks += chunks.length;
 
               sendProgress(controller, {
@@ -241,12 +241,12 @@ export async function POST(request: NextRequest): Promise<Response> {
                 console.error(`Chunks info: count=${chunks.length}, lengths=[${chunks.slice(0, 3).map(c => c.length).join(', ')}...]`);
                 continue;
               }
-              
+
               if (!embeddingsArray || embeddingsArray.length !== chunks.length) {
                 console.error(`Embedding mismatch for ${page.url}: got ${embeddingsArray?.length ?? 0} embeddings for ${chunks.length} chunks`);
                 continue;
               }
-              
+
               for (let j = 0; j < chunks.length; j++) {
                 documents.push({
                   content: chunks[j],
