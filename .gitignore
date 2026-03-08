@@ -58,3 +58,8 @@ next-env.d.ts
 
 # keep committed env template
 !/.env.example
+
+# E2E Test Artifacts
+test-audio.wav
+test-output*.txt
+debug-voice*.png
