@@ -50,7 +50,7 @@ Edit `.env.local` with your credentials:
 # Required
 CHAT_API_KEY=your-llm-api-key
 CHAT_BASE_URL=https://api.cerebras.ai/v1
-CHAT_MODEL=llama-3.3-70b-specdec
+CHAT_MODEL=gpt-oss-120b
 
 EMBEDDING_API_KEY=your-voyage-api-key
 EMBEDDING_BASE_URL=https://api.voyageai.com/v1
@@ -286,16 +286,16 @@ CMD ["npm", "start"]
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `CHAT_API_KEY` | LLM API key | ✅ |
-| `CHAT_BASE_URL` | LLM API endpoint | ✅ |
-| `CHAT_MODEL` | Model name | ✅ |
-| `EMBEDDING_API_KEY` | Embedding API key | ✅ |
-| `EMBEDDING_BASE_URL` | Embedding endpoint | ✅ |
-| `EMBEDDING_MODEL` | Embedding model | ✅ |
-| `EMBEDDING_DIMENSIONS` | Vector dimensions (must match index) | ✅ |
-| `MONGODB_URI` | MongoDB Atlas connection string | ✅ |
-| `TAVILY_API_KEY` | Tavily crawl API key | ✅ |
-| `ADMIN_SECRET` | Admin auth token (min 16 chars) | ✅ |
+| `CHAT_API_KEY` | LLM API key | Yes |
+| `CHAT_BASE_URL` | LLM API endpoint | Yes |
+| `CHAT_MODEL` | Model name | Yes |
+| `EMBEDDING_API_KEY` | Embedding API key | Yes |
+| `EMBEDDING_BASE_URL` | Embedding endpoint | Yes |
+| `EMBEDDING_MODEL` | Embedding model | Yes |
+| `EMBEDDING_DIMENSIONS` | Vector dimensions (must match index) | Yes |
+| `MONGODB_URI` | MongoDB Atlas connection string | Yes |
+| `TAVILY_API_KEY` | Tavily crawl API key | Yes |
+| `ADMIN_SECRET` | Admin auth token (min 16 chars) | Yes |
 | `FAQ_THRESHOLD` | Questions before FAQ synthesis | Default: 5 |
 | `CRAWL_*` | Crawl defaults | Optional |
 
@@ -310,7 +310,7 @@ CMD ["npm", "start"]
 | Voice | Deepgram (v4 SDK) |
 | Core Agent | @edurag/agent (Workspace) |
 | Vector Store | @langchain/mongodb |
-| LLM Provider | Cerebras (Llama 3.3) |
+| LLM Provider | Cerebras (gpt-oss-120b) |
 | Embeddings | Voyage AI (voyage-4-large) |
 | Crawling | @tavily/core |
 | Database | MongoDB Atlas |
