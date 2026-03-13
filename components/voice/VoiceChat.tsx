@@ -39,8 +39,15 @@ const personaStateMap: Record<AgentState, PersonaState> = {
   speaking: 'speaking',
 };
 
+interface VoiceConfig {
+  sttModel: string;
+  ttsModel: string;
+  thinkModel: string;
+}
+
 export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, institutionName }: VoiceChatProps): React.JSX.Element {
   const [apiKey, setApiKey] = useState<string | null>(null);
+  const [voiceConfig, setVoiceConfig] = useState<VoiceConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [agentResponse, setAgentResponse] = useState('');
@@ -58,6 +65,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
           setError(data.error);
         } else {
           setApiKey(data.token);
+          if (data.config) setVoiceConfig(data.config);
         }
       })
       .catch(err => {
@@ -116,6 +124,9 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
     onSources: handleSources,
     onRequestNotes: handleShowNotes,
     institutionName,
+    sttModel: voiceConfig?.sttModel,
+    ttsModel: voiceConfig?.ttsModel,
+    thinkModel: voiceConfig?.thinkModel,
   });
 
   const handleEnd = useCallback(() => {

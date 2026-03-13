@@ -5,7 +5,6 @@ import {
   useEffect
 } from 'react';
 import type { UIMessage } from '@ai-sdk/react';
-import { env } from '@/lib/env';
 import { stripMarkdownForVoice, getSystemPrompt } from '@edurag/agent/voice';
 import type { AgentState } from '@edurag/agent/voice';
 import type { Source } from '@edurag/agent/text';
@@ -22,6 +21,9 @@ export interface UseDeepgramVoiceOptions {
   onSources?: (sources: Source[]) => void;
   onRequestNotes?: (topic: string) => void;
   institutionName?: string;
+  sttModel?: string;
+  ttsModel?: string;
+  thinkModel?: string;
 }
 
 export interface UseDeepgramVoiceReturn {
@@ -42,6 +44,9 @@ export function useDeepgramVoice({
   onSources,
   onRequestNotes,
   institutionName,
+  sttModel,
+  ttsModel,
+  thinkModel,
 }: UseDeepgramVoiceOptions): UseDeepgramVoiceReturn {
   const [state, setState] = useState<AgentState>('idle');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -149,13 +154,13 @@ export function useDeepgramVoice({
         listen: {
           provider: {
             type: 'deepgram',
-            model: env.DEEPGRAM_STT_MODEL,
+            model: sttModel || 'nova-3',
           },
         },
         think: {
           provider: {
             type: 'google',
-            model: env.DEEPGRAM_THINK_MODEL,
+            model: thinkModel || 'gemini-2.5-flash',
           },
           prompt: getSystemPrompt(institutionName),
           functions: [
@@ -178,12 +183,12 @@ export function useDeepgramVoice({
         speak: {
           provider: {
             type: 'deepgram',
-            model: env.DEEPGRAM_TTS_MODEL,
+            model: ttsModel || 'aura-2-thalia-en',
           },
         },
       }
     }));
-  }, [history, institutionName]);
+  }, [history, institutionName, sttModel, ttsModel, thinkModel]);
 
   const handleFunctionCall = useCallback(async (data: { functions: Array<{ id: string; name: string; arguments: string }> }) => {
     const ws = wsRef.current;

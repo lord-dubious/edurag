@@ -52,6 +52,11 @@ export async function GET() {
     return NextResponse.json({
       token: data.access_token,
       expiresIn: data.expires_in,
+      config: {
+        sttModel: env.DEEPGRAM_STT_MODEL,
+        ttsModel: env.DEEPGRAM_TTS_MODEL,
+        thinkModel: env.DEEPGRAM_THINK_MODEL,
+      },
     });
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
