@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env';
 import { errorResponse } from '@/lib/errors';
-import { auth } from '@/auth';
+
 
 const DEEPGRAM_GRANT_URL = 'https://api.deepgram.com/v1/auth/grant';
 const DEFAULT_TOKEN_TTL = 3600;
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return errorResponse('UNAUTHORIZED', 'Authentication required', 401);
-  }
 
   if (!env.DEEPGRAM_API_KEY) {
     return errorResponse('INTERNAL_ERROR', 'Deepgram API key not configured', 500);
