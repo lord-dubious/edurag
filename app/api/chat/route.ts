@@ -6,7 +6,8 @@ import { generateAndSaveTitle } from '@/lib/title-generator';
 import { getSettings } from '@/lib/db/settings';
 import { errorResponse } from '@/lib/errors';
 import { nanoid } from 'nanoid';
-import { auth } from '@/auth';
+import { headers } from 'next/headers';
+import { auth } from '@/lib/auth';
 import { appendMessage, getConversation } from '@/lib/conversation';
 
 const bodySchema = z.object({
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
     return errorResponse('VALIDATION_ERROR', 'Invalid request body', 400, err);
   }
 
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   const userId = session?.user?.id;
 
   const { messages, threadId } = body;

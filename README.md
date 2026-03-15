@@ -48,6 +48,8 @@ Edit `.env.local` with your credentials:
 
 ```bash
 # Required
+AUTH_SECRET=your-random-32-char-secret
+BETTER_AUTH_URL=http://localhost:3000
 CHAT_API_KEY=your-llm-api-key
 CHAT_BASE_URL=https://api.cerebras.ai/v1
 CHAT_MODEL=gpt-oss-120b
@@ -145,6 +147,42 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
+
+---
+
+## Deploying to Netlify
+
+### 1. Install the Netlify Next.js Plugin
+
+```bash
+npm install -D @netlify/plugin-nextjs
+```
+
+### 2. Set Environment Variables in Netlify Dashboard
+
+Go to **Site Settings → Environment Variables** and add:
+
+| Variable | Value | Required |
+|----------|-------|----------|
+| `AUTH_SECRET` | Random 32+ char secret (`npx auth secret`) | Yes |
+| `BETTER_AUTH_URL` | Your full deploy URL e.g. `https://your-site.netlify.app` | Yes |
+| `MONGODB_URI` | MongoDB Atlas connection string | Yes |
+| `CHAT_API_KEY` | LLM API key | Yes |
+| `CHAT_BASE_URL` | LLM base URL | Yes |
+| `CHAT_MODEL` | `gpt-oss-120b` | Yes |
+| `EMBEDDING_API_KEY` | Voyage AI key | Yes |
+| `TAVILY_API_KEY` | Tavily key | Yes |
+| `ADMIN_SECRET` | Min 16 chars | Yes |
+| `DEEPGRAM_API_KEY` | Deepgram API key | For voice |
+
+> **Important**: `BETTER_AUTH_URL` must exactly match your Netlify site URL (no trailing slash). Without it, auth redirects back to `localhost` after sign-in.
+
+### 3. Deploy
+
+```bash
+# Push to your branch, or trigger a manual deploy in Netlify dashboard
+git push origin main
+```
 
 ---
 
@@ -286,6 +324,8 @@ CMD ["npm", "start"]
 
 | Variable | Description | Required |
 |----------|-------------|----------|
+| `AUTH_SECRET` | Random 32+ character secret, e.g., generated with `npx auth secret` | Yes |
+| `BETTER_AUTH_URL` | Full deploy URL or localhost during development | Yes |
 | `CHAT_API_KEY` | LLM API key | Yes |
 | `CHAT_BASE_URL` | LLM API endpoint | Yes |
 | `CHAT_MODEL` | Model name | Yes |
@@ -296,6 +336,9 @@ CMD ["npm", "start"]
 | `MONGODB_URI` | MongoDB Atlas connection string | Yes |
 | `TAVILY_API_KEY` | Tavily crawl API key | Yes |
 | `ADMIN_SECRET` | Admin auth token (min 16 chars) | Yes |
+| `DEEPGRAM_API_KEY` | Deepgram API key | For voice |
+| `DEEPGRAM_STT_MODEL` | Deepgram STT model | For voice |
+| `DEEPGRAM_TTS_MODEL` | Deepgram TTS model | For voice |
 | `FAQ_THRESHOLD` | Questions before FAQ synthesis | Default: 5 |
 | `CRAWL_*` | Crawl defaults | Optional |
 

@@ -4,7 +4,6 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { BrandProvider } from "@/components/providers/BrandProvider";
 import { ErrorBoundary } from "@/components/error/ErrorBoundary";
 import { Toaster } from "@/components/ui/sonner";
-import { NextAuthSessionProvider } from "@/components/providers/NextAuthSessionProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,21 +31,19 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <NextAuthSessionProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <ErrorBoundary>
-              <BrandProvider>
-                {children}
-                <Toaster position="bottom-right" />
-              </BrandProvider>
-            </ErrorBoundary>
-          </ThemeProvider>
-        </NextAuthSessionProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ErrorBoundary>
+            <BrandProvider>
+              {children}
+              <Toaster position="bottom-right" />
+            </BrandProvider>
+          </ErrorBoundary>
+        </ThemeProvider>
       </body>
     </html>
   );

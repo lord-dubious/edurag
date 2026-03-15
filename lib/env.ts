@@ -43,6 +43,8 @@ const envSchema = z.object({
 
   // Note: AUTH_SECRET is optional globally but is required by NextAuth for session encryption (used at auth.ts) when authentication is enabled.
   AUTH_SECRET: z.string().min(1).optional(),
+  // BETTER_AUTH_URL must be set to the deployment URL on non-Vercel hosts (e.g. https://your-site.netlify.app)
+  BETTER_AUTH_URL: z.string().url().optional(),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   MICROSOFT_CLIENT_ID: z.string().min(1).optional(),

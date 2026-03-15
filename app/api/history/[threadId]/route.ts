@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { deleteConversation, getConversation, appendMessage } from "@/lib/conversation";
+import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
+import { auth } from '@/lib/auth';
+import { deleteConversation, getConversation, appendMessage } from '@/lib/conversation';
 import { z } from 'zod';
 
 import { errorResponse } from '@/lib/errors';
@@ -11,7 +12,7 @@ const messageSchema = z.object({
 });
 
 export async function GET(req: Request, { params }: { params: Promise<{ threadId: string }> }) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -24,7 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ threadId
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ threadId: string }> }) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) {
     return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
@@ -64,9 +65,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ threadI
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ threadId: string }> }) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const { threadId } = await params;
   const deleted = await deleteConversation(threadId, session.user.id);

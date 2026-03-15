@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { signOut, useSession } from 'next-auth/react';
+import { authClient } from '@/lib/auth-client-better';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,10 +15,23 @@ import {
 import type { JSX } from 'react';
 
 export function UserMenu(): JSX.Element | null {
-  const { data: session } = useSession();
+  const { data: session } = authClient.useSession();
 
-  const handleSignOut = useCallback(() => {
-    void signOut({ callbackUrl: '/' });
+  const handleSignOut = useCallback(async () => {
+    try {
+      await authClient.signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            window.location.href = '/';
+          },
+          onError: (ctx) => {
+            alert(ctx.error.message ?? 'An error occurred during sign out.');
+          }
+        },
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'An error occurred during sign out.');
+    }
   }, []);
 
   if (!session?.user) {
