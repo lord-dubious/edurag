@@ -6,10 +6,12 @@ import { Image as ImageIcon, Phone } from 'lucide-react';
 import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputFooter, PromptInputSubmit, PromptInputButton } from '@/components/ai-elements/prompt-input';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import type { ChatStatus } from 'ai';
+import { authClient } from '@/lib/auth-client-better';
 import { useBrand } from '@/components/providers/BrandProvider';
 
 export function Hero(): React.JSX.Element {
   const router = useRouter();
+  const { data: session } = authClient.useSession();
   const { brand, loading } = useBrand();
 
   const name = brand?.appName || 'University Knowledge Base';
@@ -19,8 +21,12 @@ export function Hero(): React.JSX.Element {
     router.push(`/chat?q=${encodedQuery}`);
   }, [router]);
   const handleVoiceStart = useCallback(() => {
+    if (!session?.user) {
+      router.push(`/auth/signin?callbackUrl=${encodeURIComponent('/chat?voice=1')}`);
+      return;
+    }
     router.push('/chat?voice=1');
-  }, [router]);
+  }, [router, session?.user]);
 
   const renderLogo = () => {
     if (loading) {
@@ -118,6 +124,9 @@ export function Hero(): React.JSX.Element {
             </div>
           </PromptInputFooter>
         </PromptInput>
+        {!session?.user && (
+          <p className="text-xs text-muted-foreground mt-2 text-right">Voice requires login</p>
+        )}
       </div>
     </div>
   );

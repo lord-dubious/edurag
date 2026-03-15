@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { PhoneOff, X } from 'lucide-react';
 import type { UIMessage } from '@ai-sdk/react';
 import { useDeepgramVoice } from '@/lib/voice/useDeepgramVoice';
@@ -46,6 +47,7 @@ interface VoiceConfig {
 }
 
 export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, institutionName }: VoiceChatProps): React.JSX.Element {
+  const router = useRouter();
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [voiceConfig, setVoiceConfig] = useState<VoiceConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +138,9 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   const handleShowNotes = useCallback((topic: string) => {
     onShowNotes?.(topic);
   }, [onShowNotes]);
+  const handleLogin = useCallback(() => {
+    router.push(`/auth/signin?callbackUrl=${encodeURIComponent('/chat?voice=1')}`);
+  }, [router]);
 
   const { state, start, stop } = useDeepgramVoice({
     apiKey,
@@ -194,7 +199,14 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
             </div>
             <p className="text-sm font-medium text-destructive">{error}</p>
-            <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
+            {error === 'You must be logged in to use voice chat.' ? (
+              <div className="flex items-center gap-2">
+                <Button onClick={handleLogin}>Log in</Button>
+                <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
+              </div>
+            ) : (
+              <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
+            )}
           </div>
         ) : !apiKey ? (
           <div className="flex flex-col items-center justify-center space-y-4 text-muted-foreground">

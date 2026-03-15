@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { useTheme } from 'next-themes';
+import { useRouter } from 'next/navigation';
 
 import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { nanoid } from 'nanoid';
+import { useTheme } from 'next-themes';
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
@@ -54,6 +55,7 @@ const SUGGESTIONS = [
 ];
 
 export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps) {
+  const router = useRouter();
   const { data: session } = authClient.useSession();
   const [threadId, setThreadId] = useState(() => nanoid());
   const [showHistory, setShowHistory] = useState(true);
@@ -65,6 +67,7 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
   const initialQuerySentRef = useRef(false);
   const { theme, setTheme } = useTheme();
   const { brand } = useBrand();
+  const isAuthenticated = Boolean(session?.user);
 
   const appName = brand?.appName || 'University Knowledge Base';
   const logoUrl = brand?.logoUrl;
@@ -179,6 +182,13 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     },
     [sendMessage]
   );
+  const handleVoiceStart = useCallback(() => {
+    if (!isAuthenticated) {
+      router.push(`/auth/signin?callbackUrl=${encodeURIComponent('/chat?voice=1')}`);
+      return;
+    }
+    setVoiceMode(true);
+  }, [isAuthenticated, router, setVoiceMode]);
 
   const formatVoiceHandoffPrompt = useCallback((topic: string) => {
     return `[VOICE_HANDOFF] I am providing the detailed Markdown notes and source links for ${topic} now as requested in our conversation.`;
@@ -382,7 +392,12 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
                     institutionName={appName}
                   />
                 ) : (
-                  <ChatInput onSubmit={handleSubmit} status={status} onVoiceMode={() => setVoiceMode(true)} />
+                  <ChatInput
+                    onSubmit={handleSubmit}
+                    status={status}
+                    onVoiceMode={handleVoiceStart}
+                    voiceHelperText={isAuthenticated ? undefined : 'Voice requires login'}
+                  />
                 )}
               </div>
             </div>
