@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-EduRAG is a self-hostable RAG knowledge base for universities built with Next.js 16, Vercel AI SDK 6, MongoDB Atlas Vector Search, and Tavily. 
+EduRAG is a self-hostable RAG knowledge base for universities built with Next.js 16, Vercel AI SDK 6, Better Auth, MongoDB Atlas Vector Search, and Tavily. 
 
 The core agent logic (text and voice) is encapsulated in a standalone workspace package `@edurag/agent`. The main application acts as a "Thin Wiring Layer," injecting concrete implementations (database, models, search functions) into the agent's orchestration logic.
 
@@ -18,10 +18,10 @@ npm run dev              # Start Next.js dev server on http://localhost:3000
 npm run build            # Production build (run before committing changes)
 npm run start            # Start production server
 
-# Vercel Deployment
+# Platform-Agnostic Deployment (Vercel, Render, Railway, Netlify)
 # If npm install fails with peer dependency conflicts, use legacy peer deps:
 npm install --legacy-peer-deps
-# Or ensure .npmrc with 'legacy-peer-deps=true' exists in project root
+# Note: The codebase requires no platform-specific configs (like netlify.toml) by design.
 
 # Testing
 npm run test             # Run all tests with Vitest
@@ -179,6 +179,13 @@ const { messages, sendMessage, status } = useChat({
 
 ## Key Architecture Patterns
 
+### Authentication (Better Auth)
+- Migrated to **Better Auth** for robust, cross-platform session management and social logins (Google/Microsoft).
+- **Deployment Agnostic**: Relies strictly on `BETTER_AUTH_URL` instead of legacy NextAuth URLs.
+- Better Auth is configured with `BETTER_AUTH_URL` and uses `mongodbAdapter` to integrate with MongoDB.
+- `mongodbAdapter` consumes the shared MongoDB client so auth uses the same connection pool as the rest of the app.
+- MongoDB client initialization is handled in `createClientPromise`, which clears a rejected client promise to prevent cached/stalled DB connections; this is a DB client safety pattern, not an auth client behavior.
+
 ### MongoDB Vector Search
 
 - Uses **post-filtering** approach — no filter fields in MongoDB index
@@ -266,7 +273,8 @@ The Voice and Text interfaces represent a **single unified entity**.
 - **Persona Sync**: In `VoiceChat.tsx`, `AgentState` is mapped to `PersonaState` to trigger the appropriate AI animations (e.g., `thinking` state triggers the "pulsing" animation).
 
 ### Security & Persistence
-- **Token Exchange**: The `/api/voice-token` route provides short-lived temporary credentials to the browser, preventing the exposure of the master `DEEPGRAM_API_KEY`.
+- **Token Exchange & Scaling**: The `/api/voice-token` route generates **short-lived temporary credentials** using the Deepgram SDK. Token lifetime is controlled by `DEEPGRAM_TOKEN_TTL` (default 3600s in the env schema), which is separate from the rate-limiter window.
+- **Cross-Instance Rate Limiting**: Voice tokens are limited to **5 requests per 60 seconds** per user via the MongoDB-backed `voice_rate_limits` collection and a TTL index (`expireAfterSeconds: 60`). When the limit is exceeded, the route returns **HTTP 429** with `Retry-After: 60` and a response body message indicating the rate limit was exceeded.
 - **Chat History Persistence**: Chat messages are saved to `localStorage` only when a stream finishes, ensuring reliability while avoiding unnecessary writes during token-by-token generation.
 - **Client-Side Rendering**: Voice components and chat history utilize `useEffect` to ensure they only initialize on the client, preventing SSR hydration mismatches.
 
@@ -346,6 +354,7 @@ CHAT_API_KEY=...              # LLM API key (Cerebras, OpenAI-compatible)
 TAVILY_API_KEY=...            # For web crawling
 EMBEDDING_API_KEY=...         # Voyage AI key
 ADMIN_SECRET=...              # Min 16 chars, for admin dashboard access
+BETTER_AUTH_URL=...           # Full deploy URL (Required in Production)
 
 # Chat model configuration
 CHAT_MODEL=gpt-oss-120b       # Default model
@@ -366,6 +375,7 @@ CRAWL_EXCLUDE_PATHS=/archive/*,/admin/*,/login/*
 
 # Voice (optional)
 DEEPGRAM_API_KEY=...
+DEEPGRAM_TOKEN_TTL=600        # Token validity duration in seconds
 DEEPGRAM_STT_MODEL=nova-3
 DEEPGRAM_TTS_MODEL=aura-2-thalia-en
 
@@ -399,6 +409,7 @@ The app has a setup wizard for first-time configuration:
 
 | Collection | Purpose |
 |------------|---------|
+| `voice_rate_limits` | TTL-indexed centralized rate limiter for Deepgram token generation |
 | `crawled_index` | Vector search documents with embeddings |
 | `settings` | Onboarding config (single doc, `_id: 'onboarding'`) |
 | `faqs` | Auto-generated FAQs with approval workflow |
