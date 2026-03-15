@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { mongodbAdapter } from 'better-auth/adapters/mongodb';
+import { nextCookies } from 'better-auth/next-js';
 import clientPromise from './auth-client';
 import { env } from './env';
 
@@ -61,6 +62,7 @@ async function buildAuth() {
         },
       },
     },
+    plugins: [nextCookies()],
   });
 }
 
