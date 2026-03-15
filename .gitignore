@@ -63,3 +63,7 @@ next-env.d.ts
 test-audio.wav
 test-output*.txt
 debug-voice*.png
+
+# API / Review Artifacts
+prs.json
+reviews.json

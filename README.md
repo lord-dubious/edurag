@@ -48,6 +48,8 @@ Edit `.env.local` with your credentials:
 
 ```bash
 # Required
+AUTH_SECRET=your-random-32-char-secret
+AUTH_URL=http://localhost:3000
 CHAT_API_KEY=your-llm-api-key
 CHAT_BASE_URL=https://api.cerebras.ai/v1
 CHAT_MODEL=gpt-oss-120b
@@ -324,6 +326,8 @@ CMD ["npm", "start"]
 
 | Variable | Description | Required |
 |----------|-------------|----------|
+| `AUTH_SECRET` | Random 32+ character secret, e.g., generated with `npx auth secret` | Yes |
+| `AUTH_URL` | Full deploy URL or localhost during development | Yes |
 | `CHAT_API_KEY` | LLM API key | Yes |
 | `CHAT_BASE_URL` | LLM API endpoint | Yes |
 | `CHAT_MODEL` | Model name | Yes |
@@ -334,6 +338,9 @@ CMD ["npm", "start"]
 | `MONGODB_URI` | MongoDB Atlas connection string | Yes |
 | `TAVILY_API_KEY` | Tavily crawl API key | Yes |
 | `ADMIN_SECRET` | Admin auth token (min 16 chars) | Yes |
+| `DEEPGRAM_API_KEY` | Deepgram API key | For voice |
+| `DEEPGRAM_STT_MODEL` | Deepgram STT model | For voice |
+| `DEEPGRAM_TTS_MODEL` | Deepgram TTS model | For voice |
 | `FAQ_THRESHOLD` | Questions before FAQ synthesis | Default: 5 |
 | `CRAWL_*` | Crawl defaults | Optional |
 

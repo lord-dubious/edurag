@@ -24,6 +24,12 @@ async function buildAuth() {
     };
   }
 
+  if (process.env.NODE_ENV === 'production' && !env.AUTH_URL) {
+    throw new Error('AUTH_URL is required in production');
+  }
+
+  const trustedOrigins = [env.AUTH_URL ?? 'http://localhost:3000'];
+
   return betterAuth({
     database: mongodbAdapter(db),
     emailAndPassword: {
@@ -33,7 +39,7 @@ async function buildAuth() {
     },
     secret: env.AUTH_SECRET,
     baseURL: env.AUTH_URL,
-    trustedOrigins: [env.AUTH_URL ?? 'http://localhost:3000'],
+    trustedOrigins,
     socialProviders,
     session: {
       expiresIn: 60 * 60 * 24 * 30,

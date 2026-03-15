@@ -54,6 +54,21 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
     }
   }, [callbackUrl, loginEmail, loginPassword]);
 
+  const handleSocialSignIn = useCallback(async (provider: 'google' | 'microsoft') => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const result = await authClient.signIn.social({ provider, callbackURL: callbackUrl });
+      if (result.error) {
+        setError(result.error.message ?? `Failed to sign in with ${provider}.`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `An error occurred during ${provider} sign in.`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [callbackUrl]);
+
   const renderSocialButtons = () => {
     if (!hasGoogle && !hasMicrosoft) {
       return null;
@@ -65,7 +80,8 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
           <Button
             type='button'
             variant='outline'
-            onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: callbackUrl })}
+            onClick={() => handleSocialSignIn('google')}
+            disabled={isLoading}
           >
             Continue with Google
           </Button>
@@ -74,7 +90,8 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
           <Button
             type='button'
             variant='outline'
-            onClick={() => authClient.signIn.social({ provider: 'microsoft', callbackURL: callbackUrl })}
+            onClick={() => handleSocialSignIn('microsoft')}
+            disabled={isLoading}
           >
             Continue with Outlook
           </Button>
