@@ -152,8 +152,6 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## Deploying to Netlify
 
-EduRAG ships with a `netlify.toml` that uses `@netlify/plugin-nextjs` to support App Router, server components, and auth callbacks.
-
 ### 1. Install the Netlify Next.js Plugin
 
 ```bash
