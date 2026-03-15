@@ -3,7 +3,7 @@ import { MongoClient } from 'mongodb';
 function createClientPromise(): Promise<MongoClient> {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
-    return Promise.reject(new Error('Invalid/Missing environment variable: "MONGODB_URI"'));
+    throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
   }
   const client = new MongoClient(uri);
   return client.connect();
