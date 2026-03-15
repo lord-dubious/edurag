@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth';
 import { mongodbAdapter } from 'better-auth/adapters/mongodb';
 import { nextCookies } from 'better-auth/next-js';
 import clientPromise from './auth-client';
+import { resolveAuthConfig } from './auth-config';
 import { env } from './env';
 
 async function buildAuth() {
@@ -25,12 +26,7 @@ async function buildAuth() {
     };
   }
 
-  if (process.env.NODE_ENV === 'production' && !env.BETTER_AUTH_URL) {
-    throw new Error('BETTER_AUTH_URL is required in production');
-  }
-
-  const baseURL = env.BETTER_AUTH_URL ?? 'http://localhost:3000';
-  const trustedOrigins = [baseURL];
+  const { baseURL, trustedOrigins } = resolveAuthConfig(env);
 
   return betterAuth({
     database: mongodbAdapter(db),
