@@ -25,11 +25,11 @@ async function buildAuth() {
     };
   }
 
-  if (process.env.NODE_ENV === 'production' && !env.BETTER_AUTH_URL && !env.AUTH_URL) {
-    throw new Error('BETTER_AUTH_URL or AUTH_URL is required in production');
+  if (process.env.NODE_ENV === 'production' && !env.BETTER_AUTH_URL) {
+    throw new Error('BETTER_AUTH_URL is required in production');
   }
 
-  const baseURL = env.BETTER_AUTH_URL ?? env.AUTH_URL ?? 'http://localhost:3000';
+  const baseURL = env.BETTER_AUTH_URL ?? 'http://localhost:3000';
   const trustedOrigins = [baseURL];
 
   return betterAuth({
