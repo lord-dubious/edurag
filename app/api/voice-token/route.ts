@@ -24,7 +24,16 @@ export async function GET() {
     }
     const rateLimits = db.collection<VoiceRateLimit>('voice_rate_limits');
 
-    await rateLimits.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(() => {});
+    await rateLimits.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(err => {
+      const message = err instanceof Error ? err.message : String(err);
+      const code = typeof err === 'object' && err && 'code' in err
+        ? (err as { code?: number }).code
+        : undefined;
+      const isDuplicate = code === 85 || code === 86 || /already exists|IndexOptionsConflict|IndexKeySpecsConflict/i.test(message);
+      if (!isDuplicate) {
+        console.error('[voice-token] Failed to create rate limit index:', err);
+      }
+    });
 
     const rateLimitResult = await rateLimits.findOneAndUpdate(
       { _id: userId },
@@ -40,7 +49,10 @@ export async function GET() {
       : rateLimitResult) as VoiceRateLimit | null | undefined;
 
     if (doc && doc.count > 5) {
-      return errorResponse('RATE_LIMITED', 'Rate limit exceeded for voice tokens. Try again later.', 429);
+      return NextResponse.json(
+        { error: 'Rate limit exceeded for voice tokens. Try again later.', code: 'RATE_LIMITED' },
+        { status: 429, headers: { 'Retry-After': '60' } },
+      );
     }
 
     if (!env.DEEPGRAM_API_KEY) {
@@ -48,8 +60,10 @@ export async function GET() {
     }
 
     const deepgram = createClient(env.DEEPGRAM_API_KEY);
+    const ttlSecondsRaw = Number.parseInt(String(env.DEEPGRAM_TOKEN_TTL), 10);
+    const ttlSeconds = Number.isFinite(ttlSecondsRaw) && ttlSecondsRaw > 0 ? ttlSecondsRaw : 3600;
     const { result, error } = await deepgram.auth.grantToken({
-      ttl_seconds: Number(env.DEEPGRAM_TOKEN_TTL),
+      ttl_seconds: ttlSeconds,
     });
 
     if (error || !result) {

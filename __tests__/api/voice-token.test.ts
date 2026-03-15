@@ -76,6 +76,7 @@ describe('/api/voice-token', () => {
     const body = await response.json();
     expect(response.status).toBe(429);
     expect(body.code).toBe('RATE_LIMITED');
+    expect(response.headers.get('Retry-After')).toBe('60');
   });
 
   it('returns token and config on success', async () => {

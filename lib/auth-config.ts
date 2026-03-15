@@ -23,7 +23,8 @@ export function resolveAuthConfig(
       ?? processEnv.URL
       ?? processEnv.DEPLOY_PRIME_URL,
   );
-  const baseURL = normalizeUrl(env.BETTER_AUTH_URL) ?? inferredBaseURL ?? 'http://localhost:3000';
+  const normalizedBetterAuthUrl = normalizeUrl(env.BETTER_AUTH_URL);
+  const baseURL = normalizedBetterAuthUrl || inferredBaseURL || 'http://localhost:3000';
 
   if (processEnv.NODE_ENV === 'production' && baseURL === 'http://localhost:3000') {
     throw new Error('BETTER_AUTH_URL (or NEXT_PUBLIC_APP_URL/VERCEL_URL/URL) is required in production');
@@ -31,7 +32,7 @@ export function resolveAuthConfig(
 
   const trustedOrigins = Array.from(new Set([
     baseURL,
-    normalizeUrl(env.BETTER_AUTH_URL),
+    normalizedBetterAuthUrl,
     inferredBaseURL,
   ].filter((value): value is string => Boolean(value))));
 

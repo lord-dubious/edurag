@@ -182,8 +182,9 @@ const { messages, sendMessage, status } = useChat({
 ### Authentication (Better Auth)
 - Migrated to **Better Auth** for robust, cross-platform session management and social logins (Google/Microsoft).
 - **Deployment Agnostic**: Relies strictly on `BETTER_AUTH_URL` instead of legacy NextAuth URLs.
-- Uses the `mongodbAdapter` for seamless integration with the existing shared MongoDB client.
-- Auth client initialization (`createClientPromise`) strictly handles and clears Promise rejections to prevent caching stalled DB connections.
+- Better Auth is configured with `BETTER_AUTH_URL` and uses `mongodbAdapter` to integrate with MongoDB.
+- `mongodbAdapter` consumes the shared MongoDB client so auth uses the same connection pool as the rest of the app.
+- MongoDB client initialization is handled in `createClientPromise`, which clears a rejected client promise to prevent cached/stalled DB connections; this is a DB client safety pattern, not an auth client behavior.
 
 ### MongoDB Vector Search
 
@@ -272,8 +273,8 @@ The Voice and Text interfaces represent a **single unified entity**.
 - **Persona Sync**: In `VoiceChat.tsx`, `AgentState` is mapped to `PersonaState` to trigger the appropriate AI animations (e.g., `thinking` state triggers the "pulsing" animation).
 
 ### Security & Persistence
-- **Token Exchange & Scaling**: The `/api/voice-token` route generates **short-lived temporary credentials** (TTL configurable via `DEEPGRAM_TOKEN_TTL`) using the Deepgram SDK, protecting the master API key.
-- **Cross-Instance Rate Limiting**: Voice tokens are protected by a centralized MongoDB-backed rate limiter (`voice_rate_limits` collection) utilizing `$inc` and a **TTL index** (`expireAfterSeconds: 60`) to perfectly synchronize quotas across serverless instances.
+- **Token Exchange & Scaling**: The `/api/voice-token` route generates **short-lived temporary credentials** using the Deepgram SDK. Token lifetime is controlled by `DEEPGRAM_TOKEN_TTL` (default 3600s in the env schema), which is separate from the rate-limiter window.
+- **Cross-Instance Rate Limiting**: Voice tokens are limited to **5 requests per 60 seconds** per user via the MongoDB-backed `voice_rate_limits` collection and a TTL index (`expireAfterSeconds: 60`). When the limit is exceeded, the route returns **HTTP 429** with `Retry-After: 60` and a response body message indicating the rate limit was exceeded.
 - **Chat History Persistence**: Chat messages are saved to `localStorage` only when a stream finishes, ensuring reliability while avoiding unnecessary writes during token-by-token generation.
 - **Client-Side Rendering**: Voice components and chat history utilize `useEffect` to ensure they only initialize on the client, preventing SSR hydration mismatches.
 

@@ -55,12 +55,13 @@ describe('Agent Tools', () => {
 
   describe('Vector Search Tool', () => {
     it('should find relevant documents', async () => {
-      const results = await similaritySearchWithScore('MBA program requirements', 20);
+      const results = await similaritySearchWithScore('MBA program requirements GMAT 600 work experience', 80);
 
       expect(results.length).toBeGreaterThan(0);
       const [doc, score] = results[0];
       expect(typeof doc.pageContent).toBe('string');
       expect(typeof score).toBe('number');
+      expect(results.some(([resultDoc]) => resultDoc.pageContent.includes('MBA'))).toBe(true);
     });
 
     it('should return empty results for irrelevant queries', async () => {
