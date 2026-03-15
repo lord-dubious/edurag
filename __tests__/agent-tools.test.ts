@@ -12,6 +12,7 @@ import { getChatModel, getEmbeddings } from '../lib/providers';
 import { getMongoCollection, closeMongoClient, similaritySearchWithScore } from '../lib/vectorstore';
 
 const TEST_THREAD_ID = 'test-agent-thread-' + Date.now();
+const UNIQUE_MBA_TOKEN = `edurag-mba-${TEST_THREAD_ID}`;
 
 describe('Agent Tools', () => {
   let client: MongoClient;
@@ -25,7 +26,7 @@ describe('Agent Tools', () => {
 
     const docs = [
       new Document({
-        pageContent: 'The MBA program requires a bachelor\'s degree, GMAT score of 600+, and 2 years of work experience.',
+        pageContent: `The MBA program requires a bachelor's degree, GMAT score of 600+, and 2 years of work experience. ${UNIQUE_MBA_TOKEN}`,
         metadata: { url: 'https://test.edu/mba', threadId: TEST_THREAD_ID, title: 'MBA Requirements' },
       }),
       new Document({
@@ -55,13 +56,13 @@ describe('Agent Tools', () => {
 
   describe('Vector Search Tool', () => {
     it('should find relevant documents', async () => {
-      const results = await similaritySearchWithScore('MBA program requirements GMAT 600 work experience', 80);
+      const results = await similaritySearchWithScore(UNIQUE_MBA_TOKEN, 80);
 
       expect(results.length).toBeGreaterThan(0);
       const [doc, score] = results[0];
       expect(typeof doc.pageContent).toBe('string');
       expect(typeof score).toBe('number');
-      expect(results.some(([resultDoc]) => resultDoc.pageContent.includes('MBA'))).toBe(true);
+      expect(results.some(([resultDoc]) => resultDoc.pageContent.includes(UNIQUE_MBA_TOKEN))).toBe(true);
     });
 
     it('should return empty results for irrelevant queries', async () => {

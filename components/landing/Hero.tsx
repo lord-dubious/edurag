@@ -2,8 +2,8 @@
 
 import React, { useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Image as ImageIcon } from 'lucide-react';
-import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputFooter, PromptInputSubmit } from '@/components/ai-elements/prompt-input';
+import { Image as ImageIcon, Phone } from 'lucide-react';
+import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputFooter, PromptInputSubmit, PromptInputButton } from '@/components/ai-elements/prompt-input';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import type { ChatStatus } from 'ai';
 import { useBrand } from '@/components/providers/BrandProvider';
@@ -17,6 +17,9 @@ export function Hero(): React.JSX.Element {
   const handleSubmit = useCallback((message: PromptInputMessage) => {
     const encodedQuery = encodeURIComponent(message.text);
     router.push(`/chat?q=${encodedQuery}`);
+  }, [router]);
+  const handleVoiceStart = useCallback(() => {
+    router.push('/chat?voice=1');
   }, [router]);
 
   const renderLogo = () => {
@@ -102,7 +105,17 @@ export function Hero(): React.JSX.Element {
           </PromptInputBody>
           <PromptInputFooter className="bg-background/80 backdrop-blur-sm rounded-b-lg border-t-0 p-2">
             <div className="flex-1" />
-            <PromptInputSubmit status={'ready' as ChatStatus} />
+            <div className="flex items-center gap-2">
+              <PromptInputButton
+                onClick={handleVoiceStart}
+                title="Start voice"
+                aria-label="Start voice chat"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md shadow-sm border-none shadow-black/5 flex items-center justify-center p-2"
+              >
+                <Phone className="size-4" />
+              </PromptInputButton>
+              <PromptInputSubmit status={'ready' as ChatStatus} />
+            </div>
           </PromptInputFooter>
         </PromptInput>
       </div>

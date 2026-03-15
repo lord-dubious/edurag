@@ -56,21 +56,44 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   useEffect(() => {
     const controller = new AbortController();
     fetch('/api/voice-token', { signal: controller.signal })
-      .then(res => {
-        if (!res.ok) throw new Error(`Voice token request failed (${res.status})`);
-        return res.json();
+      .then(async res => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          if (res.status === 401) {
+            setError('You must be logged in to use voice chat.');
+            return null;
+          }
+          const message = data && typeof data === 'object' && 'error' in data
+            ? String((data as { error?: string }).error)
+            : `Voice token request failed (${res.status})`;
+          setError(message);
+          return null;
+        }
+        return data;
       })
       .then(data => {
-        if (data.error) {
-          setError(data.error);
-        } else {
-          setApiKey(data.token);
-          if (data.config) setVoiceConfig(data.config);
+        if (!data || typeof data !== 'object') {
+          setError('Voice token response was empty.');
+          return;
+        }
+        if ('error' in data && (data as { error?: string }).error) {
+          setError(String((data as { error?: string }).error));
+          return;
+        }
+        const token = (data as { token?: unknown }).token;
+        if (typeof token !== 'string' || token.trim().length === 0) {
+          setError('Voice token response missing token.');
+          return;
+        }
+        setApiKey(token);
+        const config = (data as { config?: unknown }).config;
+        if (config && typeof config === 'object') {
+          setVoiceConfig(config as VoiceConfig);
         }
       })
       .catch(err => {
         if (err.name === 'AbortError') return;
-        setError('Failed to get API key');
+        setError(prev => prev ?? 'Failed to get API key');
         console.error(err);
       });
     return () => { controller.abort(); };

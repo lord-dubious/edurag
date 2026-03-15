@@ -1,17 +1,15 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from 'next-themes';
 
 import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import { authClient } from '@/lib/auth-client-better';
-import { useTheme } from 'next-themes';
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 
-import type { Source } from '@edurag/agent/text';
-
+import { authClient } from '@/lib/auth-client-better';
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { HistorySidebar } from "@/components/chat/HistorySidebar";
@@ -20,6 +18,7 @@ import { VoiceChat, VoiceMessagePayload } from '@/components/voice/VoiceChat';
 import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
 import { CitationPanel } from './CitationPanel';
+import type { Source } from '@edurag/agent/text';
 
 interface VectorSearchResult {
   url: string;
@@ -44,6 +43,7 @@ function isVectorSearchToolPart(part: MessagePart): part is VectorSearchToolPart
 
 interface ChatInterfaceProps {
   initialQuery?: string;
+  initialVoice?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -53,7 +53,7 @@ const SUGGESTIONS = [
   { label: 'Campus Life', query: 'Tell me about campus life' },
 ];
 
-export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
+export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps) {
   const { data: session } = authClient.useSession();
   const [threadId, setThreadId] = useState(() => nanoid());
   const [showHistory, setShowHistory] = useState(true);
@@ -61,7 +61,7 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
 
   const [sources, setSources] = useState<Record<string, Source[]>>({});
   const [showSources, setShowSources] = useState(true);
-  const [voiceMode, setVoiceMode] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(Boolean(initialVoice));
   const initialQuerySentRef = useRef(false);
   const { theme, setTheme } = useTheme();
   const { brand } = useBrand();
