@@ -56,11 +56,23 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   useEffect(() => {
     const controller = new AbortController();
     fetch('/api/voice-token', { signal: controller.signal })
-      .then(res => {
-        if (!res.ok) throw new Error(`Voice token request failed (${res.status})`);
-        return res.json();
+      .then(async res => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok) {
+          if (res.status === 401) {
+            setError('You must be logged in to use voice chat.');
+            return null;
+          }
+          const message = data && typeof data === 'object' && 'error' in data
+            ? String((data as { error?: string }).error)
+            : `Voice token request failed (${res.status})`;
+          setError(message);
+          return null;
+        }
+        return data;
       })
       .then(data => {
+        if (!data) return;
         if (data.error) {
           setError(data.error);
         } else {
@@ -70,7 +82,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
       })
       .catch(err => {
         if (err.name === 'AbortError') return;
-        setError('Failed to get API key');
+        setError(prev => prev ?? 'Failed to get API key');
         console.error(err);
       });
     return () => { controller.abort(); };

@@ -6,6 +6,7 @@ import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { authClient } from '@/lib/auth-client-better';
 import { useTheme } from 'next-themes';
+import { useSearchParams } from 'next/navigation';
 
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
@@ -54,6 +55,7 @@ const SUGGESTIONS = [
 ];
 
 export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
+  const searchParams = useSearchParams();
   const { data: session } = authClient.useSession();
   const [threadId, setThreadId] = useState(() => nanoid());
   const [showHistory, setShowHistory] = useState(true);
@@ -172,6 +174,12 @@ export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
     initialQuerySentRef.current = true;
     sendMessage({ text: initialQuery });
   }, [initialQuery, status, messages.length, sendMessage]);
+  useEffect(() => {
+    const voiceParam = searchParams?.get('voice');
+    if (voiceParam === '1' || voiceParam === 'true') {
+      setVoiceMode(true);
+    }
+  }, [searchParams]);
 
   const handleSubmit = useCallback(
     (message: { text: string }) => {
