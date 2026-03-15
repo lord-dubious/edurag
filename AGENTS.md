@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-EduRAG is a self-hostable RAG knowledge base for universities built with Next.js 16, Vercel AI SDK 6, MongoDB Atlas Vector Search, and Tavily. 
+EduRAG is a self-hostable RAG knowledge base for universities built with Next.js 16, Vercel AI SDK 6, Better Auth, MongoDB Atlas Vector Search, and Tavily. 
 
 The core agent logic (text and voice) is encapsulated in a standalone workspace package `@edurag/agent`. The main application acts as a "Thin Wiring Layer," injecting concrete implementations (database, models, search functions) into the agent's orchestration logic.
 
@@ -18,10 +18,10 @@ npm run dev              # Start Next.js dev server on http://localhost:3000
 npm run build            # Production build (run before committing changes)
 npm run start            # Start production server
 
-# Vercel Deployment
+# Platform-Agnostic Deployment (Vercel, Render, Railway, Netlify)
 # If npm install fails with peer dependency conflicts, use legacy peer deps:
 npm install --legacy-peer-deps
-# Or ensure .npmrc with 'legacy-peer-deps=true' exists in project root
+# Note: The codebase requires no platform-specific configs (like netlify.toml) by design.
 
 # Testing
 npm run test             # Run all tests with Vitest
@@ -179,6 +179,12 @@ const { messages, sendMessage, status } = useChat({
 
 ## Key Architecture Patterns
 
+### Authentication (Better Auth)
+- Migrated to **Better Auth** for robust, cross-platform session management and social logins (Google/Microsoft).
+- **Deployment Agnostic**: Relies strictly on `BETTER_AUTH_URL` instead of legacy NextAuth URLs.
+- Uses the `mongodbAdapter` for seamless integration with the existing shared MongoDB client.
+- Auth client initialization (`createClientPromise`) strictly handles and clears Promise rejections to prevent caching stalled DB connections.
+
 ### MongoDB Vector Search
 
 - Uses **post-filtering** approach — no filter fields in MongoDB index
@@ -266,7 +272,8 @@ The Voice and Text interfaces represent a **single unified entity**.
 - **Persona Sync**: In `VoiceChat.tsx`, `AgentState` is mapped to `PersonaState` to trigger the appropriate AI animations (e.g., `thinking` state triggers the "pulsing" animation).
 
 ### Security & Persistence
-- **Token Exchange**: The `/api/voice-token` route provides short-lived temporary credentials to the browser, preventing the exposure of the master `DEEPGRAM_API_KEY`.
+- **Token Exchange & Scaling**: The `/api/voice-token` route generates **short-lived temporary credentials** (TTL configurable via `DEEPGRAM_TOKEN_TTL`) using the Deepgram SDK, protecting the master API key.
+- **Cross-Instance Rate Limiting**: Voice tokens are protected by a centralized MongoDB-backed rate limiter (`voice_rate_limits` collection) utilizing `$inc` and a **TTL index** (`expireAfterSeconds: 60`) to perfectly synchronize quotas across serverless instances.
 - **Chat History Persistence**: Chat messages are saved to `localStorage` only when a stream finishes, ensuring reliability while avoiding unnecessary writes during token-by-token generation.
 - **Client-Side Rendering**: Voice components and chat history utilize `useEffect` to ensure they only initialize on the client, preventing SSR hydration mismatches.
 
@@ -346,6 +353,7 @@ CHAT_API_KEY=...              # LLM API key (Cerebras, OpenAI-compatible)
 TAVILY_API_KEY=...            # For web crawling
 EMBEDDING_API_KEY=...         # Voyage AI key
 ADMIN_SECRET=...              # Min 16 chars, for admin dashboard access
+BETTER_AUTH_URL=...           # Full deploy URL (Required in Production)
 
 # Chat model configuration
 CHAT_MODEL=gpt-oss-120b       # Default model
@@ -366,6 +374,7 @@ CRAWL_EXCLUDE_PATHS=/archive/*,/admin/*,/login/*
 
 # Voice (optional)
 DEEPGRAM_API_KEY=...
+DEEPGRAM_TOKEN_TTL=600        # Token validity duration in seconds
 DEEPGRAM_STT_MODEL=nova-3
 DEEPGRAM_TTS_MODEL=aura-2-thalia-en
 
@@ -399,6 +408,7 @@ The app has a setup wizard for first-time configuration:
 
 | Collection | Purpose |
 |------------|---------|
+| `voice_rate_limits` | TTL-indexed centralized rate limiter for Deepgram token generation |
 | `crawled_index` | Vector search documents with embeddings |
 | `settings` | Onboarding config (single doc, `_id: 'onboarding'`) |
 | `faqs` | Auto-generated FAQs with approval workflow |
