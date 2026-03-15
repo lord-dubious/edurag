@@ -50,6 +50,7 @@ Edit `.env.local` with your credentials:
 # Required
 AUTH_SECRET=your-random-32-char-secret
 AUTH_URL=http://localhost:3000
+BETTER_AUTH_URL=http://localhost:3000
 CHAT_API_KEY=your-llm-api-key
 CHAT_BASE_URL=https://api.cerebras.ai/v1
 CHAT_MODEL=gpt-oss-120b
@@ -168,6 +169,7 @@ Go to **Site Settings → Environment Variables** and add:
 |----------|-------|----------|
 | `AUTH_SECRET` | Random 32+ char secret (`npx auth secret`) | Yes |
 | `AUTH_URL` | Your full deploy URL e.g. `https://your-site.netlify.app` | Yes |
+| `BETTER_AUTH_URL` | Your full deploy URL e.g. `https://your-site.netlify.app` | Yes |
 | `MONGODB_URI` | MongoDB Atlas connection string | Yes |
 | `CHAT_API_KEY` | LLM API key | Yes |
 | `CHAT_BASE_URL` | LLM base URL | Yes |
@@ -177,7 +179,7 @@ Go to **Site Settings → Environment Variables** and add:
 | `ADMIN_SECRET` | Min 16 chars | Yes |
 | `DEEPGRAM_API_KEY` | Deepgram API key | For voice |
 
-> **Important**: `AUTH_URL` must exactly match your Netlify site URL (no trailing slash). Without it, NextAuth redirects back to `localhost` after sign-in.
+> **Important**: `AUTH_URL` and `BETTER_AUTH_URL` must exactly match your Netlify site URL (no trailing slash). Without it, auth redirects back to `localhost` after sign-in.
 
 ### 3. Deploy
 
@@ -328,6 +330,7 @@ CMD ["npm", "start"]
 |----------|-------------|----------|
 | `AUTH_SECRET` | Random 32+ character secret, e.g., generated with `npx auth secret` | Yes |
 | `AUTH_URL` | Full deploy URL or localhost during development | Yes |
+| `BETTER_AUTH_URL` | Full deploy URL or localhost during development | Yes |
 | `CHAT_API_KEY` | LLM API key | Yes |
 | `CHAT_BASE_URL` | LLM API endpoint | Yes |
 | `CHAT_MODEL` | Model name | Yes |
