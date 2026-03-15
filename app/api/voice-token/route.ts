@@ -37,7 +37,7 @@ export async function GET() {
   }
 
   const deepgram = createClient(env.DEEPGRAM_API_KEY);
-  const { result, error } = await deepgram.auth.grantToken({ timeToLive: 60 });
+  const { result, error } = await deepgram.auth.grantToken({ timeToLive: 600 });
 
   if (error || !result) {
     console.error('[Deepgram] Failed to generate token:', error);
