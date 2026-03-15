@@ -1,43 +1,54 @@
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { env } from '@/lib/env';
-import { errorResponse } from '@/lib/errors';
 import { createClient } from '@deepgram/sdk';
 import { auth } from '@/lib/auth';
-import { headers } from 'next/headers';
+import { env } from '@/lib/env';
+import { errorResponse } from '@/lib/errors';
 
-// In-memory rate limiting: Max 5 connections per minute per user
-const rateLimitMap = new Map<string, { count: number; expiresAt: number }>();
-const RATE_LIMIT_WINDOW = 60 * 1000;
-const MAX_REQUESTS = 5;
+import clientPromise from '@/lib/auth-client';
 
 export async function GET() {
-  // 1. Enforce authentication
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) {
     return errorResponse('UNAUTHORIZED', 'Authentication required', 401);
   }
 
   const userId = session.user.id;
-  const now = Date.now();
+  const client = await clientPromise;
+  const db = client.db(env.DB_NAME);
+  interface VoiceRateLimit {
+    _id: string;
+    count: number;
+    createdAt: Date;
+  }
+  const rateLimits = db.collection<VoiceRateLimit>('voice_rate_limits');
 
-  // 2. Apply rate limiting
-  const userRateLimit = rateLimitMap.get(userId);
-  if (!userRateLimit || userRateLimit.expiresAt < now) {
-    rateLimitMap.set(userId, { count: 1, expiresAt: now + RATE_LIMIT_WINDOW });
-  } else {
-    if (userRateLimit.count >= MAX_REQUESTS) {
-      return errorResponse('RATE_LIMITED', 'Rate limit exceeded for voice tokens. Try again later.', 429);
-    }
-    userRateLimit.count++;
+  // Ensure TTL index for automatic cleanup across all instances
+  await rateLimits.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(() => {});
+
+  const rateLimitResult = await rateLimits.findOneAndUpdate(
+    { _id: userId },
+    {
+      $inc: { count: 1 },
+      $setOnInsert: { createdAt: new Date() }
+    },
+    { upsert: true, returnDocument: 'after' }
+  );
+
+  const doc = (rateLimitResult && typeof rateLimitResult === 'object' && 'value' in rateLimitResult 
+    ? rateLimitResult.value 
+    : rateLimitResult) as VoiceRateLimit | null | undefined;
+  
+  if (doc && doc.count > 5) {
+    return errorResponse('RATE_LIMITED', 'Rate limit exceeded for voice tokens. Try again later.', 429);
   }
 
-  // 3. Generate Token
   if (!env.DEEPGRAM_API_KEY) {
     return errorResponse('INTERNAL_ERROR', 'Deepgram API key not configured', 500);
   }
 
   const deepgram = createClient(env.DEEPGRAM_API_KEY);
-  const { result, error } = await deepgram.auth.grantToken({ timeToLive: 600 });
+  const { result, error } = await deepgram.auth.grantToken({ timeToLive: Number(env.DEEPGRAM_TOKEN_TTL) });
 
   if (error || !result) {
     console.error('[Deepgram] Failed to generate token:', error);

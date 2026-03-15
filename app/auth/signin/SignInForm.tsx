@@ -54,7 +54,7 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
     }
   }, [callbackUrl, loginEmail, loginPassword]);
 
-  const handleSocialSignIn = useCallback(async (provider: 'google' | 'microsoft') => {
+  const handleSocialSignIn = useCallback(async (provider: 'google' | 'microsoft'): Promise<void> => {
     setError(null);
     setIsLoading(true);
     try {

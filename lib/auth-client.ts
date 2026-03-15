@@ -6,7 +6,15 @@ function createClientPromise(): Promise<MongoClient> {
     throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
   }
   const client = new MongoClient(uri);
-  return client.connect();
+  return client.connect().catch(err => {
+    const globalWithMongo = global as typeof globalThis & {
+      _mongoClientPromise?: Promise<MongoClient>;
+    };
+    if (globalWithMongo._mongoClientPromise) {
+      delete globalWithMongo._mongoClientPromise;
+    }
+    throw err;
+  });
 }
 
 let clientPromise: Promise<MongoClient>;
