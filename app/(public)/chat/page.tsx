@@ -8,7 +8,14 @@ type ChatSearchParams = {
 
 async function ChatPageContent({ searchParams }: { searchParams: Promise<ChatSearchParams> }) {
   const params = await searchParams;
-  const initialQuery = params.q ? decodeURIComponent(params.q) : undefined;
+  let initialQuery: string | undefined;
+  if (params.q) {
+    try {
+      initialQuery = decodeURIComponent(params.q);
+    } catch {
+      initialQuery = params.q;
+    }
+  }
   const voiceValue = Array.isArray(params.voice) ? params.voice[0] : params.voice;
   const initialVoice = voiceValue === '1' || voiceValue === 'true';
   return <ChatInterface initialQuery={initialQuery} initialVoice={initialVoice} />;
