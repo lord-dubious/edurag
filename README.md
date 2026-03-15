@@ -148,6 +148,44 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
+## Deploying to Netlify
+
+EduRAG ships with a `netlify.toml` that uses `@netlify/plugin-nextjs` to support App Router, server components, and auth callbacks.
+
+### 1. Install the Netlify Next.js Plugin
+
+```bash
+npm install -D @netlify/plugin-nextjs
+```
+
+### 2. Set Environment Variables in Netlify Dashboard
+
+Go to **Site Settings → Environment Variables** and add:
+
+| Variable | Value | Required |
+|----------|-------|----------|
+| `AUTH_SECRET` | Random 32+ char secret (`npx auth secret`) | Yes |
+| `AUTH_URL` | Your full deploy URL e.g. `https://your-site.netlify.app` | Yes |
+| `MONGODB_URI` | MongoDB Atlas connection string | Yes |
+| `CHAT_API_KEY` | LLM API key | Yes |
+| `CHAT_BASE_URL` | LLM base URL | Yes |
+| `CHAT_MODEL` | `gpt-oss-120b` | Yes |
+| `EMBEDDING_API_KEY` | Voyage AI key | Yes |
+| `TAVILY_API_KEY` | Tavily key | Yes |
+| `ADMIN_SECRET` | Min 16 chars | Yes |
+| `DEEPGRAM_API_KEY` | Deepgram API key | For voice |
+
+> **Important**: `AUTH_URL` must exactly match your Netlify site URL (no trailing slash). Without it, NextAuth redirects back to `localhost` after sign-in.
+
+### 3. Deploy
+
+```bash
+# Push to your branch, or trigger a manual deploy in Netlify dashboard
+git push origin main
+```
+
+---
+
 ## Project Structure
 
 ```

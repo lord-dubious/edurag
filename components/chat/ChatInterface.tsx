@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 
 import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import { useSession } from "next-auth/react";
+import { authClient } from '@/lib/auth-client-better';
 import { useTheme } from 'next-themes';
 
 import { useChat } from '@ai-sdk/react';
@@ -54,7 +54,7 @@ const SUGGESTIONS = [
 ];
 
 export function ChatInterface({ initialQuery }: ChatInterfaceProps) {
-  const { data: session } = useSession();
+  const { data: session } = authClient.useSession();
   const [threadId, setThreadId] = useState(() => nanoid());
   const [showHistory, setShowHistory] = useState(true);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);

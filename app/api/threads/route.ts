@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { auth } from '@/auth';
+import { headers } from 'next/headers';
+import { auth } from '@/lib/auth';
 import { clearHistory } from '@/lib/conversation';
 import { errorResponse } from '@/lib/errors';
 
@@ -8,7 +9,7 @@ const bodySchema = z.object({
 });
 
 export async function DELETE(req: Request) {
-  const session = await auth();
+  const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) {
     return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }

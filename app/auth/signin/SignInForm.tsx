@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { authClient } from '@/lib/auth-client-better';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -35,26 +35,24 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
     setError(null);
     setIsLoading(true);
     try {
-      const result = await signIn('credentials', {
+      const result = await authClient.signIn.email({
         email: loginEmail,
         password: loginPassword,
-        callbackUrl,
-        redirect: false,
+        callbackURL: callbackUrl,
       });
 
-      if (!result?.ok) {
+      if (result.error) {
         setError('Invalid email or password.');
         return;
       }
 
-      window.location.href = result.url || callbackUrl;
+      window.location.href = callbackUrl;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during sign in.');
     } finally {
       setIsLoading(false);
     }
   }, [callbackUrl, loginEmail, loginPassword]);
-
 
   const renderSocialButtons = () => {
     if (!hasGoogle && !hasMicrosoft) {
@@ -64,12 +62,20 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
     return (
       <div className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
         {hasGoogle && (
-          <Button type='button' variant='outline' onClick={() => signIn('google', { callbackUrl })}>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: callbackUrl })}
+          >
             Continue with Google
           </Button>
         )}
         {hasMicrosoft && (
-          <Button type='button' variant='outline' onClick={() => signIn('microsoft-entra-id', { callbackUrl })}>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={() => authClient.signIn.social({ provider: 'microsoft', callbackURL: callbackUrl })}
+          >
             Continue with Outlook
           </Button>
         )}
@@ -83,39 +89,19 @@ export function SignInForm({ hasGoogle, hasMicrosoft }: SignInFormProps) {
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          name: registerName,
-          email: registerEmail,
-          password: registerPassword,
-        }),
-      });
-
-      if (!res.ok) {
-        try {
-          const errorData = await res.json();
-          setError(errorData.error || 'Unable to create account. Please try another email.');
-        } catch {
-          setError('Unable to create account. Please try another email.');
-        }
-        return;
-      }
-
-      const loginResult = await signIn('credentials', {
+      const result = await authClient.signUp.email({
+        name: registerName,
         email: registerEmail,
         password: registerPassword,
-        callbackUrl,
-        redirect: false,
+        callbackURL: callbackUrl,
       });
 
-      if (!loginResult?.ok) {
-        setError('Account created, but sign-in failed. Please sign in manually.');
+      if (result.error) {
+        setError(result.error.message ?? 'Unable to create account. Please try another email.');
         return;
       }
 
-      window.location.href = loginResult.url || callbackUrl;
+      window.location.href = callbackUrl;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during registration.');
     } finally {

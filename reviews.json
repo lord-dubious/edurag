@@ -1,0 +1,82 @@
+[
+  {
+    "id": 3912179972,
+    "node_id": "PRR_kwDORUx1rc7pLyEE",
+    "user": {
+      "login": "chatgpt-codex-connector[bot]",
+      "id": 199175422,
+      "node_id": "BOT_kgDOC98s_g",
+      "avatar_url": "https://avatars.githubusercontent.com/in/1144995?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/chatgpt-codex-connector%5Bbot%5D",
+      "html_url": "https://github.com/apps/chatgpt-codex-connector",
+      "followers_url": "https://api.github.com/users/chatgpt-codex-connector%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/chatgpt-codex-connector%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/chatgpt-codex-connector%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/chatgpt-codex-connector%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/chatgpt-codex-connector%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/chatgpt-codex-connector%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/chatgpt-codex-connector%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/chatgpt-codex-connector%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/chatgpt-codex-connector%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.\n\n**Reviewed commit:** `8702c822da`\n    \n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](http://chatgpt.com/codex/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\".\n\nIf Codex has suggestions, it will comment; otherwise it will react with 👍.\n\n\n\n\nCodex can also answer questions or update the PR. Try commenting \"@codex address that feedback\".\n            \n</details>",
+    "state": "COMMENTED",
+    "html_url": "https://github.com/lord-dubious/edurag/pull/24#pullrequestreview-3912179972",
+    "pull_request_url": "https://api.github.com/repos/lord-dubious/edurag/pulls/24",
+    "author_association": "NONE",
+    "_links": {
+      "html": {
+        "href": "https://github.com/lord-dubious/edurag/pull/24#pullrequestreview-3912179972"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/lord-dubious/edurag/pulls/24"
+      }
+    },
+    "submitted_at": "2026-03-08T23:27:06Z",
+    "commit_id": "8702c822da9a31fd1c6977ad8ddbbf348053ad6d"
+  },
+  {
+    "id": 3912181756,
+    "node_id": "PRR_kwDORUx1rc7pLyf8",
+    "user": {
+      "login": "coderabbitai[bot]",
+      "id": 136622811,
+      "node_id": "BOT_kgDOCCSy2w",
+      "avatar_url": "https://avatars.githubusercontent.com/in/347564?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/coderabbitai%5Bbot%5D",
+      "html_url": "https://github.com/apps/coderabbitai",
+      "followers_url": "https://api.github.com/users/coderabbitai%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/coderabbitai%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/coderabbitai%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/coderabbitai%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/coderabbitai%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/coderabbitai%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/coderabbitai%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/coderabbitai%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/coderabbitai%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "**Actionable comments posted: 3**\n\n<details>\n<summary>🧹 Nitpick comments (2)</summary><blockquote>\n\n<details>\n<summary>scripts/generate_test_audio.ts (1)</summary><blockquote>\n\n`33-33`: **Unhandled promise rejection on top-level call.**\n\nThe `.catch(console.error)` logs the error but the process will exit with code 0 even on failure. Consider propagating the error to the exit code.\n\n\n\n<details>\n<summary>Proposed fix</summary>\n\n```diff\n-generateTestAudio().catch(console.error);\n+generateTestAudio().catch(err => {\n+    console.error(err);\n+    process.exit(1);\n+});\n```\n</details>\n\n<details>\n<summary>🤖 Prompt for AI Agents</summary>\n\n```\nVerify each finding against the current code and only fix it if needed.\n\nIn `@scripts/generate_test_audio.ts` at line 33, Top-level call to\ngenerateTestAudio() uses .catch(console.error) which logs errors but leaves\nprocess exit code as 0; change the invocation to propagate failures by handling\nthe error and exiting with non-zero code — e.g. replace\ngenerateTestAudio().catch(console.error) with an explicit handler that logs the\nerror (console.error or processLogger) and calls process.exit(1), or invoke\ngenerateTestAudio inside an async IIFE and catch errors to call process.exit(1);\nreference the generateTestAudio invocation to locate the change.\n```\n\n</details>\n\n</blockquote></details>\n<details>\n<summary>scripts/e2e.ts (1)</summary><blockquote>\n\n`68-73`: **Fixed timeout for hydration is fragile.**\n\nUsing `waitForTimeout(2000)` for hydration is a time-based assumption that may be too short on slow CI runners or unnecessarily slow on fast machines. Consider waiting for a specific element or network idle state.\n\n\n\n<details>\n<summary>Proposed fix</summary>\n\n```diff\n         await page.goto(appUrl);\n \n-        // Wait for hydration\n-        await page.waitForTimeout(2000);\n+        await page.waitForLoadState('networkidle');\n```\n</details>\n\n<details>\n<summary>🤖 Prompt for AI Agents</summary>\n\n```\nVerify each finding against the current code and only fix it if needed.\n\nIn `@scripts/e2e.ts` around lines 68 - 73, Replace the fragile time-based\nhydration wait (page.waitForTimeout) with a deterministic wait: after\npage.goto(appUrl) use a specific readiness signal such as await\npage.waitForLoadState('networkidle') or await\npage.waitForSelector('<root-or-app-specific-selector>') so tests only proceed\nonce the app has actually hydrated; update the code around page.goto and\npage.waitForTimeout to call page.waitForLoadState or waitForSelector with a\nmeaningful selector (e.g., the app root or a known hydrated element).\n```\n\n</details>\n\n</blockquote></details>\n\n</blockquote></details>\n\n<details>\n<summary>🤖 Prompt for all review comments with AI agents</summary>\n\n```\nVerify each finding against the current code and only fix it if needed.\n\nInline comments:\nIn `@scripts/e2e.ts`:\n- Around line 138-142: The catch block in the top-level run (where errors are\nlogged via console.error('Test failed:', err)) doesn't set a non-zero exit code,\nso failures still return success; modify the catch/finally flow in the e2e\nrunner to ensure the process exits with a failure status (e.g., call\nprocess.exit(1) or rethrow the error after ensuring browser.close() in finally)\nwhen an exception is caught, referencing the existing catch(err) handler and the\nfinally block that awaits browser.close() so the browser is closed before\nexiting.\n- Around line 6-10: The runTests function must validate required prerequisites:\nensure process.env.DEEPGRAM_API_KEY is present and that the audioFile path\n(const audioFile) points to an existing readable file before proceeding; if the\nenv var is missing or the file check fails, log a clear error and exit/throw so\nyou don't pass undefined to the Deepgram mock or let fake audio capture fail\nsilently. Update runTests to check process.env.DEEPGRAM_API_KEY and use\nfs.existsSync or fs.promises.access on audioFile, and stop execution with an\nexplicit error message that references DEEPGRAM_API_KEY and test-audio.wav when\neither check fails.\n\nIn `@scripts/generate_test_audio.ts`:\n- Line 14: The test audio generator uses sample_rate=16000 in the fetch call\ninside scripts/generate_test_audio.ts which conflicts with the 24000 Hz pipeline\nused in lib/voice/useDeepgramVoice.ts; update the Deepgram TTS request to use\nsample_rate=24000 (keeping encoding=linear16 if desired) so the generated audio\nmatches the AudioContext/Deepgram input/output settings in useDeepgramVoice.ts\nand avoid implicit resampling; verify the URL/query string and any downstream\nhandling still expect linear16 at 24000 Hz.\n\n---\n\nNitpick comments:\nIn `@scripts/e2e.ts`:\n- Around line 68-73: Replace the fragile time-based hydration wait\n(page.waitForTimeout) with a deterministic wait: after page.goto(appUrl) use a\nspecific readiness signal such as await page.waitForLoadState('networkidle') or\nawait page.waitForSelector('<root-or-app-specific-selector>') so tests only\nproceed once the app has actually hydrated; update the code around page.goto and\npage.waitForTimeout to call page.waitForLoadState or waitForSelector with a\nmeaningful selector (e.g., the app root or a known hydrated element).\n\nIn `@scripts/generate_test_audio.ts`:\n- Line 33: Top-level call to generateTestAudio() uses .catch(console.error)\nwhich logs errors but leaves process exit code as 0; change the invocation to\npropagate failures by handling the error and exiting with non-zero code — e.g.\nreplace generateTestAudio().catch(console.error) with an explicit handler that\nlogs the error (console.error or processLogger) and calls process.exit(1), or\ninvoke generateTestAudio inside an async IIFE and catch errors to call\nprocess.exit(1); reference the generateTestAudio invocation to locate the\nchange.\n```\n\n</details>\n\n---\n\n<details>\n<summary>ℹ️ Review info</summary>\n\n<details>\n<summary>⚙️ Run configuration</summary>\n\n**Configuration used**: Organization UI\n\n**Review profile**: CHILL\n\n**Plan**: Pro\n\n**Run ID**: `ea9d1365-897d-4729-8da2-d6b53c6aed0a`\n\n</details>\n\n<details>\n<summary>📥 Commits</summary>\n\nReviewing files that changed from the base of the PR and between c5886ec6e5dc649c436fb03f95b832e9b2729260 and 8702c822da9a31fd1c6977ad8ddbbf348053ad6d.\n\n</details>\n\n<details>\n<summary>📒 Files selected for processing (4)</summary>\n\n* `.gitignore`\n* `lib/voice/useDeepgramVoice.ts`\n* `scripts/e2e.ts`\n* `scripts/generate_test_audio.ts`\n\n</details>\n\n</details>\n\n<!-- This is an auto-generated comment by CodeRabbit for review status -->",
+    "state": "COMMENTED",
+    "html_url": "https://github.com/lord-dubious/edurag/pull/24#pullrequestreview-3912181756",
+    "pull_request_url": "https://api.github.com/repos/lord-dubious/edurag/pulls/24",
+    "author_association": "CONTRIBUTOR",
+    "_links": {
+      "html": {
+        "href": "https://github.com/lord-dubious/edurag/pull/24#pullrequestreview-3912181756"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/lord-dubious/edurag/pulls/24"
+      }
+    },
+    "submitted_at": "2026-03-08T23:29:14Z",
+    "commit_id": "8702c822da9a31fd1c6977ad8ddbbf348053ad6d"
+  }
+]
