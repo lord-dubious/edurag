@@ -6,9 +6,18 @@ import { z } from 'zod';
 
 import { errorResponse } from '@/lib/errors';
 
-const messageSchema = z.object({
-  role: z.literal('user'),
+const sourceSchema = z.object({
+  url: z.string(),
+  title: z.string().optional(),
   content: z.string(),
+  score: z.number().optional(),
+});
+
+const messageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
+  id: z.string().optional(),
+  sources: z.array(sourceSchema).optional(),
 });
 
 export async function GET(req: Request, { params }: { params: Promise<{ threadId: string }> }) {
@@ -45,9 +54,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ threadI
   const { threadId } = await params;
   try {
     await appendMessage(threadId, {
+      id: parsed.data.id,
       role: parsed.data.role,
       content: parsed.data.content,
       timestamp: new Date(),
+      sources: parsed.data.sources,
     }, session.user.id);
   } catch (err) {
     console.error('[History POST] Error appending message:', err);

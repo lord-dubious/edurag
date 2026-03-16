@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageSquare, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Source } from '@edurag/agent/text';
 
 interface Conversation {
   threadId: string;
   title?: string;
-  messages: { role: string; content: string; timestamp: string }[];
+  messages: { role: string; content: string; timestamp: string; id?: string; sources?: Source[] }[];
   updatedAt: string;
 }
 

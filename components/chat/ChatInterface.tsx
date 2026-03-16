@@ -109,22 +109,19 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     id: threadId,
     transport,
     onFinish: ({ message }) => {
+      let newSources: Source[] = [];
       if (message.parts) {
         const toolParts = message.parts.filter(isVectorSearchToolPart);
         if (toolParts.length > 0) {
-          const seenUrls = new Set<string>();
-          const newSources: Source[] = [];
+          newSources = [];
           toolParts.forEach((part) => {
             if (part.output?.results) {
               part.output.results.forEach((r: VectorSearchResult) => {
-                if (!seenUrls.has(r.url)) {
-                  seenUrls.add(r.url);
-                  newSources.push({
-                    url: r.url,
-                    title: r.title,
-                    content: r.content,
-                  });
-                }
+                newSources.push({
+                  url: r.url,
+                  title: r.title,
+                  content: r.content,
+                });
               });
             }
           });
@@ -135,6 +132,24 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
             }));
           }
         }
+      }
+
+      const assistantText = message.parts
+        ?.filter((part): part is { type: 'text'; text: string } => part.type === 'text' && typeof (part as { text?: unknown }).text === 'string')
+        .map(part => part.text)
+        .join('') ?? '';
+
+      if (session?.user && assistantText.trim()) {
+        fetch(`/api/history/${threadId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            role: 'assistant',
+            id: message.id,
+            content: assistantText,
+            sources: newSources,
+          }),
+        }).catch(err => console.error('[Chat] Failed to persist assistant message:', err));
       }
     },
   });
@@ -150,14 +165,22 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
       if (res.ok) {
         const data = await res.json();
         if (data && data.messages) {
-          const uiMessages = data.messages.map((m: { role: string; content: string; timestamp: string }) => ({
-            id: nanoid(),
-            role: m.role as 'user' | 'assistant',
-            content: m.content,
-            parts: [{ type: 'text', text: m.content }],
-            createdAt: new Date(m.timestamp)
-          }));
+          const sourcesMap: Record<string, Source[]> = {};
+          const uiMessages = data.messages.map((m: { role: string; content: string; timestamp: string; id?: string; sources?: Source[] }) => {
+            const id = m.id ?? nanoid();
+            if (m.role === 'assistant' && Array.isArray(m.sources) && m.sources.length > 0) {
+              sourcesMap[id] = m.sources;
+            }
+            return {
+              id,
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+              parts: [{ type: 'text', text: m.content }],
+              createdAt: new Date(m.timestamp)
+            };
+          });
           setMessages(uiMessages);
+          setSources(sourcesMap);
         }
       }
     } catch (e) {
@@ -241,8 +264,21 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
         fetch(`/api/history/${threadId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: 'user', content: msg.content }),
+          body: JSON.stringify({ role: 'user', id, content: msg.content }),
         }).catch(err => console.error('[Voice] Failed to persist user message:', err));
+      }
+    } else if (msg.role === 'assistant') {
+      if (session?.user) {
+        fetch(`/api/history/${threadId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            role: 'assistant',
+            id: nanoid(),
+            content: msg.content,
+            sources: msg.sources ?? [],
+          }),
+        }).catch(err => console.error('[Voice] Failed to persist assistant message:', err));
       }
     }
   }, [setMessages, threadId, session?.user]);

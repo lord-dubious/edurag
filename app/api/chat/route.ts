@@ -77,6 +77,7 @@ export async function POST(req: Request) {
       const existing = await getConversation(currentThreadId, userId);
 
       await appendMessage(currentThreadId, {
+        id: lastMessage.id,
         role: 'user',
         content: userText,
         timestamp: new Date(),
@@ -120,15 +121,6 @@ export async function POST(req: Request) {
       universityName,
       maxSteps,
       maxTokens,
-      onFinish: async ({ text }) => {
-        if (userId && text) {
-          await appendMessage(currentThreadId, {
-            role: 'assistant',
-            content: text,
-            timestamp: new Date(),
-          }, userId);
-        }
-      }
     });
 
     return (await result).toUIMessageStreamResponse();
