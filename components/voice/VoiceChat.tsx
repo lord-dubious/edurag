@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { PhoneOff, X } from 'lucide-react';
+import { Mic, PhoneOff, X } from 'lucide-react';
 import type { UIMessage } from '@ai-sdk/react';
 import { useDeepgramVoice } from '@/lib/voice/useDeepgramVoice';
 import type { AgentState, Source } from '@/lib/voice/useDeepgramVoice';
@@ -22,6 +22,7 @@ interface VoiceChatProps {
   onMessageAdded?: (msg: VoiceMessagePayload) => void;
   onShowNotes?: (topic: string) => void;
   institutionName?: string;
+  autoStart?: boolean;
 }
 
 const stateLabels: Record<AgentState, string> = {
@@ -46,7 +47,7 @@ interface VoiceConfig {
   thinkModel: string;
 }
 
-export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, institutionName }: VoiceChatProps): React.JSX.Element {
+export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, institutionName, autoStart = false }: VoiceChatProps): React.JSX.Element {
   const router = useRouter();
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [voiceConfig, setVoiceConfig] = useState<VoiceConfig | null>(null);
@@ -164,13 +165,35 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
 
   const autoStartedRef = useRef(false);
   useEffect(() => {
+    if (!autoStart) return;
     if (apiKey && state === 'idle' && !autoStartedRef.current) {
       autoStartedRef.current = true;
       start();
     }
-  }, [apiKey, state, start]);
+  }, [apiKey, autoStart, state, start]);
 
   const isInCall = state !== 'idle';
+  const showTapToSpeak = Boolean(apiKey) && state === 'idle' && !error && !autoStart;
+  const showAutoStarting = Boolean(apiKey) && state === 'idle' && !error && autoStart;
+  const errorMessage = error ?? '';
+  const lowerError = errorMessage.toLowerCase();
+  const isAuthError = lowerError.includes('logged in') || lowerError.includes('authentication required') || lowerError.includes('unauthorized');
+  const isMicError = lowerError.includes('microphone') || lowerError.includes('mic') || lowerError.includes('notallowederror') || lowerError.includes('permission') || lowerError.includes('notfounderror');
+  const isConnectionError = lowerError.includes('websocket') || lowerError.includes('connection closed') || lowerError.includes('network') || lowerError.includes('token');
+  const errorTitle = isAuthError
+    ? 'Sign in required'
+    : isMicError
+      ? 'Microphone access blocked'
+      : isConnectionError
+        ? 'Voice connection failed'
+        : errorMessage || 'Something went wrong';
+  const errorBody = isAuthError
+    ? 'Please sign in to use voice chat.'
+    : isMicError
+      ? 'Allow microphone access in your browser settings, then try again.'
+      : isConnectionError
+        ? 'Check your network connection and try again.'
+        : 'Please try again.';
 
   return (
     <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex flex-col pointer-events-auto">
@@ -198,8 +221,12 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
             <div className="p-4 bg-destructive/10 rounded-full text-destructive">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
             </div>
-            <p className="text-sm font-medium text-destructive">{error}</p>
-            {error === 'You must be logged in to use voice chat.' ? (
+            <p className="text-sm font-medium text-destructive">{errorTitle}</p>
+            <p className="text-xs text-muted-foreground">{errorBody}</p>
+            {errorMessage && !isAuthError && (
+              <p className="text-[10px] text-muted-foreground/70">{errorMessage}</p>
+            )}
+            {isAuthError ? (
               <div className="flex items-center gap-2">
                 <Button onClick={handleLogin}>Log in</Button>
                 <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
@@ -223,6 +250,30 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
               <p className="text-base md:text-lg font-medium text-muted-foreground min-h-[28px] animate-in fade-in transition-opacity">
                 {stateLabels[state]}
               </p>
+              {showAutoStarting && (
+                <div className="mt-6 flex flex-col items-center gap-2 text-muted-foreground">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="inline-flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    Starting voice…
+                  </div>
+                  <Button variant="outline" size="sm" onClick={start} className="rounded-full">
+                    Tap to retry
+                  </Button>
+                </div>
+              )}
+              {showTapToSpeak && (
+                <div className="mt-6 flex flex-col items-center gap-2">
+                  <Button
+                    onClick={start}
+                    size="lg"
+                    className="rounded-full shadow-lg h-14 px-8 text-base gap-2"
+                  >
+                    <Mic className="h-5 w-5" />
+                    Tap to speak
+                  </Button>
+                  <p className="text-xs text-muted-foreground">You can switch back to text anytime.</p>
+                </div>
+              )}
             </div>
 
             <div className="absolute bottom-24 w-full px-6 flex flex-col items-center justify-end max-h-[30vh] overflow-hidden pointer-events-none">
@@ -254,26 +305,36 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
         )}
       </div>
 
-      <footer className="flex justify-center items-center p-6 gap-4 border-t bg-background/50">
+      <footer className="flex flex-col sm:flex-row justify-center items-center p-6 gap-2 sm:gap-4 border-t bg-background/50">
         {!isInCall ? (
           <Button
-            onClick={start}
-            disabled={!apiKey}
-            size="lg"
-            className="rounded-full shadow-lg h-14 w-full max-w-sm text-base gap-2"
+            variant="ghost"
+            size="sm"
+            onClick={handleEnd}
+            className="rounded-full w-full max-w-sm sm:max-w-none sm:w-auto text-muted-foreground"
           >
-            Start Conversation
+            Switch to text chat
           </Button>
         ) : (
-          <Button
-            variant="destructive"
-            size="lg"
-            onClick={handleEnd}
-            className="rounded-full shadow-lg h-14 w-full max-w-sm text-base gap-2"
-          >
-            <PhoneOff className="h-5 w-5" />
-            End Call
-          </Button>
+          <>
+            <Button
+              variant="destructive"
+              size="lg"
+              onClick={handleEnd}
+              className="rounded-full shadow-lg h-14 w-full max-w-sm sm:max-w-none sm:w-auto text-base gap-2"
+            >
+              <PhoneOff className="h-5 w-5" />
+              End Call
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleEnd}
+              className="rounded-full w-full max-w-sm sm:max-w-none sm:w-auto text-muted-foreground"
+            >
+              Switch to text chat
+            </Button>
+          </>
         )}
       </footer>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Image as ImageIcon, Phone } from 'lucide-react';
 import { PromptInput, PromptInputBody, PromptInputTextarea, PromptInputFooter, PromptInputSubmit, PromptInputButton } from '@/components/ai-elements/prompt-input';
@@ -13,6 +13,7 @@ export function Hero(): React.JSX.Element {
   const router = useRouter();
   const { data: session } = authClient.useSession();
   const { brand, loading } = useBrand();
+  const [showVoiceHint, setShowVoiceHint] = useState(false);
 
   const name = brand?.appName || 'University Knowledge Base';
 
@@ -114,6 +115,10 @@ export function Hero(): React.JSX.Element {
             <div className="flex items-center gap-2">
               <PromptInputButton
                 onClick={handleVoiceStart}
+                onMouseEnter={() => setShowVoiceHint(true)}
+                onMouseLeave={() => setShowVoiceHint(false)}
+                onFocus={() => setShowVoiceHint(true)}
+                onBlur={() => setShowVoiceHint(false)}
                 title="Start voice"
                 aria-label="Start voice chat"
                 className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md shadow-sm border-none shadow-black/5 flex items-center justify-center p-2"
@@ -124,8 +129,11 @@ export function Hero(): React.JSX.Element {
             </div>
           </PromptInputFooter>
         </PromptInput>
-        {!session?.user && (
-          <p className="text-xs text-muted-foreground mt-2 text-right">Voice requires login</p>
+        {showVoiceHint && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+            <span>Press the phone to speak</span>
+            {!session?.user && <span>Voice requires login</span>}
+          </div>
         )}
       </div>
     </div>

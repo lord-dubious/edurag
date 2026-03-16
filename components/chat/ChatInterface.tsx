@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
-import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen, Phone } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { useTheme } from 'next-themes';
 
@@ -11,6 +12,7 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 
 import { authClient } from '@/lib/auth-client-better';
+import { Button } from '@/components/ui/button';
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { HistorySidebar } from "@/components/chat/HistorySidebar";
@@ -47,12 +49,34 @@ interface ChatInterfaceProps {
   initialVoice?: boolean;
 }
 
-const SUGGESTIONS = [
+const SUGGESTION_POOL = [
   { label: 'Programs', query: 'What programs are offered?' },
   { label: 'Tuition', query: 'How much is tuition?' },
   { label: 'Admissions', query: 'What are the admission requirements?' },
   { label: 'Campus Life', query: 'Tell me about campus life' },
+  { label: 'Deadlines', query: 'What are the application deadlines?' },
+  { label: 'Scholarships', query: 'What scholarships or financial aid options are available?' },
+  { label: 'Housing', query: 'What on-campus housing options are available?' },
+  { label: 'International', query: 'What do international students need to apply?' },
+  { label: 'Transfer', query: 'How do transfer credits work?' },
+  { label: 'Visit', query: 'How can I schedule a campus tour?' },
+  { label: 'Contacts', query: 'Who do I contact for admissions help?' },
+  { label: 'Outcomes', query: 'What are graduate outcomes or career support like?' },
 ];
+
+function pickSuggestions<T>(items: T[], count: number, seed: number): T[] {
+  let state = Math.floor(seed * 1000000) || 1;
+  const rand = () => {
+    state = (state * 1664525 + 1013904223) % 4294967296;
+    return state / 4294967296;
+  };
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.slice(0, count);
+}
 
 export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps) {
   const router = useRouter();
@@ -64,6 +88,8 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
   const [sources, setSources] = useState<Record<string, Source[]>>({});
   const [showSources, setShowSources] = useState(true);
   const [voiceMode, setVoiceMode] = useState(Boolean(initialVoice));
+  const [voiceAutoStart, setVoiceAutoStart] = useState(Boolean(initialVoice));
+  const [suggestionsSeed, setSuggestionsSeed] = useState(() => Math.random());
   const initialQuerySentRef = useRef(false);
   const { theme, setTheme } = useTheme();
   const { brand } = useBrand();
@@ -147,6 +173,7 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     setMessages([]);
     setSources({});
     setHistoryRefreshKey(k => k + 1);
+    setSuggestionsSeed(Math.random());
     if (window.innerWidth < 768) {
       setShowHistory(false);
     }
@@ -187,8 +214,13 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
       router.push(`/auth/signin?callbackUrl=${encodeURIComponent('/chat?voice=1')}`);
       return;
     }
+    setVoiceAutoStart(true);
     setVoiceMode(true);
-  }, [isAuthenticated, router, setVoiceMode]);
+  }, [isAuthenticated, router, setVoiceAutoStart, setVoiceMode]);
+  const handleVoiceClose = useCallback(() => {
+    setVoiceMode(false);
+    setVoiceAutoStart(false);
+  }, []);
 
   const formatVoiceHandoffPrompt = useCallback((topic: string) => {
     return `[VOICE_HANDOFF] I am providing the detailed Markdown notes and source links for ${topic} now as requested in our conversation.`;
@@ -245,6 +277,8 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
   const lastMessage = messages.at(-1);
   const lastSources = lastMessage ? sources[lastMessage.id] ?? [] : [];
   const isEmpty = messages.length === 0 && status === 'ready';
+  const hasSources = lastSources.length > 0;
+  const suggestions = useMemo(() => pickSuggestions(SUGGESTION_POOL, 4, suggestionsSeed), [suggestionsSeed]);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -281,6 +315,18 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
           </div>
         </div>
       )}
+      {!session?.user && (
+        <div className="w-80 shrink-0 hidden md:flex flex-col border-r h-full bg-muted/20">
+          <div className="p-6 space-y-3">
+            <h2 className="text-sm font-semibold">History</h2>
+            <p className="text-sm text-muted-foreground">Sign in to save and revisit your chats.</p>
+            <p className="text-xs text-muted-foreground">Keep your admissions questions, compare answers, and pick up where you left off.</p>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/auth/signin?callbackUrl=/chat">Sign in</Link>
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="flex items-center gap-3 px-4 h-14 border-b bg-background shrink-0">
@@ -306,18 +352,19 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            {lastSources.length > 0 && (
-              <button
-                onClick={() => setShowSources(!showSources)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${showSources
+            <button
+              onClick={() => setShowSources(!showSources)}
+              disabled={!hasSources}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${hasSources
+                ? (showSources
                   ? 'border-primary text-primary bg-primary/10'
-                  : 'border-border hover:border-primary hover:text-primary'
-                  }`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                Sources {lastSources.length}
-              </button>
-            )}
+                  : 'border-border hover:border-primary hover:text-primary')
+                : 'border-border text-muted-foreground bg-muted/40 cursor-not-allowed'
+                }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${hasSources ? 'bg-primary' : 'bg-muted-foreground/50'}`} />
+              Sources {lastSources.length}
+            </button>
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
@@ -346,7 +393,7 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-3 w-full max-w-md">
-                      {SUGGESTIONS.map((suggestion) => (
+                      {suggestions.map((suggestion) => (
                         <button
                           key={suggestion.label}
                           onClick={() => handleSuggestionClick(suggestion.query)}
@@ -355,6 +402,12 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
                           {suggestion.label}
                         </button>
                       ))}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Phone className="size-3.5" />
+                      <span>
+                        Prefer voice? Tap the phone icon{isAuthenticated ? ' to start a call.' : ' to sign in and start a call.'}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -386,10 +439,11 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
                 {voiceMode ? (
                   <VoiceChat
                     messages={messages}
-                    onClose={() => setVoiceMode(false)}
+                    onClose={handleVoiceClose}
                     onMessageAdded={handleVoiceMessage}
                     onShowNotes={handleShowNotes}
                     institutionName={appName}
+                    autoStart={voiceAutoStart}
                   />
                 ) : (
                   <ChatInput
