@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { AlertCircleIcon, SearchIcon } from 'lucide-react';
 import { FaqApprovalCard } from '@/components/admin/FaqApprovalCard';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +19,7 @@ interface FAQ {
 }
 
 export default function FAQsPage() {
+  const router = useRouter();
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,11 +29,21 @@ export default function FAQsPage() {
     : '';
 
   useEffect(() => {
+    if (!token) {
+      router.replace('/admin/login');
+    }
+  }, [router, token]);
+
+  useEffect(() => {
     const fetchFaqs = async () => {
       try {
         const res = await fetch('/api/faqs?all=true', {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (res.status === 401) {
+          router.replace('/admin/login');
+          return;
+        }
         const data = await res.json();
         if (data.success) setFaqs(data.data);
       } catch (err) {
@@ -41,7 +53,7 @@ export default function FAQsPage() {
       }
     };
     fetchFaqs();
-  }, [token]);
+  }, [router, token]);
 
   const handleApprove = async (id: string, editedAnswer?: string) => {
     try {
@@ -80,6 +92,8 @@ export default function FAQsPage() {
 
   const pendingFaqs = faqs.filter(f => f.pendingApproval);
   const approvedFaqs = faqs.filter(f => !f.pendingApproval && f.public);
+  const trackingFaqs = faqs.filter(f => !f.answer);
+  const totalFaqs = faqs.length;
 
   const filteredPending = pendingFaqs.filter(f =>
     f.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -89,6 +103,9 @@ export default function FAQsPage() {
   const filteredApproved = approvedFaqs.filter(f =>
     f.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
     f.answer.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredTracking = trackingFaqs.filter(f =>
+    f.question.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) {
@@ -100,12 +117,33 @@ export default function FAQsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">FAQ Management</h1>
+          <h1 className="text-3xl font-bold tracking-tight">FAQ Management</h1>
           <p className="text-muted-foreground">Review and approve auto-generated FAQs</p>
         </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardContent className="pt-4">
+            <div className="text-sm text-muted-foreground">Total FAQs</div>
+            <div className="text-2xl font-bold">{totalFaqs}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="text-sm text-muted-foreground">Pending Review</div>
+            <div className="text-2xl font-bold">{pendingFaqs.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="text-sm text-muted-foreground">Approved</div>
+            <div className="text-2xl font-bold">{approvedFaqs.length}</div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="relative max-w-md">
@@ -132,6 +170,12 @@ export default function FAQsPage() {
             Approved
             <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">
               {approvedFaqs.length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="tracking" className="gap-2">
+            Tracking
+            <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+              {trackingFaqs.length}
             </Badge>
           </TabsTrigger>
         </TabsList>
@@ -174,6 +218,29 @@ export default function FAQsPage() {
           ) : (
             <div className="grid gap-4">
               {filteredApproved.map((faq) => (
+                <FaqApprovalCard
+                  key={faq._id}
+                  faq={faq}
+                  onApprove={handleApprove}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="tracking" className="space-y-4">
+          {filteredTracking.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <AlertCircleIcon className="size-12 text-muted-foreground/50 mb-4" />
+                <p className="text-muted-foreground">
+                  {searchQuery ? 'No matching FAQs found' : 'No tracked questions yet'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredTracking.map((faq) => (
                 <FaqApprovalCard
                   key={faq._id}
                   faq={faq}

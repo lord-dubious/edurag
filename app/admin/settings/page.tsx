@@ -1,4 +1,6 @@
 import { getSettings, updateSettings } from '@/lib/db/settings';
+import { requireAdmin } from '@/lib/admin-guard';
+import { env } from '@/lib/env';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -6,9 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Save } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
 import { LogoUpload } from '@/components/admin/LogoUpload';
+import { Badge } from '@/components/ui/badge';
 
 async function saveSettings(formData: FormData) {
   'use server';
+
+  await requireAdmin();
+  const existing = await getSettings();
 
   const appName = formData.get('appName') as string;
   const brandPrimary = formData.get('brandPrimary') as string;
@@ -19,15 +25,33 @@ async function saveSettings(formData: FormData) {
 
   const chatMaxTokens = parseInt(formData.get('chatMaxTokens') as string) || 32000;
   const chatMaxSteps = Math.min(20, Math.max(1, parseInt(formData.get('chatMaxSteps') as string) || 5));
+  const chatModel = (formData.get('chatModel') as string).trim();
+  const chatBaseUrl = (formData.get('chatBaseUrl') as string).trim();
+  const chatApiKeyInput = formData.get('chatApiKey') as string;
+  const chatApiKey = chatApiKeyInput || existing?.chatConfig?.apiKey;
 
-  const embeddingModel = formData.get('embeddingModel') as string;
+  const embeddingModel = (formData.get('embeddingModel') as string).trim();
   const embeddingDimensions = parseInt(formData.get('embeddingDimensions') as string) || 2048;
+  const embeddingApiKeyInput = formData.get('embeddingApiKey') as string;
+  const embeddingApiKey = embeddingApiKeyInput || existing?.embeddingConfig?.apiKey;
 
-  const rerankModel = formData.get('rerankModel') as string;
+  const rerankModel = (formData.get('rerankModel') as string).trim();
   const rerankTopK = Math.min(20, Math.max(1, parseInt(formData.get('rerankTopK') as string) || 6));
 
-  const uploadthingSecret = formData.get('uploadthingSecret') as string;
-  const uploadthingAppId = formData.get('uploadthingAppId') as string;
+  const tavilyApiKeyInput = formData.get('tavilyApiKey') as string;
+  const tavilyApiKey = tavilyApiKeyInput || existing?.tavilyApiKey;
+
+  const deepgramApiKeyInput = formData.get('deepgramApiKey') as string;
+  const deepgramApiKey = deepgramApiKeyInput || existing?.voiceConfig?.apiKey;
+  const deepgramTokenTtl = parseInt(formData.get('deepgramTokenTtl') as string) || env.DEEPGRAM_TOKEN_TTL;
+  const deepgramSttModel = (formData.get('deepgramSttModel') as string).trim();
+  const deepgramTtsModel = (formData.get('deepgramTtsModel') as string).trim();
+  const deepgramThinkModel = (formData.get('deepgramThinkModel') as string).trim();
+
+  const uploadthingSecretInput = formData.get('uploadthingSecret') as string;
+  const uploadthingSecret = uploadthingSecretInput || existing?.uploadthingSecret;
+  const uploadthingAppIdInput = formData.get('uploadthingAppId') as string;
+  const uploadthingAppId = uploadthingAppIdInput || existing?.uploadthingAppId;
 
   await updateSettings({
     appName,
@@ -39,14 +63,26 @@ async function saveSettings(formData: FormData) {
     chatConfig: {
       maxTokens: chatMaxTokens,
       maxSteps: chatMaxSteps,
+      model: chatModel || undefined,
+      baseUrl: chatBaseUrl || undefined,
+      apiKey: chatApiKey || undefined,
     },
     embeddingConfig: {
-      model: embeddingModel,
+      model: embeddingModel || undefined,
       dimensions: embeddingDimensions,
+      apiKey: embeddingApiKey || undefined,
     },
     rerankConfig: {
-      model: rerankModel || 'rerank-2.5',
+      model: rerankModel || undefined,
       topK: rerankTopK,
+    },
+    tavilyApiKey: tavilyApiKey || undefined,
+    voiceConfig: {
+      apiKey: deepgramApiKey || undefined,
+      tokenTtl: deepgramTokenTtl,
+      sttModel: deepgramSttModel || undefined,
+      ttsModel: deepgramTtsModel || undefined,
+      thinkModel: deepgramThinkModel || undefined,
     },
     uploadthingSecret: uploadthingSecret || undefined,
     uploadthingAppId: uploadthingAppId || undefined,
@@ -56,6 +92,7 @@ async function saveSettings(formData: FormData) {
 }
 
 export default async function AdminSettingsPage() {
+  await requireAdmin();
   const settings = await getSettings();
 
   const appName = settings?.appName || 'University Knowledge Base';
@@ -65,14 +102,57 @@ export default async function AdminSettingsPage() {
   const emoji = settings?.emoji || '🎓';
   const iconType = settings?.iconType || 'emoji';
 
-  const chatMaxTokens = settings?.chatConfig?.maxTokens || 32000;
-  const chatMaxSteps = settings?.chatConfig?.maxSteps || 5;
+  const chatMaxTokens = settings?.chatConfig?.maxTokens || env.CHAT_MAX_TOKENS;
+  const chatMaxSteps = settings?.chatConfig?.maxSteps || env.CHAT_MAX_STEPS;
+  const chatModel = settings?.chatConfig?.model || env.CHAT_MODEL;
+  const chatBaseUrl = settings?.chatConfig?.baseUrl || env.CHAT_BASE_URL || '';
+  const hasChatKeyInSettings = Boolean(settings?.chatConfig?.apiKey);
+  const hasChatKeyInEnv = Boolean(env.CHAT_API_KEY);
+  const chatKeyPlaceholder = hasChatKeyInSettings
+    ? '•••••••• (saved)'
+    : hasChatKeyInEnv
+      ? '•••••••• (env)'
+      : 'not configured';
 
-  const embeddingModel = settings?.embeddingConfig?.model || 'voyage-4-large';
-  const embeddingDimensions = settings?.embeddingConfig?.dimensions || 2048;
+  const embeddingModel = settings?.embeddingConfig?.model || env.EMBEDDING_MODEL;
+  const embeddingDimensions = settings?.embeddingConfig?.dimensions || env.EMBEDDING_DIMENSIONS;
+  const hasEmbeddingKeyInSettings = Boolean(settings?.embeddingConfig?.apiKey);
+  const hasEmbeddingKeyInEnv = Boolean(env.EMBEDDING_API_KEY);
+  const embeddingKeyPlaceholder = hasEmbeddingKeyInSettings
+    ? '•••••••• (saved)'
+    : hasEmbeddingKeyInEnv
+      ? '•••••••• (env)'
+      : 'not configured';
 
-  const rerankModel = settings?.rerankConfig?.model || 'rerank-2.5';
-  const rerankTopK = settings?.rerankConfig?.topK || 6;
+  const rerankModel = settings?.rerankConfig?.model || env.RERANK_MODEL;
+  const rerankTopK = settings?.rerankConfig?.topK || env.RERANK_TOP_K;
+  const hasTavilyKeyInSettings = Boolean(settings?.tavilyApiKey);
+  const hasTavilyKeyInEnv = Boolean(env.TAVILY_API_KEY);
+  const tavilyKeyPlaceholder = hasTavilyKeyInSettings
+    ? '•••••••• (saved)'
+    : hasTavilyKeyInEnv
+      ? '•••••••• (env)'
+      : 'not configured';
+
+  const deepgramTokenTtl = settings?.voiceConfig?.tokenTtl || env.DEEPGRAM_TOKEN_TTL;
+  const deepgramSttModel = settings?.voiceConfig?.sttModel || env.DEEPGRAM_STT_MODEL;
+  const deepgramTtsModel = settings?.voiceConfig?.ttsModel || env.DEEPGRAM_TTS_MODEL;
+  const deepgramThinkModel = settings?.voiceConfig?.thinkModel || env.DEEPGRAM_THINK_MODEL;
+  const hasDeepgramKeyInSettings = Boolean(settings?.voiceConfig?.apiKey);
+  const hasDeepgramKeyInEnv = Boolean(env.DEEPGRAM_API_KEY);
+  const deepgramKeyPlaceholder = hasDeepgramKeyInSettings
+    ? '•••••••• (saved)'
+    : hasDeepgramKeyInEnv
+      ? '•••••••• (env)'
+      : 'not configured';
+  const statusItems = [
+    { label: 'Database', ok: Boolean(env.MONGODB_URI) },
+    { label: 'Admin Secret', ok: Boolean(env.ADMIN_SECRET) },
+    { label: 'Chat API Key', ok: hasChatKeyInSettings || hasChatKeyInEnv },
+    { label: 'Embedding API Key', ok: hasEmbeddingKeyInSettings || hasEmbeddingKeyInEnv },
+    { label: 'Tavily API Key', ok: hasTavilyKeyInSettings || hasTavilyKeyInEnv },
+    { label: 'Deepgram API Key', ok: hasDeepgramKeyInSettings || hasDeepgramKeyInEnv },
+  ];
 
   return (
     <div className="space-y-6">
@@ -84,6 +164,24 @@ export default async function AdminSettingsPage() {
       </div>
 
       <form action={saveSettings} className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>System Status</CardTitle>
+            <CardDescription>
+              Current environment readiness and key configuration sources
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-3">
+            {statusItems.map((item) => (
+              <div key={item.label} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                <span className="text-sm text-muted-foreground">{item.label}</span>
+                <Badge variant={item.ok ? 'default' : 'destructive'}>
+                  {item.ok ? 'Ready' : 'Missing'}
+                </Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle>Brand</CardTitle>
@@ -172,10 +270,11 @@ export default async function AdminSettingsPage() {
           <CardHeader>
             <CardTitle>AI Models</CardTitle>
             <CardDescription>
-              Configure the AI models used for chat and embeddings
+              Configure the AI models used for chat, embeddings, and reranking
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Chat</div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="chatMaxTokens">Max Output Tokens</Label>
@@ -210,6 +309,45 @@ export default async function AdminSettingsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label htmlFor="chatModel">Chat Model</Label>
+                <Input
+                  id="chatModel"
+                  name="chatModel"
+                  defaultValue={chatModel}
+                  placeholder="gpt-oss-120b"
+                  className="font-mono text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="chatBaseUrl">Chat Base URL</Label>
+                <Input
+                  id="chatBaseUrl"
+                  name="chatBaseUrl"
+                  defaultValue={chatBaseUrl}
+                  placeholder="https://api.openai.com/v1"
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to use the default provider URL
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="chatApiKey">Chat API Key</Label>
+              <Input
+                id="chatApiKey"
+                name="chatApiKey"
+                type="password"
+                placeholder={chatKeyPlaceholder}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to keep the current key (saved or env)
+              </p>
+            </div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground pt-2">Embeddings</div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="embeddingModel">Embedding Model</Label>
                 <Input
                   id="embeddingModel"
@@ -236,6 +374,20 @@ export default async function AdminSettingsPage() {
                 </p>
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="embeddingApiKey">Embedding API Key</Label>
+              <Input
+                id="embeddingApiKey"
+                name="embeddingApiKey"
+                type="password"
+                placeholder={embeddingKeyPlaceholder}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to keep the current key (saved or env)
+              </p>
+            </div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground pt-2">Reranking</div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="rerankModel">Reranking Model</Label>
@@ -264,6 +416,98 @@ export default async function AdminSettingsPage() {
                 <p className="text-xs text-muted-foreground">
                   Number of results after reranking
                 </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Crawler (Tavily)</CardTitle>
+            <CardDescription>
+              API access for crawling and indexing content
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label htmlFor="tavilyApiKey">Tavily API Key</Label>
+            <Input
+              id="tavilyApiKey"
+              name="tavilyApiKey"
+              type="password"
+              placeholder={tavilyKeyPlaceholder}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave blank to keep the current key (saved or env)
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Voice (Deepgram)</CardTitle>
+            <CardDescription>
+              Configure speech models and credentials for voice chat
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="deepgramApiKey">Deepgram API Key</Label>
+              <Input
+                id="deepgramApiKey"
+                name="deepgramApiKey"
+                type="password"
+                placeholder={deepgramKeyPlaceholder}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to keep the current key (saved or env)
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="deepgramTokenTtl">Token TTL (seconds)</Label>
+                <Input
+                  id="deepgramTokenTtl"
+                  name="deepgramTokenTtl"
+                  type="number"
+                  min={30}
+                  max={3600}
+                  defaultValue={deepgramTokenTtl}
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deepgramThinkModel">Think Model</Label>
+                <Input
+                  id="deepgramThinkModel"
+                  name="deepgramThinkModel"
+                  defaultValue={deepgramThinkModel}
+                  placeholder="gemini-2.5-flash"
+                  className="font-mono text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="deepgramSttModel">STT Model</Label>
+                <Input
+                  id="deepgramSttModel"
+                  name="deepgramSttModel"
+                  defaultValue={deepgramSttModel}
+                  placeholder="nova-3"
+                  className="font-mono text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="deepgramTtsModel">TTS Model</Label>
+                <Input
+                  id="deepgramTtsModel"
+                  name="deepgramTtsModel"
+                  defaultValue={deepgramTtsModel}
+                  placeholder="aura-2-thalia-en"
+                  className="font-mono text-sm"
+                />
               </div>
             </div>
           </CardContent>

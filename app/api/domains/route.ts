@@ -17,7 +17,33 @@ export async function GET(req: NextRequest) {
   const collection = await getMongoCollection(env.DOMAINS_COLLECTION);
   const domains = await collection.find({}).sort({ createdAt: -1 }).toArray();
 
-  return Response.json({ success: true, data: domains });
+  const threadIds = domains.map(d => d.threadId).filter(Boolean);
+  const baseUrls = domains.map(d => d.url).filter(Boolean);
+  const vectorCollection = await getMongoCollection(env.VECTOR_COLLECTION);
+  const counts = threadIds.length > 0
+    ? await vectorCollection.aggregate<{ _id: string; count: number }>([
+      { $match: { threadId: { $in: threadIds } } },
+      { $group: { _id: '$threadId', count: { $sum: 1 } } },
+    ]).toArray()
+    : [];
+  const baseUrlCounts = baseUrls.length > 0
+    ? await vectorCollection.aggregate<{ _id: string; count: number }>([
+      { $match: { 'metadata.baseUrl': { $in: baseUrls } } },
+      { $group: { _id: '$metadata.baseUrl', count: { $sum: 1 } } },
+    ]).toArray()
+    : [];
+  const countMap = new Map(counts.map(c => [c._id, c.count]));
+  const baseUrlMap = new Map(baseUrlCounts.map(c => [c._id, c.count]));
+
+  const hydrated = domains.map(d => ({
+    ...d,
+    documentCount: typeof d.documentCount === 'number'
+      ? d.documentCount
+      : (countMap.get(d.threadId) ?? baseUrlMap.get(d.url) ?? 0),
+    status: d.status ?? ((countMap.get(d.threadId) ?? 0) > 0 ? 'indexed' : 'pending'),
+  }));
+
+  return Response.json({ success: true, data: hydrated });
 }
 
 export async function POST(req: NextRequest) {

@@ -21,10 +21,14 @@ export interface OnboardingSettings {
   };
   crawlStatus?: 'pending' | 'running' | 'complete' | 'failed';
   chatConfig?: {
+    model?: string;
+    baseUrl?: string;
+    apiKey?: string;
     maxTokens?: number;
     maxSteps?: number;
   };
   embeddingConfig?: {
+    apiKey?: string;
     model?: string;
     dimensions?: number;
   };
@@ -32,7 +36,15 @@ export interface OnboardingSettings {
     model?: string;
     topK?: number;
   };
+  voiceConfig?: {
+    apiKey?: string;
+    tokenTtl?: number;
+    sttModel?: string;
+    ttsModel?: string;
+    thinkModel?: string;
+  };
   crawlerInstructions?: string;
+  tavilyApiKey?: string;
   uploadthingSecret?: string;
   uploadthingAppId?: string;
   fileTypeRules?: {

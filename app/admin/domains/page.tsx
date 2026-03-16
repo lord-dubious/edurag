@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CrawlForm } from '@/components/admin/CrawlForm';
 import { CrawlProgress } from '@/components/admin/CrawlProgress';
@@ -29,6 +30,7 @@ interface DomainApiResponse {
 }
 
 export default function DomainsPage() {
+  const router = useRouter();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -44,11 +46,21 @@ export default function DomainsPage() {
     ? document.cookie.split('; ').find(c => c.startsWith('admin_token='))?.split('=')[1]
     : '';
 
+  useEffect(() => {
+    if (!token) {
+      router.replace('/admin/login');
+    }
+  }, [router, token]);
+
   const fetchDomains = useCallback(async () => {
     try {
       const res = await fetch('/api/domains', {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.status === 401) {
+        router.replace('/admin/login');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setDomains(data.data.map((d: DomainApiResponse) => ({
@@ -65,7 +77,7 @@ export default function DomainsPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [router, token]);
 
   useEffect(() => {
     fetchDomains();
@@ -193,11 +205,62 @@ export default function DomainsPage() {
     }
   };
 
+  const indexedCount = domains.filter(d => d.status === 'indexed').length;
+  const crawlingCount = domains.filter(d => d.status === 'crawling').length;
+  const errorCount = domains.filter(d => d.status === 'error').length;
+  const totalDocuments = domains.reduce((sum, d) => sum + (d.documentCount || 0), 0);
+  const recentDomains = [...domains]
+    .sort((a, b) => {
+      const aTime = a.lastCrawled ? new Date(a.lastCrawled).getTime() : 0;
+      const bTime = b.lastCrawled ? new Date(b.lastCrawled).getTime() : 0;
+      return bTime - aTime;
+    })
+    .slice(0, 3);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Domains</h1>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight">Domains</h1>
         <p className="text-muted-foreground">Manage crawled domains and knowledge base sources</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Domains</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{domains.length}</div>
+            <p className="text-xs text-muted-foreground">Connected sources</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Indexed Docs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalDocuments.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Search-ready content</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Crawling</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{crawlingCount}</div>
+            <p className="text-xs text-muted-foreground">Active jobs</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Errors</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{errorCount}</div>
+            <p className="text-xs text-muted-foreground">Needs attention</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -209,6 +272,32 @@ export default function DomainsPage() {
         </CardHeader>
         <CardContent>
           <CrawlForm onSubmit={handleAddDomain} isLoading={actionLoading === 'adding'} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Crawls</CardTitle>
+          <CardDescription>Latest domains and their crawl status</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {recentDomains.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No crawl activity yet.</div>
+          ) : (
+            recentDomains.map(domain => (
+              <div key={domain._id} className="flex items-center justify-between border rounded-lg px-4 py-3">
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{domain.url}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Last crawled: {domain.lastCrawled ? new Date(domain.lastCrawled).toLocaleString() : 'Not yet'}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {domain.documentCount.toLocaleString()} docs
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 

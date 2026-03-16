@@ -91,7 +91,7 @@ export function AdminSidebar() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 h-14 bg-background border-b z-50 flex items-center px-4">
+      <header className="fixed top-0 left-0 right-0 h-14 bg-background/80 backdrop-blur border-b z-50 flex items-center px-4">
         <div className="flex items-center gap-2">
           {renderLogo()}
           {showTitle && <span className="font-semibold">{name}</span>}
@@ -128,10 +128,10 @@ export function AdminSidebar() {
         </div>
       </header>
 
-      <aside className="fixed left-0 top-14 bottom-0 w-56 border-r bg-muted/30 flex flex-col">
-        <nav className="flex-1 p-3">
+      <aside className="fixed left-0 top-14 bottom-0 w-56 border-r bg-muted/20 flex flex-col">
+        <nav className="flex-1 p-4">
           {navSections.map((section) => (
-            <div key={section.title} className="mb-4">
+            <div key={section.title} className="mb-5">
               <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 py-1.5">
                 {section.title}
               </div>
@@ -145,7 +145,7 @@ export function AdminSidebar() {
                       <Button
                         variant="ghost"
                         className={cn(
-                          'w-full justify-start gap-2',
+                          'w-full justify-start gap-2 rounded-lg',
                           isActive && 'bg-primary/10 text-primary hover:bg-primary/15'
                         )}
                       >

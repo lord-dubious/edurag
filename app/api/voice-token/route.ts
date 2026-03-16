@@ -4,6 +4,7 @@ import { createClient } from '@deepgram/sdk';
 import { auth } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { errorResponse } from '@/lib/errors';
+import { getSettings } from '@/lib/db/settings';
 
 import clientPromise from '@/lib/auth-client';
 
@@ -55,12 +56,17 @@ export async function GET() {
       );
     }
 
-    if (!env.DEEPGRAM_API_KEY) {
+    const settings = await getSettings();
+    const voiceConfig = settings?.voiceConfig;
+    const deepgramApiKey = voiceConfig?.apiKey || env.DEEPGRAM_API_KEY;
+
+    if (!deepgramApiKey) {
       return errorResponse('INTERNAL_ERROR', 'Deepgram API key not configured', 500);
     }
 
-    const deepgram = createClient(env.DEEPGRAM_API_KEY);
-    const ttlSecondsRaw = Number.parseInt(String(env.DEEPGRAM_TOKEN_TTL), 10);
+    const deepgram = createClient(deepgramApiKey);
+    const ttlSource = voiceConfig?.tokenTtl ?? env.DEEPGRAM_TOKEN_TTL;
+    const ttlSecondsRaw = Number.parseInt(String(ttlSource), 10);
     const ttlSeconds = Number.isFinite(ttlSecondsRaw) && ttlSecondsRaw > 0 ? ttlSecondsRaw : 3600;
     const { result, error } = await deepgram.auth.grantToken({
       ttl_seconds: ttlSeconds,
@@ -74,9 +80,9 @@ export async function GET() {
     return NextResponse.json({
       token: result.access_token,
       config: {
-        sttModel: env.DEEPGRAM_STT_MODEL,
-        ttsModel: env.DEEPGRAM_TTS_MODEL,
-        thinkModel: env.DEEPGRAM_THINK_MODEL,
+        sttModel: voiceConfig?.sttModel || env.DEEPGRAM_STT_MODEL,
+        ttsModel: voiceConfig?.ttsModel || env.DEEPGRAM_TTS_MODEL,
+        thinkModel: voiceConfig?.thinkModel || env.DEEPGRAM_THINK_MODEL,
       },
     });
   } catch (error) {
