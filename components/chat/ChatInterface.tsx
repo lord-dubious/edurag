@@ -9,7 +9,7 @@ import { nanoid } from 'nanoid';
 import { useTheme } from 'next-themes';
 
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, type TextUIPart, type UIMessage } from 'ai';
 
 import { authClient } from '@/lib/auth-client-better';
 import { Button } from '@/components/ui/button';
@@ -91,6 +91,7 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
   const [voiceAutoStart, setVoiceAutoStart] = useState(Boolean(initialVoice));
   const [suggestionsSeed, setSuggestionsSeed] = useState(() => Math.random());
   const initialQuerySentRef = useRef(false);
+  const historyLoadIdRef = useRef(0);
   const { theme, setTheme } = useTheme();
   const { brand } = useBrand();
   const isAuthenticated = Boolean(session?.user);
@@ -105,26 +106,45 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     body: () => ({ threadId }),
   }), [threadId]);
 
+  const persistHistoryMessage = useCallback(async (
+    payload: { role: 'user' | 'assistant'; id?: string; content: string; sources?: Source[] },
+    context: string,
+  ) => {
+    try {
+      const res = await fetch(`/api/history/${threadId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        console.error(`[History] ${context} failed`, {
+          status: res.status,
+          body,
+        });
+      }
+    } catch (err) {
+      console.error(`[History] ${context} failed`, err);
+    }
+  }, [threadId]);
+
   const { messages, setMessages, status, error, sendMessage, regenerate } = useChat({
     id: threadId,
     transport,
-    onFinish: ({ message }) => {
+    onFinish: async ({ message }) => {
+      let newSources: Source[] = [];
       if (message.parts) {
         const toolParts = message.parts.filter(isVectorSearchToolPart);
         if (toolParts.length > 0) {
-          const seenUrls = new Set<string>();
-          const newSources: Source[] = [];
+          newSources = [];
           toolParts.forEach((part) => {
             if (part.output?.results) {
               part.output.results.forEach((r: VectorSearchResult) => {
-                if (!seenUrls.has(r.url)) {
-                  seenUrls.add(r.url);
-                  newSources.push({
-                    url: r.url,
-                    title: r.title,
-                    content: r.content,
-                  });
-                }
+                newSources.push({
+                  url: r.url,
+                  title: r.title,
+                  content: r.content,
+                });
               });
             }
           });
@@ -136,11 +156,26 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
           }
         }
       }
+
+      const assistantText = message.parts
+        ?.filter((part): part is { type: 'text'; text: string } => part.type === 'text' && typeof (part as { text?: unknown }).text === 'string')
+        .map(part => part.text)
+        .join('') ?? '';
+
+      if (session?.user && assistantText.trim()) {
+        await persistHistoryMessage({
+          role: 'assistant',
+          id: message.id,
+          content: assistantText,
+          sources: newSources,
+        }, 'assistant message');
+      }
     },
   });
 
   const handleHistorySelect = async (newThreadId: string) => {
     if (newThreadId === threadId) return;
+    const loadId = ++historyLoadIdRef.current;
     setThreadId(newThreadId);
     setMessages([]);
     setSources({});
@@ -150,14 +185,24 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
       if (res.ok) {
         const data = await res.json();
         if (data && data.messages) {
-          const uiMessages = data.messages.map((m: { role: string; content: string; timestamp: string }) => ({
-            id: nanoid(),
-            role: m.role as 'user' | 'assistant',
-            content: m.content,
-            parts: [{ type: 'text', text: m.content }],
-            createdAt: new Date(m.timestamp)
-          }));
-          setMessages(uiMessages);
+          const sourcesMap: Record<string, Source[]> = {};
+          const uiMessages = data.messages.map((m: { role: string; content: string; timestamp: string; id?: string; sources?: Source[] }) => {
+            const id = m.id ?? nanoid();
+            if (m.role === 'assistant' && Array.isArray(m.sources) && m.sources.length > 0) {
+              sourcesMap[id] = m.sources;
+            }
+            return {
+              id,
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+              parts: [{ type: 'text', text: m.content }],
+              createdAt: new Date(m.timestamp)
+            };
+          });
+          if (historyLoadIdRef.current === loadId) {
+            setMessages(uiMessages);
+            setSources(sourcesMap);
+          }
         }
       }
     } catch (e) {
@@ -226,26 +271,52 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     return `[VOICE_HANDOFF] I am providing the detailed Markdown notes and source links for ${topic} now as requested in our conversation.`;
   }, []);
 
-  const handleVoiceMessage = useCallback((msg: VoiceMessagePayload) => {
+  const handleVoiceMessage = useCallback(async (msg: VoiceMessagePayload) => {
     if (msg.role === 'user') {
       const id = nanoid();
+      const textPart: TextUIPart = { type: 'text', text: msg.content };
       setMessages(prev => [...prev, {
         id,
         role: 'user',
         content: msg.content,
         createdAt: new Date(),
-        parts: [{ type: 'text', text: msg.content }],
+        parts: [textPart],
       }]);
 
       if (session?.user) {
-        fetch(`/api/history/${threadId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: 'user', content: msg.content }),
-        }).catch(err => console.error('[Voice] Failed to persist user message:', err));
+        await persistHistoryMessage({
+          role: 'user',
+          id,
+          content: msg.content,
+        }, 'voice user message');
+      }
+    } else if (msg.role === 'assistant') {
+      const id = nanoid();
+      const textPart: TextUIPart = { type: 'text', text: msg.content };
+      const assistantMessage: UIMessage & { content: string; createdAt: Date } = {
+        id,
+        role: 'assistant' as const,
+        content: msg.content,
+        createdAt: new Date(),
+        parts: [textPart],
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      if (msg.sources && msg.sources.length > 0) {
+        setSources(prev => ({
+          ...prev,
+          [id]: msg.sources ?? [],
+        }));
+      }
+      if (session?.user) {
+        await persistHistoryMessage({
+          role: 'assistant',
+          id,
+          content: msg.content,
+          sources: msg.sources ?? [],
+        }, 'voice assistant message');
       }
     }
-  }, [setMessages, threadId, session?.user]);
+  }, [setMessages, setSources, persistHistoryMessage, session?.user]);
 
   const pendingNotesRef = useRef<string | null>(null);
 

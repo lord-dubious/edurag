@@ -1,11 +1,14 @@
 import { ObjectId } from 'mongodb';
 import type { Collection, Filter, UpdateFilter } from 'mongodb';
+import type { Source } from '@edurag/agent/text';
 import { getMongoCollection } from './vectorstore';
 
 export interface Message {
+  id?: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  sources?: Source[];
 }
 
 export interface ConversationDocument {
