@@ -8,6 +8,7 @@ import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 import { env } from './env';
 import { getEmbeddings } from './providers';
 import { getMongoCollection } from './vectorstore';
+import { getSettings } from './db/settings';
 
 interface CrawlOptions {
   url: string;
@@ -96,7 +97,12 @@ function isQualityChunk(content: string): boolean {
 }
 
 export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
-  const client = tavily({ apiKey: env.TAVILY_API_KEY });
+  const settings = await getSettings();
+  const tavilyApiKey = settings?.tavilyApiKey || env.TAVILY_API_KEY;
+  if (!tavilyApiKey) {
+    throw new Error('TAVILY_API_KEY is required to crawl');
+  }
+  const client = tavily({ apiKey: tavilyApiKey });
 
   const selectPaths = opts.selectPaths
     ?? env.CRAWL_SELECT_PATHS?.split(',').map(p => p.trim()).filter(Boolean);

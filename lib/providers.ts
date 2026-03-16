@@ -8,7 +8,10 @@ let _chatModel: ReturnType<ReturnType<typeof createOpenAI>['chat']> | undefined;
 let _embeddings: VoyageEmbeddings | undefined;
 let _voyageClient: VoyageAIClient | undefined;
 
-export function getVoyageClient(): VoyageAIClient {
+export function getVoyageClient(apiKey?: string): VoyageAIClient {
+  if (apiKey) {
+    return new VoyageAIClient({ apiKey });
+  }
   if (!_voyageClient) {
     _voyageClient = new VoyageAIClient({ apiKey: env.EMBEDDING_API_KEY });
   }

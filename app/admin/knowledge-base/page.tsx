@@ -4,6 +4,7 @@ import { Save, RefreshCw, Loader2 } from 'lucide-react';
 import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
 import { getSettings, updateSettings } from '@/lib/db/settings';
 import { env } from '@/lib/env';
+import { requireAdmin } from '@/lib/admin-guard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -34,6 +35,7 @@ async function saveCrawlSettings(formData: FormData) {
 }
 
 export default async function KnowledgeBasePage() {
+  await requireAdmin();
   const settings = await getSettings();
 
   const uniUrl = settings?.uniUrl || env.UNIVERSITY_URL || '';

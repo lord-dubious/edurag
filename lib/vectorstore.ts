@@ -2,6 +2,7 @@ import { MongoClient, type Collection, type Document as MongoDocument, type With
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { env } from './env';
 import { getEmbeddings, getVoyageClient } from './providers';
+import { getSettings } from './db/settings';
 
 declare global {
   var mongoClient: MongoClient | undefined;
@@ -38,7 +39,13 @@ export type { MongoDocument, WithId, OptionalId };
 
 export async function getVectorStore() {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
-  const embeddingsInstance = getEmbeddings();
+  const settings = await getSettings();
+  const embeddingConfig = settings?.embeddingConfig;
+  const embeddingsInstance = getEmbeddings(
+    embeddingConfig?.apiKey,
+    embeddingConfig?.model,
+    embeddingConfig?.dimensions,
+  );
 
   const vectorStore = new MongoDBAtlasVectorSearch(embeddingsInstance, {
     collection,
@@ -56,7 +63,14 @@ export async function similaritySearchWithScore(
 ): Promise<[import('@langchain/core/documents').Document, number][]> {
   k = Math.max(1, Math.floor(k));
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
-  const embeddingsInstance = getEmbeddings();
+  const settings = await getSettings();
+  const embeddingConfig = settings?.embeddingConfig;
+  const rerankConfig = settings?.rerankConfig;
+  const embeddingsInstance = getEmbeddings(
+    embeddingConfig?.apiKey,
+    embeddingConfig?.model,
+    embeddingConfig?.dimensions,
+  );
 
   const vectorStore = new MongoDBAtlasVectorSearch(embeddingsInstance, {
     collection,
@@ -79,7 +93,7 @@ export async function similaritySearchWithScore(
 
   let timerId: ReturnType<typeof setTimeout> | undefined;
   try {
-    const voyageClient = getVoyageClient();
+    const voyageClient = getVoyageClient(embeddingConfig?.apiKey);
 
     // Fix LangChain textKey mapping issue by explicitly populating pageContent
     allResults.forEach(([doc]) => {
@@ -102,8 +116,8 @@ export async function similaritySearchWithScore(
       voyageClient.rerank({
         query,
         documents,
-        model: env.RERANK_MODEL,
-        topK: k,
+        model: rerankConfig?.model || env.RERANK_MODEL,
+        topK: Math.min(k, rerankConfig?.topK ?? env.RERANK_TOP_K),
         truncation: true,
       }),
       timeoutPromise,
