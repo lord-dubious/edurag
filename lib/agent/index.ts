@@ -20,7 +20,7 @@ function buildChatModel(config: { model: string; baseUrl?: string; apiKey?: stri
   }).chat(config.model);
 }
 
-function resolvePrimaryChatModel(settings: Awaited<ReturnType<typeof getSettings>>): LanguageModel {
+export function resolvePrimaryChatModel(settings: Awaited<ReturnType<typeof getSettings>>): LanguageModel {
   const chatConfig = settings?.chatConfig;
   const modelName = chatConfig?.model || env.CHAT_MODEL;
   const baseURL = chatConfig?.baseUrl || env.CHAT_BASE_URL;
