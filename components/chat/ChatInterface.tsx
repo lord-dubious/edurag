@@ -9,7 +9,7 @@ import { nanoid } from 'nanoid';
 import { useTheme } from 'next-themes';
 
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, type TextUIPart, type UIMessage } from 'ai';
 
 import { authClient } from '@/lib/auth-client-better';
 import { Button } from '@/components/ui/button';
@@ -274,12 +274,13 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
   const handleVoiceMessage = useCallback(async (msg: VoiceMessagePayload) => {
     if (msg.role === 'user') {
       const id = nanoid();
+      const textPart: TextUIPart = { type: 'text', text: msg.content };
       setMessages(prev => [...prev, {
         id,
         role: 'user',
         content: msg.content,
         createdAt: new Date(),
-        parts: [{ type: 'text', text: msg.content }],
+        parts: [textPart],
       }]);
 
       if (session?.user) {
@@ -291,12 +292,13 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
       }
     } else if (msg.role === 'assistant') {
       const id = nanoid();
-      const assistantMessage = {
+      const textPart: TextUIPart = { type: 'text', text: msg.content };
+      const assistantMessage: UIMessage & { content: string; createdAt: Date } = {
         id,
         role: 'assistant' as const,
         content: msg.content,
         createdAt: new Date(),
-        parts: [{ type: 'text', text: msg.content }],
+        parts: [textPart],
       };
       setMessages(prev => [...prev, assistantMessage]);
       if (msg.sources && msg.sources.length > 0) {
