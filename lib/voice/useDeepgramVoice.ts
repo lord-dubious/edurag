@@ -57,6 +57,7 @@ export function useDeepgramVoice({
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const audioQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false);
+  const audioStartedRef = useRef(false);
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const lastSearchResultsRef = useRef<string>('');
 
@@ -246,6 +247,9 @@ export function useDeepgramVoice({
     }
   }, [onSources, onRequestNotes, updateState]);
 
+  const startAudioCaptureRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const cleanupAudioResourcesRef = useRef<() => void>(() => {});
+
   const handleMessage = useCallback((event: MessageEvent) => {
     if (event.data instanceof ArrayBuffer) {
       audioQueueRef.current.push(event.data);
@@ -272,6 +276,18 @@ export function useDeepgramVoice({
 
       case 'SettingsApplied':
         console.log('Settings applied');
+        if (!audioStartedRef.current) {
+          audioStartedRef.current = true;
+          startAudioCaptureRef.current()
+            .then(() => updateState('listening'))
+            .catch(err => {
+              console.error('[Deepgram] Audio capture failed:', err);
+              onError?.(err instanceof Error ? err : new Error('Audio capture failed'));
+              wsRef.current?.close();
+              cleanupAudioResourcesRef.current();
+              updateState('idle');
+            });
+        }
         break;
 
       case 'UserStartedSpeaking':
@@ -361,26 +377,19 @@ export function useDeepgramVoice({
     audioQueueRef.current = [];
     isPlayingRef.current = false;
     setIsPlaying(false);
+    audioStartedRef.current = false;
   }, []);
 
-  const stop = useCallback(() => {
-    if (wsRef.current) {
-      wsRef.current.close(1000, 'User ended call');
-      wsRef.current = null;
-    }
-
-    cleanupAudioResources();
-    updateState('idle');
-  }, [updateState, cleanupAudioResources]);
-
   useEffect(() => {
-    return () => { stop(); };
-  }, [stop]);
+    cleanupAudioResourcesRef.current = cleanupAudioResources;
+  }, [cleanupAudioResources]);
 
   const startAudioCapture = useCallback(async () => {
     const stream = mediaStreamRef.current;
     const audioContext = audioContextRef.current;
-    if (!stream || !audioContext) return;
+    if (!stream || !audioContext) {
+      throw new Error('Audio capture prerequisites missing');
+    }
 
     const source = audioContext.createMediaStreamSource(stream);
 
@@ -398,6 +407,24 @@ export function useDeepgramVoice({
 
     source.connect(workletNode);
   }, []);
+
+  useEffect(() => {
+    startAudioCaptureRef.current = startAudioCapture;
+  }, [startAudioCapture]);
+
+  const stop = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close(1000, 'User ended call');
+      wsRef.current = null;
+    }
+
+    cleanupAudioResources();
+    updateState('idle');
+  }, [updateState, cleanupAudioResources]);
+
+  useEffect(() => {
+    return () => { stop(); };
+  }, [stop]);
 
   const isStartingRef = useRef(false);
   const start = useCallback(async () => {
@@ -427,25 +454,17 @@ export function useDeepgramVoice({
         }
       });
 
+      const isJwt = /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(apiKey);
+      const protocolScheme = isJwt ? 'bearer' : 'token';
       const ws = new WebSocket(
         'wss://agent.deepgram.com/v1/agent/converse',
-        ['token', apiKey]
+        [protocolScheme, apiKey]
       );
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
 
       ws.onopen = async () => {
         console.log('[Deepgram] WebSocket opened, waiting for Welcome...');
-        try {
-          await startAudioCapture();
-          updateState('listening');
-        } catch (err) {
-          console.error('[Deepgram] Audio capture failed:', err);
-          onError?.(err instanceof Error ? err : new Error('Audio capture failed'));
-          ws.close();
-          cleanupAudioResources();
-          updateState('idle');
-        }
       };
 
       ws.onmessage = (event: MessageEvent) => handleMessageRef.current(event);
@@ -453,7 +472,7 @@ export function useDeepgramVoice({
       ws.onerror = (event) => {
         console.error('WebSocket error event:', event);
         cleanupAudioResources();
-        onError?.(new Error('WebSocket connection failed. Check your API key.'));
+        onError?.(new Error('WebSocket connection failed. Check your Deepgram token and network access.'));
         updateState('idle');
       };
 
@@ -461,7 +480,7 @@ export function useDeepgramVoice({
         console.log('WebSocket closed:', event.code, event.reason);
         cleanupAudioResources();
         if (event.code !== 1000 && event.code !== 1005) {
-          onError?.(new Error(`Connection closed: ${event.reason || 'Unknown reason'}`));
+          onError?.(new Error(`Connection closed (${event.code}): ${event.reason || 'Unknown reason'}`));
         }
         updateState('idle');
       };
