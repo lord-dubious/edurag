@@ -91,6 +91,7 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
   const [voiceAutoStart, setVoiceAutoStart] = useState(Boolean(initialVoice));
   const [suggestionsSeed, setSuggestionsSeed] = useState(() => Math.random());
   const initialQuerySentRef = useRef(false);
+  const historyLoadIdRef = useRef(0);
   const { theme, setTheme } = useTheme();
   const { brand } = useBrand();
   const isAuthenticated = Boolean(session?.user);
@@ -105,10 +106,32 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     body: () => ({ threadId }),
   }), [threadId]);
 
+  const persistHistoryMessage = useCallback(async (
+    payload: { role: 'user' | 'assistant'; id?: string; content: string; sources?: Source[] },
+    context: string,
+  ) => {
+    try {
+      const res = await fetch(`/api/history/${threadId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        console.error(`[History] ${context} failed`, {
+          status: res.status,
+          body,
+        });
+      }
+    } catch (err) {
+      console.error(`[History] ${context} failed`, err);
+    }
+  }, [threadId]);
+
   const { messages, setMessages, status, error, sendMessage, regenerate } = useChat({
     id: threadId,
     transport,
-    onFinish: ({ message }) => {
+    onFinish: async ({ message }) => {
       let newSources: Source[] = [];
       if (message.parts) {
         const toolParts = message.parts.filter(isVectorSearchToolPart);
@@ -140,22 +163,19 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
         .join('') ?? '';
 
       if (session?.user && assistantText.trim()) {
-        fetch(`/api/history/${threadId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            role: 'assistant',
-            id: message.id,
-            content: assistantText,
-            sources: newSources,
-          }),
-        }).catch(err => console.error('[Chat] Failed to persist assistant message:', err));
+        await persistHistoryMessage({
+          role: 'assistant',
+          id: message.id,
+          content: assistantText,
+          sources: newSources,
+        }, 'assistant message');
       }
     },
   });
 
   const handleHistorySelect = async (newThreadId: string) => {
     if (newThreadId === threadId) return;
+    const loadId = ++historyLoadIdRef.current;
     setThreadId(newThreadId);
     setMessages([]);
     setSources({});
@@ -179,8 +199,10 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
               createdAt: new Date(m.timestamp)
             };
           });
-          setMessages(uiMessages);
-          setSources(sourcesMap);
+          if (historyLoadIdRef.current === loadId) {
+            setMessages(uiMessages);
+            setSources(sourcesMap);
+          }
         }
       }
     } catch (e) {
@@ -249,7 +271,7 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     return `[VOICE_HANDOFF] I am providing the detailed Markdown notes and source links for ${topic} now as requested in our conversation.`;
   }, []);
 
-  const handleVoiceMessage = useCallback((msg: VoiceMessagePayload) => {
+  const handleVoiceMessage = useCallback(async (msg: VoiceMessagePayload) => {
     if (msg.role === 'user') {
       const id = nanoid();
       setMessages(prev => [...prev, {
@@ -261,27 +283,38 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
       }]);
 
       if (session?.user) {
-        fetch(`/api/history/${threadId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ role: 'user', id, content: msg.content }),
-        }).catch(err => console.error('[Voice] Failed to persist user message:', err));
+        await persistHistoryMessage({
+          role: 'user',
+          id,
+          content: msg.content,
+        }, 'voice user message');
       }
     } else if (msg.role === 'assistant') {
+      const id = nanoid();
+      const assistantMessage = {
+        id,
+        role: 'assistant' as const,
+        content: msg.content,
+        createdAt: new Date(),
+        parts: [{ type: 'text', text: msg.content }],
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      if (msg.sources && msg.sources.length > 0) {
+        setSources(prev => ({
+          ...prev,
+          [id]: msg.sources ?? [],
+        }));
+      }
       if (session?.user) {
-        fetch(`/api/history/${threadId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            role: 'assistant',
-            id: nanoid(),
-            content: msg.content,
-            sources: msg.sources ?? [],
-          }),
-        }).catch(err => console.error('[Voice] Failed to persist assistant message:', err));
+        await persistHistoryMessage({
+          role: 'assistant',
+          id,
+          content: msg.content,
+          sources: msg.sources ?? [],
+        }, 'voice assistant message');
       }
     }
-  }, [setMessages, threadId, session?.user]);
+  }, [setMessages, setSources, persistHistoryMessage, session?.user]);
 
   const pendingNotesRef = useRef<string | null>(null);
 
