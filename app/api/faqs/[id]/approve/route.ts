@@ -17,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   if (!ObjectId.isValid(id)) {
-    return errorResponse('INVALID_ID', 'Invalid FAQ id', 400);
+    return errorResponse('VALIDATION_ERROR', 'Invalid FAQ id', 400);
   }
   let body: z.infer<typeof bodySchema>;
   try {

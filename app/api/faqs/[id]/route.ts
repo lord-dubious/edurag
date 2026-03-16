@@ -12,7 +12,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params;
   if (!ObjectId.isValid(id)) {
-    return errorResponse('INVALID_ID', 'Invalid FAQ id', 400);
+    return errorResponse('VALIDATION_ERROR', 'Invalid FAQ id', 400);
   }
   const col = await getMongoCollection(env.FAQ_COLLECTION);
   const result = await col.updateOne(
