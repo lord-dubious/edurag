@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { type UIMessage, type TextUIPart, type ToolUIPart } from 'ai';
-import { runAgent } from '@/lib/agent';
+import { runAgent, resolveFallbackChatModel } from '@/lib/agent';
 import { trackAndMaybeGenerateFaq } from '@/lib/faq-manager';
 import { generateAndSaveTitle } from '@/lib/title-generator';
 import { getSettings } from '@/lib/db/settings';
@@ -93,28 +93,28 @@ export async function POST(req: Request) {
     }
   }
 
-  try {
-    const uiMessages: UIMessage[] = messages.map((m): UIMessage => ({
-      id: m.id,
-      role: m.role as 'user' | 'assistant',
-      parts: convertToUIMessageParts(m.parts),
-    }));
+  const uiMessages: UIMessage[] = messages.map((m): UIMessage => ({
+    id: m.id,
+    role: m.role as 'user' | 'assistant',
+    parts: convertToUIMessageParts(m.parts),
+  }));
 
-    const lastAssistantIdx = uiMessages.findLastIndex(m => m.role === 'assistant');
-    for (let i = 0; i < uiMessages.length; i++) {
-      if (i !== lastAssistantIdx && uiMessages[i].role === 'assistant') {
-        uiMessages[i] = {
-          ...uiMessages[i],
-          parts: uiMessages[i].parts.filter(p => p.type === 'text'),
-        };
-      }
+  const lastAssistantIdx = uiMessages.findLastIndex(m => m.role === 'assistant');
+  for (let i = 0; i < uiMessages.length; i++) {
+    if (i !== lastAssistantIdx && uiMessages[i].role === 'assistant') {
+      uiMessages[i] = {
+        ...uiMessages[i],
+        parts: uiMessages[i].parts.filter(p => p.type === 'text'),
+      };
     }
+  }
 
-    const settings = await getSettings();
-    const universityName = settings?.appName || 'University Knowledge Base';
-    const maxSteps = settings?.chatConfig?.maxSteps;
-    const maxTokens = settings?.chatConfig?.maxTokens;
+  const settings = await getSettings();
+  const universityName = settings?.appName || 'University Knowledge Base';
+  const maxSteps = settings?.chatConfig?.maxSteps;
+  const maxTokens = settings?.chatConfig?.maxTokens;
 
+  try {
     const result = runAgent({
       messages: uiMessages,
       threadId: currentThreadId,
@@ -125,8 +125,28 @@ export async function POST(req: Request) {
 
     return (await result).toUIMessageStreamResponse();
   } catch (err) {
-    console.error('[Chat] agent error:', err);
-    const message = err instanceof Error ? err.message : 'Agent failed to process request';
-    return errorResponse('AGENT_ERROR', message, 500);
+    const fallbackModel = resolveFallbackChatModel();
+    if (!fallbackModel) {
+      console.error('[Chat] agent error:', err);
+      const message = err instanceof Error ? err.message : 'Agent failed to process request';
+      return errorResponse('AGENT_ERROR', message, 500);
+    }
+
+    console.warn('[Chat] Primary model failed, retrying with fallback.', err);
+    try {
+      const result = runAgent({
+        messages: uiMessages,
+        threadId: currentThreadId,
+        universityName,
+        maxSteps,
+        maxTokens,
+      }, { model: fallbackModel });
+
+      return (await result).toUIMessageStreamResponse();
+    } catch (fallbackErr) {
+      console.error('[Chat] fallback model error:', fallbackErr);
+      const message = fallbackErr instanceof Error ? fallbackErr.message : 'Agent failed to process request';
+      return errorResponse('AGENT_ERROR', message, 500);
+    }
   }
 }
