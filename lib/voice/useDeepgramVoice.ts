@@ -492,7 +492,7 @@ export function useDeepgramVoice({
     } finally {
       isStartingRef.current = false;
     }
-  }, [apiKey, updateState, onError, startAudioCapture, cleanupAudioResources]);
+  }, [apiKey, updateState, onError, cleanupAudioResources]);
 
 
   const interrupt = useCallback(() => {
