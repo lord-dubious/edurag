@@ -156,20 +156,6 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
           }
         }
       }
-
-      const assistantText = message.parts
-        ?.filter((part): part is { type: 'text'; text: string } => part.type === 'text' && typeof (part as { text?: unknown }).text === 'string')
-        .map(part => part.text)
-        .join('') ?? '';
-
-      if (session?.user && assistantText.trim()) {
-        await persistHistoryMessage({
-          role: 'assistant',
-          id: message.id,
-          content: assistantText,
-          sources: newSources,
-        }, 'assistant message');
-      }
     },
   });
 

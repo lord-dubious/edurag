@@ -54,7 +54,7 @@ export async function appendMessage(threadId: string, message: Message, userId?:
 
   if (existing) {
     // Security check: If thread belongs to another user, prevent write.
-    if (existing.userId && userId && existing.userId !== userId) {
+    if (existing.userId && existing.userId !== userId) {
       console.error(`[appendMessage] Unauthorized write attempt to thread ${threadId} by user ${userId}`);
       throw new Error('Unauthorized: Cannot write to another user\'s thread');
     }

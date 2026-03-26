@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CrawlForm } from '@/components/admin/CrawlForm';
 import { CrawlProgress } from '@/components/admin/CrawlProgress';
@@ -27,6 +28,19 @@ interface DomainApiResponse {
   documentCount?: number;
   lastCrawled?: string | null;
   status?: 'indexed' | 'crawling' | 'error';
+}
+
+interface VerificationSummary {
+  checkedSources: number;
+  dead: number;
+  errors: number;
+  contentMismatch: number;
+}
+
+interface VerificationResult {
+  url: string;
+  linkStatus: string;
+  contentStatus: string;
 }
 
 export default function DomainsPage() {
@@ -205,6 +219,61 @@ export default function DomainsPage() {
     }
   };
 
+  const handleVerify = async (domain: Domain) => {
+    setActionLoading(`verify-${domain.threadId}`);
+    try {
+      const res = await fetch('/api/domains/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ threadId: domain.threadId }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error((data && typeof data.error === 'string' && data.error) || 'Verification failed');
+      }
+
+      const summary = data.summary as VerificationSummary;
+      const results = Array.isArray(data.results) ? data.results as VerificationResult[] : [];
+
+      const hasIssues = summary.dead > 0 || summary.errors > 0 || summary.contentMismatch > 0;
+      if (!hasIssues) {
+        toast.success(`Verification passed for ${summary.checkedSources} sources.`);
+      } else {
+        const issueParts = [
+          summary.dead > 0 ? `${summary.dead} dead` : '',
+          summary.errors > 0 ? `${summary.errors} errors` : '',
+          summary.contentMismatch > 0 ? `${summary.contentMismatch} content mismatches` : '',
+        ].filter(Boolean);
+        toast.warning(`Verification found issues: ${issueParts.join(', ')}.`);
+
+        const flagged = results
+          .filter(result => result.linkStatus === 'dead' || result.linkStatus === 'error' || result.contentStatus === 'mismatch')
+          .slice(0, 3)
+          .map((result) => {
+            try {
+              return new URL(result.url).hostname;
+            } catch {
+              return result.url;
+            }
+          })
+          .filter(Boolean);
+
+        if (flagged.length > 0) {
+          toast.info(`Check: ${flagged.join(', ')}`);
+        }
+      }
+    } catch (err) {
+      console.error('Verification failed:', err);
+      toast.error('Failed to verify sources');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const indexedCount = domains.filter(d => d.status === 'indexed').length;
   const crawlingCount = domains.filter(d => d.status === 'crawling').length;
   const errorCount = domains.filter(d => d.status === 'error').length;
@@ -328,8 +397,9 @@ export default function DomainsPage() {
             <DomainTable
               domains={domains}
               onReindex={handleReindex}
+              onVerify={handleVerify}
               onDelete={handleDelete}
-              isLoading={!!crawlProgress?.active}
+              isLoading={!!crawlProgress?.active || Boolean(actionLoading?.startsWith('verify-'))}
             />
           )}
         </CardContent>

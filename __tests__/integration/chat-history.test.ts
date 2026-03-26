@@ -95,4 +95,19 @@ describe('Chat History with User', () => {
     expect(history).toHaveLength(1);
     expect(history[0].content).toBe('My Secret');
   });
+
+  it('should PREVENT anonymous append to an owned thread', async () => {
+    const threadId = nanoid();
+    const ownerId = 'user-' + nanoid();
+
+    await appendMessage(threadId, { role: 'user', content: 'Owner Message', timestamp: new Date() }, ownerId);
+
+    await expect(async () => {
+      await appendMessage(threadId, { role: 'user', content: 'Anonymous Injection', timestamp: new Date() });
+    }).rejects.toThrow('Unauthorized');
+
+    const history = await getHistory(threadId, ownerId);
+    expect(history).toHaveLength(1);
+    expect(history[0].content).toBe('Owner Message');
+  });
 });

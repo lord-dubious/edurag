@@ -9,6 +9,7 @@ import { nanoid } from 'nanoid';
 import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { appendMessage, getConversation } from '@/lib/conversation';
+import type { Source } from '@edurag/agent/text';
 
 const bodySchema = z.object({
   messages: z.array(z.object({
@@ -23,6 +24,14 @@ const bodySchema = z.object({
 export const maxDuration = 60;
 
 type PartRecord = Record<string, unknown>;
+type UIMessagePartLike = PartRecord | TextUIPart | ToolUIPart;
+type VectorSearchOutputPart = {
+  type: 'tool-vector_search';
+  state: 'output-available';
+  output?: {
+    results?: unknown;
+  };
+};
 
 function isTextPart(part: PartRecord): part is { type: 'text'; text: string } {
   return part.type === 'text' && typeof part.text === 'string';
@@ -42,6 +51,65 @@ function convertToUIMessageParts(parts: PartRecord[]): Array<TextUIPart | ToolUI
     }
     return { type: 'text', text: JSON.stringify(part) };
   });
+}
+
+function isResponseTextPart(part: UIMessagePartLike): part is TextUIPart {
+  return part.type === 'text' && typeof (part as { text?: unknown }).text === 'string';
+}
+
+function isVectorSearchOutputPart(part: UIMessagePartLike): part is VectorSearchOutputPart {
+  return part.type === 'tool-vector_search' && (part as { state?: unknown }).state === 'output-available';
+}
+
+function extractAssistantText(parts: UIMessagePartLike[]): string {
+  return parts
+    .filter(isResponseTextPart)
+    .map(part => part.text)
+    .join('');
+}
+
+function extractAssistantSources(parts: UIMessagePartLike[]): Source[] {
+  const sources: Source[] = [];
+
+  parts.forEach((part) => {
+    if (!isVectorSearchOutputPart(part)) {
+      return;
+    }
+
+    const results = part.output?.results;
+    if (!Array.isArray(results)) {
+      return;
+    }
+
+    results.forEach((result) => {
+      if (typeof result !== 'object' || result === null) {
+        return;
+      }
+
+      const candidate = result as Record<string, unknown>;
+      const content = typeof candidate.content === 'string' ? candidate.content.trim() : '';
+      if (!content) {
+        return;
+      }
+
+      const url = typeof candidate.url === 'string' ? candidate.url.trim() : '';
+      const title = typeof candidate.title === 'string' && candidate.title.trim().length > 0
+        ? candidate.title.trim()
+        : undefined;
+      const score = typeof candidate.score === 'number' && Number.isFinite(candidate.score)
+        ? candidate.score
+        : undefined;
+
+      sources.push({
+        url,
+        title,
+        content,
+        score,
+      });
+    });
+  });
+
+  return sources;
 }
 
 export async function POST(req: Request) {
@@ -123,7 +191,50 @@ export async function POST(req: Request) {
       maxTokens,
     });
 
-    return (await result).toUIMessageStreamResponse();
+    const streamResult = await result;
+    return streamResult.toUIMessageStreamResponse({
+      originalMessages: uiMessages,
+      onFinish: async ({ responseMessage, messages }) => {
+        if (!userId || responseMessage.role !== 'assistant') {
+          return;
+        }
+
+        const assistantText = extractAssistantText(responseMessage.parts as UIMessagePartLike[]).trim();
+        if (!assistantText) {
+          return;
+        }
+
+        let assistantSources = extractAssistantSources(responseMessage.parts as UIMessagePartLike[]);
+        if (assistantSources.length === 0) {
+          for (let i = messages.length - 1; i >= 0; i -= 1) {
+            const candidate = messages[i];
+            if (candidate.role !== 'assistant') {
+              continue;
+            }
+            const candidateSources = extractAssistantSources(candidate.parts as UIMessagePartLike[]);
+            if (candidateSources.length > 0) {
+              assistantSources = candidateSources;
+              break;
+            }
+          }
+        }
+        const messageId = typeof responseMessage.id === 'string' && responseMessage.id.length > 0
+          ? responseMessage.id
+          : nanoid();
+
+        try {
+          await appendMessage(currentThreadId, {
+            id: messageId,
+            role: 'assistant',
+            content: assistantText,
+            timestamp: new Date(),
+            sources: assistantSources,
+          }, userId);
+        } catch (dbErr) {
+          console.error('[DB] Failed to persist assistant message:', dbErr);
+        }
+      },
+    });
   } catch (err) {
     console.error('[Chat] agent error:', err);
     const message = err instanceof Error ? err.message : 'Agent failed to process request';

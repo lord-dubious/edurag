@@ -10,6 +10,27 @@ interface Props {
   sources: Source[];
 }
 
+function getSafeHref(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function getSourceHostname(url: string): string {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '');
+    return hostname || 'source';
+  } catch {
+    return 'source';
+  }
+}
+
 function cleanSourcePreview(content: string, maxLength = 150): string {
   if (!content) return 'Content preview not available';
 
@@ -59,13 +80,15 @@ export function CitationPanel({ sources }: Props) {
       </div>
       <div className="space-y-3">
         {sources.map((source, i) => {
-          const domain = new URL(source.url).hostname.replace('www.', '');
+          const safeHref = getSafeHref(source.url);
+          const domain = getSourceHostname(source.url);
           return (
             <a
               key={i}
-              href={source.url}
+              href={safeHref ?? '#'}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={safeHref ? undefined : (event) => event.preventDefault()}
               className="group flex items-start gap-3 p-3.5 bg-card border rounded-xl hover:border-primary/50 hover:bg-accent/40 hover:shadow-sm transition-all cursor-pointer no-underline"
             >
               <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">

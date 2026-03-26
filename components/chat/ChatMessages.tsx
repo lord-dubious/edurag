@@ -63,15 +63,38 @@ interface Props {
   onRegenerate: () => void;
 }
 
+function getSafeHref(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function getSourceHostname(url: string): string {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '');
+    return hostname || 'source';
+  } catch {
+    return 'source';
+  }
+}
+
 function CitationChip({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
-  const displayTitle = customTitle || source.title || new URL(source.url).hostname;
+  const safeHref = getSafeHref(source.url);
+  const displayTitle = customTitle || source.title || getSourceHostname(source.url);
   return (
     <a
-      href={source.url}
+      href={safeHref ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={safeHref ? undefined : (event) => event.preventDefault()}
       className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-[11px] font-medium text-primary hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer no-underline group"
-      title={source.url}
+      title={safeHref ?? 'Unavailable source URL'}
     >
       <span className="flex size-[16px] shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-mono text-primary-foreground group-hover:bg-primary-foreground/30 transition-colors">
         {index + 1}
@@ -82,14 +105,16 @@ function CitationChip({ index, source, customTitle }: { index: number; source: S
 }
 
 function SourceCard({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
-  const domain = new URL(source.url).hostname.replace('www.', '');
+  const safeHref = getSafeHref(source.url);
+  const domain = getSourceHostname(source.url);
   const displayTitle = customTitle || source.title || domain;
 
   return (
     <a
-      href={source.url}
+      href={safeHref ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={safeHref ? undefined : (event) => event.preventDefault()}
       className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-accent/50 transition-colors cursor-pointer no-underline"
     >
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10">

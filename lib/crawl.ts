@@ -166,6 +166,16 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
     embeddingKey: 'embedding',
   });
 
+  if (documents.length > 0) {
+    await collection.deleteMany({
+      $or: [
+        { threadId: opts.threadId },
+        { 'metadata.threadId': opts.threadId },
+        { 'metadata.baseUrl': opts.url },
+      ],
+    });
+  }
+
   await vectorStore.addDocuments(documents);
 
   return documents.length;
@@ -173,6 +183,11 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
 
 export async function deleteCrawlData(threadId: string): Promise<number> {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
-  const result = await collection.deleteMany({ threadId });
+  const result = await collection.deleteMany({
+    $or: [
+      { threadId },
+      { 'metadata.threadId': threadId },
+    ],
+  });
   return result.deletedCount;
 }

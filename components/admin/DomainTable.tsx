@@ -17,7 +17,7 @@ import {
   ConfirmationAction,
   ConfirmationRequest
 } from '@/components/ai-elements/confirmation';
-import { RefreshCcw, Trash2, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { RefreshCcw, Trash2, ExternalLink, MoreHorizontal, ShieldCheck } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,11 +37,12 @@ export interface Domain {
 interface DomainTableProps {
   domains: Domain[];
   onReindex: (domain: Domain) => void;
+  onVerify?: (domain: Domain) => void;
   onDelete: (domain: Domain) => void;
   isLoading?: boolean;
 }
 
-export function DomainTable({ domains, onReindex, onDelete, isLoading }: DomainTableProps) {
+export function DomainTable({ domains, onReindex, onVerify, onDelete, isLoading }: DomainTableProps) {
   const [deleteDomain, setDeleteDomain] = useState<Domain | null>(null);
 
   const formatDate = (date: Date | null) => {
@@ -113,6 +114,12 @@ export function DomainTable({ domains, onReindex, onDelete, isLoading }: DomainT
                         <RefreshCcw className="h-4 w-4 mr-2" />
                         Re-index
                       </DropdownMenuItem>
+                      {onVerify && (
+                        <DropdownMenuItem onClick={() => onVerify(domain)}>
+                          <ShieldCheck className="h-4 w-4 mr-2" />
+                          Verify sources
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem
                         onClick={() => setDeleteDomain(domain)}
                         className="text-destructive focus:text-destructive"
