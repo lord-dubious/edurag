@@ -7,6 +7,7 @@ export interface AgentOptions {
     extraTools?: Record<string, unknown>;
     maxSteps?: number;
     maxTokens?: number;
+    temperature?: number;
     onFinish?: (result: { text: string }) => Promise<void> | void;
 }
 

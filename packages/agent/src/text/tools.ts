@@ -15,6 +15,18 @@ export type SimilaritySearchFn = (
 
 export type GetPublicFaqsFn = (limit: number) => Promise<{ question: string; answer: string }[]>;
 
+export interface WebSearchResult {
+    content: string;
+    url: string;
+    title?: string;
+    score: number;
+}
+
+export type WebSearchFn = (
+    query: string,
+    maxResults: number
+) => Promise<WebSearchResult[]>;
+
 export const createVectorSearchTool = (searchFn: SimilaritySearchFn) =>
     tool({
         description:
@@ -31,7 +43,7 @@ export const createVectorSearchTool = (searchFn: SimilaritySearchFn) =>
                 return {
                     found: false,
                     results: [],
-                    instruction: 'No results found. Tell the user you could not find specific information and suggest they contact the university directly.'
+                    instruction: 'No local knowledge base results were found. If the web_search tool is available, call it next to find authoritative web sources; otherwise tell the user you could not find specific information and suggest they contact the university directly.'
                 };
             }
 
@@ -66,5 +78,47 @@ export const createPopularFaqsTool = (getFaqsFn: GetPublicFaqsFn) =>
         execute: async ({ limit }) => {
             const faqs = await getFaqsFn(limit);
             return faqs.map(f => ({ question: f.question, answer: f.answer }));
+        },
+    });
+
+export const createWebSearchTool = (webSearchFn: WebSearchFn) =>
+    tool({
+        description:
+            'Search trusted web sources when the knowledge base is missing, outdated, or insufficient. Use this as a fallback after vector_search when needed. IMPORTANT: After receiving results, you MUST provide a text response.',
+        inputSchema: z.object({
+            query: z.string().describe('A focused query for missing or unclear details.'),
+            maxResults: z.number().optional().default(5),
+        }),
+        execute: async ({ query, maxResults = 5 }): Promise<ToolResult> => {
+            const results = await webSearchFn(query, maxResults);
+
+            if (results.length === 0) {
+                console.log('[web_search] No results found for query:', query);
+                return {
+                    found: false,
+                    results: [],
+                    instruction: 'No web results were found. Tell the user what is missing and suggest a direct official contact for confirmation.',
+                };
+            }
+
+            console.log('[web_search] Found', results.length, 'results for query:', query);
+
+            const cleanedResults = results.map((result) => {
+                const cleaned = cleanForDisplay(result.content);
+                return {
+                    content: cleaned.length > 1200 ? cleaned.slice(0, 1200) + '...' : cleaned,
+                    url: result.url,
+                    title: result.title,
+                    score: Number.isFinite(result.score) ? Math.round(result.score * 100) / 100 : 0,
+                };
+            });
+
+            console.log('[web_search] Top result:', cleanedResults[0]?.title, 'score:', cleanedResults[0]?.score);
+
+            return {
+                found: true,
+                results: cleanedResults,
+                instruction: 'Above are the fallback web search results. You MUST now write a helpful response to the user based on this information. For citations, you MUST use the format [Clean, Short Title](cite:1) where 1 is the 1-based index of the result, and "Clean, Short Title" is a concise, readable title you create.',
+            };
         },
     });

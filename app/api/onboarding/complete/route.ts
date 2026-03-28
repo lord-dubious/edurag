@@ -12,6 +12,7 @@ interface ApiKeys {
   chatModel: string;
   chatMaxTokens: number;
   chatMaxSteps: number;
+  chatTemperature: number;
   embeddingApiKey: string;
   embeddingModel: string;
   embeddingDimensions: number;
@@ -96,6 +97,7 @@ async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>)
     CHAT_MODEL: sanitizeEnvValue(apiKeys.chatModel),
     CHAT_MAX_TOKENS: apiKeys.chatMaxTokens != null ? String(apiKeys.chatMaxTokens) : undefined,
     CHAT_MAX_STEPS: apiKeys.chatMaxSteps != null ? String(apiKeys.chatMaxSteps) : undefined,
+    CHAT_TEMPERATURE: apiKeys.chatTemperature != null ? String(apiKeys.chatTemperature) : undefined,
     EMBEDDING_API_KEY: sanitizeEnvValue(apiKeys.embeddingApiKey),
     EMBEDDING_MODEL: sanitizeEnvValue(apiKeys.embeddingModel),
     EMBEDDING_DIMENSIONS: apiKeys.embeddingDimensions != null ? String(apiKeys.embeddingDimensions) : undefined,
@@ -244,6 +246,9 @@ export async function POST(request: NextRequest): Promise<Response> {
       `CHAT_API_KEY=${maskSecret(resolvedApiKeys?.chatApiKey || process.env.CHAT_API_KEY)}`,
       resolvedApiKeys?.chatBaseUrl || process.env.CHAT_BASE_URL ? `CHAT_BASE_URL=${sanitizeEnvValue(resolvedApiKeys?.chatBaseUrl || process.env.CHAT_BASE_URL)}` : null,
       `CHAT_MODEL=${sanitizeEnvValue(resolvedApiKeys?.chatModel) || process.env.CHAT_MODEL || 'gpt-oss-120b'}`,
+      `CHAT_MAX_TOKENS=${resolvedApiKeys?.chatMaxTokens ?? process.env.CHAT_MAX_TOKENS ?? 32000}`,
+      `CHAT_MAX_STEPS=${resolvedApiKeys?.chatMaxSteps ?? process.env.CHAT_MAX_STEPS ?? 5}`,
+      `CHAT_TEMPERATURE=${resolvedApiKeys?.chatTemperature ?? process.env.CHAT_TEMPERATURE ?? 0.2}`,
       `EMBEDDING_API_KEY=${maskSecret(resolvedApiKeys?.embeddingApiKey || process.env.EMBEDDING_API_KEY)}`,
       `EMBEDDING_MODEL=${resolvedApiKeys?.embeddingModel || process.env.EMBEDDING_MODEL || 'voyage-4-large'}`,
       `EMBEDDING_DIMENSIONS=${resolvedApiKeys?.embeddingDimensions || process.env.EMBEDDING_DIMENSIONS || 2048}`,
@@ -290,6 +295,9 @@ export async function GET(): Promise<Response> {
         chatApiKey: process.env.CHAT_API_KEY || '',
         chatBaseUrl: process.env.CHAT_BASE_URL || '',
         chatModel: process.env.CHAT_MODEL || '',
+        chatMaxTokens: process.env.CHAT_MAX_TOKENS || '',
+        chatMaxSteps: process.env.CHAT_MAX_STEPS || '',
+        chatTemperature: process.env.CHAT_TEMPERATURE || '',
         embeddingApiKey: process.env.EMBEDDING_API_KEY || '',
         embeddingModel: process.env.EMBEDDING_MODEL || '',
         embeddingDimensions: process.env.EMBEDDING_DIMENSIONS || '',

@@ -25,8 +25,8 @@ export const maxDuration = 60;
 
 type PartRecord = Record<string, unknown>;
 type UIMessagePartLike = PartRecord | TextUIPart | ToolUIPart;
-type VectorSearchOutputPart = {
-  type: 'tool-vector_search';
+type SearchOutputPart = {
+  type: 'tool-vector_search' | 'tool-web_search';
   state: 'output-available';
   output?: {
     results?: unknown;
@@ -57,8 +57,11 @@ function isResponseTextPart(part: UIMessagePartLike): part is TextUIPart {
   return part.type === 'text' && typeof (part as { text?: unknown }).text === 'string';
 }
 
-function isVectorSearchOutputPart(part: UIMessagePartLike): part is VectorSearchOutputPart {
-  return part.type === 'tool-vector_search' && (part as { state?: unknown }).state === 'output-available';
+function isSearchOutputPart(part: UIMessagePartLike): part is SearchOutputPart {
+  return (
+    (part.type === 'tool-vector_search' || part.type === 'tool-web_search') &&
+    (part as { state?: unknown }).state === 'output-available'
+  );
 }
 
 function extractAssistantText(parts: UIMessagePartLike[]): string {
@@ -72,7 +75,7 @@ function extractAssistantSources(parts: UIMessagePartLike[]): Source[] {
   const sources: Source[] = [];
 
   parts.forEach((part) => {
-    if (!isVectorSearchOutputPart(part)) {
+    if (!isSearchOutputPart(part)) {
       return;
     }
 
@@ -182,6 +185,7 @@ export async function POST(req: Request) {
     const universityName = settings?.appName || 'University Knowledge Base';
     const maxSteps = settings?.chatConfig?.maxSteps;
     const maxTokens = settings?.chatConfig?.maxTokens;
+    const temperature = settings?.chatConfig?.temperature;
 
     const result = runAgent({
       messages: uiMessages,
@@ -189,6 +193,7 @@ export async function POST(req: Request) {
       universityName,
       maxSteps,
       maxTokens,
+      temperature,
     });
 
     const streamResult = await result;
@@ -206,15 +211,11 @@ export async function POST(req: Request) {
 
         let assistantSources = extractAssistantSources(responseMessage.parts as UIMessagePartLike[]);
         if (assistantSources.length === 0) {
-          for (let i = messages.length - 1; i >= 0; i -= 1) {
-            const candidate = messages[i];
-            if (candidate.role !== 'assistant') {
-              continue;
-            }
-            const candidateSources = extractAssistantSources(candidate.parts as UIMessagePartLike[]);
-            if (candidateSources.length > 0) {
-              assistantSources = candidateSources;
-              break;
+          const responseIdx = messages.findIndex(message => message.id === responseMessage.id);
+          if (responseIdx > 0) {
+            const previousMessage = messages[responseIdx - 1];
+            if (previousMessage.role === 'assistant') {
+              assistantSources = extractAssistantSources(previousMessage.parts as UIMessagePartLike[]);
             }
           }
         }

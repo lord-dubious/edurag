@@ -45,6 +45,7 @@ const deps: AgentDependencies = {
   getFaqsFn: yourFaqFunction,
   maxSteps: 5,
   maxTokens: 32000,
+  temperature: 0.2,
 };
 
 const result = await runAgent(deps, {

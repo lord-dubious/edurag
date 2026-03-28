@@ -171,7 +171,17 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
       $or: [
         { threadId: opts.threadId },
         { 'metadata.threadId': opts.threadId },
-        { 'metadata.baseUrl': opts.url },
+        {
+          $and: [
+            { 'metadata.baseUrl': opts.url },
+            {
+              $or: [
+                { threadId: opts.threadId },
+                { 'metadata.threadId': opts.threadId },
+              ],
+            },
+          ],
+        },
       ],
     });
   }

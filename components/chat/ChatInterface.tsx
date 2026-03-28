@@ -30,18 +30,22 @@ interface VectorSearchResult {
   score: number;
 }
 
-interface VectorSearchToolPartWithOutput {
-  type: 'tool-vector_search';
+interface SearchToolPartWithOutput {
+  type: 'tool-vector_search' | 'tool-web_search';
   toolCallId: string;
   state: 'output-available';
-  input: { query: string; topK?: number };
+  input: { query: string; topK?: number; maxResults?: number };
   output: { found: boolean; results: VectorSearchResult[] };
 }
 
 type MessagePart = { type: string; state?: string; output?: unknown };
 
-function isVectorSearchToolPart(part: MessagePart): part is VectorSearchToolPartWithOutput {
-  return part.type === 'tool-vector_search' && part.state === 'output-available' && 'output' in part;
+function isSearchToolPart(part: MessagePart): part is SearchToolPartWithOutput {
+  return (
+    (part.type === 'tool-vector_search' || part.type === 'tool-web_search') &&
+    part.state === 'output-available' &&
+    'output' in part
+  );
 }
 
 interface ChatInterfaceProps {
@@ -134,7 +138,7 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     onFinish: async ({ message }) => {
       let newSources: Source[] = [];
       if (message.parts) {
-        const toolParts = message.parts.filter(isVectorSearchToolPart);
+        const toolParts = message.parts.filter(isSearchToolPart);
         if (toolParts.length > 0) {
           newSources = [];
           toolParts.forEach((part) => {

@@ -43,6 +43,40 @@ interface VerificationResult {
   contentStatus: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isVerificationSummary(value: unknown): value is VerificationSummary {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.checkedSources === 'number' &&
+    Number.isFinite(value.checkedSources) &&
+    typeof value.dead === 'number' &&
+    Number.isFinite(value.dead) &&
+    typeof value.errors === 'number' &&
+    Number.isFinite(value.errors) &&
+    typeof value.contentMismatch === 'number' &&
+    Number.isFinite(value.contentMismatch)
+  );
+}
+
+function isVerificationResult(value: unknown): value is VerificationResult {
+  return (
+    isRecord(value) &&
+    typeof value.url === 'string' &&
+    typeof value.linkStatus === 'string' &&
+    typeof value.contentStatus === 'string'
+  );
+}
+
+function isVerificationResultArray(value: unknown): value is VerificationResult[] {
+  return Array.isArray(value) && value.every(isVerificationResult);
+}
+
 export default function DomainsPage() {
   const router = useRouter();
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -232,12 +266,21 @@ export default function DomainsPage() {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        throw new Error((data && typeof data.error === 'string' && data.error) || 'Verification failed');
+      if (res.status === 401) {
+        router.replace('/admin/login');
+        return;
       }
 
-      const summary = data.summary as VerificationSummary;
-      const results = Array.isArray(data.results) ? data.results as VerificationResult[] : [];
+      const dataRecord = isRecord(data) ? data : null;
+      if (!res.ok || dataRecord?.success !== true) {
+        throw new Error((dataRecord && typeof dataRecord.error === 'string' && dataRecord.error) || 'Verification failed');
+      }
+
+      const summary = isVerificationSummary(dataRecord?.summary) ? dataRecord.summary : null;
+      const results = isVerificationResultArray(dataRecord?.results) ? dataRecord.results : [];
+      if (!summary) {
+        throw new Error('Verification failed');
+      }
 
       const hasIssues = summary.dead > 0 || summary.errors > 0 || summary.contentMismatch > 0;
       if (!hasIssues) {

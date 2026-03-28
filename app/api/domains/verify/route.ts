@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   let body: z.infer<typeof bodySchema>;
   try {
-    const rawBody = await req.json().catch(() => ({}));
+    const rawBody = await req.json();
     body = bodySchema.parse(rawBody);
   } catch (err) {
     return errorResponse('VALIDATION_ERROR', 'Invalid input', 400, err);
