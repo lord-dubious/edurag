@@ -117,4 +117,27 @@ describe('text agent runtime config', () => {
     expect(streamArgs.stopWhen).toBe('steps-4');
     expect(streamArgs.system).toContain('## Multi-Question Coverage');
   });
+
+  it('does not reduce explicit maxSteps for multi-question prompts', async () => {
+    const { runAgent } = await import('@edurag/agent/text');
+
+    await runAgent(
+      {
+        ...deps,
+        maxSteps: 12,
+      },
+      {
+        messages: [
+          {
+            id: 'msg-multi-high-budget',
+            role: 'user',
+            parts: [{ type: 'text', text: 'What is tuition? What is the admissions deadline?' }],
+          },
+        ],
+        threadId: 'thread-multi-high-budget',
+      },
+    );
+
+    expect(stepCountIsMock).toHaveBeenCalledWith(12);
+  });
 });

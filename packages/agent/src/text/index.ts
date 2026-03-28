@@ -84,7 +84,7 @@ export async function runAgent(
     const temp = temperature ?? deps.temperature;
     const latestQuestions = extractQuestionList(getLatestUserText(messages)).slice(0, 8);
     const adaptiveSteps = latestQuestions.length > 1
-        ? Math.min(8, Math.max(steps, latestQuestions.length + 1))
+        ? Math.max(steps, Math.min(8, latestQuestions.length + 1))
         : steps;
     const multiQuestionInstruction = latestQuestions.length > 1
         ? `\n\n## Multi-Question Coverage\nThe latest user message contains ${latestQuestions.length} distinct questions.\nYou MUST answer every question explicitly in your final response.\nUse numbered sections that map one-to-one with these questions:\n${latestQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\nBefore finalizing, verify that no question was skipped.`

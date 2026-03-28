@@ -382,4 +382,80 @@ describe('POST /api/chat history persistence', () => {
       sources: [],
     });
   });
+
+  it('does not persist assistant message when stream finish is aborted', async () => {
+    const responseAssistant = {
+      id: 'assistant-aborted',
+      role: 'assistant' as const,
+      parts: [
+        { type: 'text', text: 'Partial answer that should not be stored.' },
+      ],
+    };
+
+    const { POST, appendMessage } = await loadRoute({
+      responseMessage: responseAssistant,
+      messages: [
+        {
+          id: 'user-1-msg',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Tell me about tuition' }],
+        },
+        responseAssistant,
+      ],
+      isContinuation: false,
+      isAborted: true,
+    });
+
+    const req = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildRequestBody('thread-aborted')),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(appendMessage).toHaveBeenCalledTimes(1);
+    expect(appendMessage.mock.calls[0][1]).toMatchObject({
+      role: 'user',
+      content: 'What is tuition?',
+    });
+  });
+
+  it('does not persist assistant message for continuation segment finishes', async () => {
+    const responseAssistant = {
+      id: 'assistant-continuation',
+      role: 'assistant' as const,
+      parts: [
+        { type: 'text', text: 'Continuation chunk that should not be stored.' },
+      ],
+    };
+
+    const { POST, appendMessage } = await loadRoute({
+      responseMessage: responseAssistant,
+      messages: [
+        {
+          id: 'user-1-msg',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Tell me about admissions' }],
+        },
+        responseAssistant,
+      ],
+      isContinuation: true,
+      isAborted: false,
+    });
+
+    const req = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildRequestBody('thread-continuation')),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(appendMessage).toHaveBeenCalledTimes(1);
+    expect(appendMessage.mock.calls[0][1]).toMatchObject({
+      role: 'user',
+      content: 'What is tuition?',
+    });
+  });
 });

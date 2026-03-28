@@ -199,8 +199,8 @@ export async function POST(req: Request) {
     const streamResult = await result;
     return streamResult.toUIMessageStreamResponse({
       originalMessages: uiMessages,
-      onFinish: async ({ responseMessage, messages }) => {
-        if (!userId || responseMessage.role !== 'assistant') {
+      onFinish: async ({ responseMessage, messages, isAborted, isContinuation }) => {
+        if (!userId || responseMessage.role !== 'assistant' || isAborted || isContinuation) {
           return;
         }
 
