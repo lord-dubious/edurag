@@ -16,6 +16,7 @@ export interface Source {
     title?: string;
     content: string;
     score?: number;
+    sourceType?: 'vector' | 'web';
 }
 
 export interface ChatMessage {

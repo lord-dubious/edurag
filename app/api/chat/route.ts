@@ -78,6 +78,7 @@ function extractAssistantSources(parts: UIMessagePartLike[]): Source[] {
     if (!isSearchOutputPart(part)) {
       return;
     }
+    const sourceType: Source['sourceType'] = part.type === 'tool-web_search' ? 'web' : 'vector';
 
     const results = part.output?.results;
     if (!Array.isArray(results)) {
@@ -108,6 +109,7 @@ function extractAssistantSources(parts: UIMessagePartLike[]): Source[] {
         title,
         content,
         score,
+        sourceType,
       });
     });
   });

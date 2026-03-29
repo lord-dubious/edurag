@@ -23,19 +23,12 @@ import { ChatMessages } from './ChatMessages';
 import { CitationPanel } from './CitationPanel';
 import type { Source } from '@edurag/agent/text';
 
-interface VectorSearchResult {
-  url: string;
-  title?: string;
-  content: string;
-  score: number;
-}
-
 interface SearchToolPartWithOutput {
   type: 'tool-vector_search' | 'tool-web_search';
   toolCallId: string;
   state: 'output-available';
   input: { query: string; topK?: number; maxResults?: number };
-  output: { found: boolean; results: VectorSearchResult[] };
+  output: { found: boolean; results?: unknown };
 }
 
 type MessagePart = { type: string; state?: string; output?: unknown };
@@ -46,6 +39,51 @@ function isSearchToolPart(part: MessagePart): part is SearchToolPartWithOutput {
     part.state === 'output-available' &&
     'output' in part
   );
+}
+
+function extractSourcesFromMessageParts(parts: MessagePart[]): { sources: Source[]; usedWebFallback: boolean } {
+  const sources: Source[] = [];
+  let usedWebFallback = false;
+
+  parts.forEach((part) => {
+    if (!isSearchToolPart(part)) {
+      return;
+    }
+
+    const outputResults = part.output?.results;
+    if (!Array.isArray(outputResults)) {
+      return;
+    }
+
+    const sourceType: Source['sourceType'] = part.type === 'tool-web_search' ? 'web' : 'vector';
+    if (sourceType === 'web') {
+      usedWebFallback = true;
+    }
+
+    outputResults.forEach((result) => {
+      if (typeof result !== 'object' || result === null) {
+        return;
+      }
+      const candidate = result as Record<string, unknown>;
+      const url = typeof candidate.url === 'string' ? candidate.url : '';
+      const content = typeof candidate.content === 'string' ? candidate.content : '';
+      if (!url || !content) {
+        return;
+      }
+
+      const title = typeof candidate.title === 'string' ? candidate.title : undefined;
+      const score = typeof candidate.score === 'number' && Number.isFinite(candidate.score) ? candidate.score : undefined;
+      sources.push({
+        url,
+        title,
+        content,
+        score,
+        sourceType,
+      });
+    });
+  });
+
+  return { sources, usedWebFallback };
 }
 
 interface ChatInterfaceProps {
@@ -135,30 +173,27 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
   const { messages, setMessages, status, error, sendMessage, regenerate } = useChat({
     id: threadId,
     transport,
-    onFinish: async ({ message }) => {
-      let newSources: Source[] = [];
-      if (message.parts) {
-        const toolParts = message.parts.filter(isSearchToolPart);
-        if (toolParts.length > 0) {
-          newSources = [];
-          toolParts.forEach((part) => {
-            if (part.output?.results) {
-              part.output.results.forEach((r: VectorSearchResult) => {
-                newSources.push({
-                  url: r.url,
-                  title: r.title,
-                  content: r.content,
-                });
-              });
-            }
-          });
-          if (newSources.length > 0) {
-            setSources(prev => ({
-              ...prev,
-              [message.id]: newSources,
-            }));
+    onFinish: async ({ message, messages, isAbort, isDisconnect, isError }) => {
+      if (isAbort || isDisconnect || isError) {
+        return;
+      }
+
+      let extraction = extractSourcesFromMessageParts((message.parts ?? []) as MessagePart[]);
+      if (extraction.sources.length === 0) {
+        const responseIdx = messages.findIndex(msg => msg.id === message.id);
+        if (responseIdx > 0) {
+          const previousMessage = messages[responseIdx - 1];
+          if (previousMessage.role === 'assistant') {
+            extraction = extractSourcesFromMessageParts((previousMessage.parts ?? []) as MessagePart[]);
           }
         }
+      }
+
+      if (extraction.sources.length > 0) {
+        setSources(prev => ({
+          ...prev,
+          [message.id]: extraction.sources,
+        }));
       }
     },
   });
@@ -335,10 +370,13 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     [status, sendMessage]
   );
 
-  const lastMessage = messages.at(-1);
-  const lastSources = lastMessage ? sources[lastMessage.id] ?? [] : [];
+  const lastSourcedAssistantMessage = [...messages]
+    .reverse()
+    .find(message => message.role === 'assistant' && (sources[message.id]?.length ?? 0) > 0);
+  const lastSources = lastSourcedAssistantMessage ? sources[lastSourcedAssistantMessage.id] ?? [] : [];
   const isEmpty = messages.length === 0 && status === 'ready';
   const hasSources = lastSources.length > 0;
+  const hasWebFallbackSources = lastSources.some(source => source.sourceType === 'web');
   const suggestions = useMemo(() => pickSuggestions(SUGGESTION_POOL, 4, suggestionsSeed), [suggestionsSeed]);
 
   return (
@@ -425,6 +463,11 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
             >
               <span className={`w-1.5 h-1.5 rounded-full ${hasSources ? 'bg-primary' : 'bg-muted-foreground/50'}`} />
               Sources {lastSources.length}
+              {hasWebFallbackSources && (
+                <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none">
+                  Web
+                </span>
+              )}
             </button>
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

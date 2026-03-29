@@ -4,6 +4,7 @@ interface Source {
   url: string;
   title?: string;
   content: string;
+  sourceType?: 'vector' | 'web';
 }
 
 interface Props {
@@ -69,11 +70,19 @@ function cleanSourcePreview(content: string, maxLength = 150): string {
 
 export function CitationPanel({ sources }: Props) {
   if (sources.length === 0) return null;
+  const hasWebFallback = sources.some(source => source.sourceType === 'web');
 
   return (
     <aside className="w-[340px] border-l bg-muted/20 p-5 overflow-y-auto animate-in slide-in-from-right-8 duration-300 shrink-0">
       <div className="flex items-center justify-between mb-5">
-        <h3 className="text-sm font-semibold">Sources</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold">Sources</h3>
+          {hasWebFallback && (
+            <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+              Web fallback
+            </span>
+          )}
+        </div>
         <span className="flex items-center justify-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold font-mono">
           {sources.length}
         </span>
@@ -95,9 +104,14 @@ export function CitationPanel({ sources }: Props) {
                 <span className="text-[10px] font-mono font-bold text-primary">{i + 1}</span>
               </div>
               <div className="min-w-0 flex-1 space-y-1.5">
-                <h4 className="text-sm font-medium line-clamp-2 text-foreground group-hover:text-primary leading-snug">
-                  {source.title ?? domain}
-                </h4>
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="text-sm font-medium line-clamp-2 text-foreground group-hover:text-primary leading-snug">
+                    {source.title ?? domain}
+                  </h4>
+                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    {source.sourceType === 'web' ? 'Web' : 'KB'}
+                  </span>
+                </div>
                 <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
                   {cleanSourcePreview(source.content, 120)}
                 </p>

@@ -265,11 +265,11 @@ export default function DomainsPage() {
         body: JSON.stringify({ threadId: domain.threadId }),
       });
 
-      const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
         router.replace('/admin/login');
         return;
       }
+      const data = await res.json().catch(() => ({}));
 
       const dataRecord = isRecord(data) ? data : null;
       if (!res.ok || dataRecord?.success !== true) {
