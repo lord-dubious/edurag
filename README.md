@@ -210,7 +210,7 @@ edurag/
 │       ├── crawl/route.ts        # SSE crawl progress
 │       ├── domains/route.ts      # Domain CRUD
 │       ├── faqs/route.ts         # Public FAQs
-│       └── threads/route.ts      # Conversation management
+│       └── threads/route.ts      # Thread deletion
 ├── lib/
 │   ├── voice/                    # Deepgram & Voice logic
 │   ├── agent/                    # App-specific agent wiring

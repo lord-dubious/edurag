@@ -217,6 +217,85 @@ describe('POST /api/chat history persistence', () => {
     });
   });
 
+  it('persists sources from the latest non-empty search tool output when multiple outputs exist', async () => {
+    const assistantWithMultipleSearchOutputs = {
+      id: 'assistant-multi-1',
+      role: 'assistant' as const,
+      parts: [
+        { type: 'text', text: 'Here are the latest admissions details.' },
+        {
+          type: 'tool-vector_search',
+          state: 'output-available',
+          output: {
+            results: [
+              {
+                url: 'https://example.edu/old-admissions',
+                title: 'Older Admissions Page',
+                content: 'Older admissions content',
+                score: 0.75,
+              },
+            ],
+          },
+        },
+        {
+          type: 'tool-web_search',
+          state: 'output-available',
+          output: {
+            results: [
+              {
+                url: 'https://example.edu/current-admissions',
+                title: 'Current Admissions',
+                content: 'Current admissions requirements and deadlines',
+                score: 0.95,
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const { POST, appendMessage } = await loadRoute({
+      responseMessage: assistantWithMultipleSearchOutputs,
+      messages: [
+        {
+          id: 'user-1-msg',
+          role: 'user',
+          parts: [{ type: 'text', text: 'What are current admissions requirements?' }],
+        },
+        assistantWithMultipleSearchOutputs,
+      ],
+      isContinuation: false,
+      isAborted: false,
+    });
+
+    const req = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildRequestBody('thread-multi-source')),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(appendMessage).toHaveBeenCalledTimes(2);
+
+    const assistantCall = appendMessage.mock.calls[1];
+    expect(assistantCall[0]).toBe('thread-multi-source');
+    expect(assistantCall[1]).toMatchObject({
+      id: 'assistant-multi-1',
+      role: 'assistant',
+      content: 'Here are the latest admissions details.',
+      sources: [
+        {
+          url: 'https://example.edu/current-admissions',
+          title: 'Current Admissions',
+          content: 'Current admissions requirements and deadlines',
+          score: 0.95,
+          sourceType: 'web',
+        },
+      ],
+    });
+  });
+
   it('falls back to prior assistant tool outputs when response message has none', async () => {
     const priorAssistantWithTool = {
       id: 'assistant-mid',

@@ -121,8 +121,11 @@ export async function runAgent(
     const adaptiveSteps = latestQuestionCount > 1
         ? Math.max(steps, Math.min(8, cappedQuestions + 1))
         : steps;
+    const truncationNote = latestQuestionCount > cappedQuestions
+        ? `\nNote: only the first ${cappedQuestions} of ${latestQuestionCount} questions are shown; remaining questions were truncated.`
+        : '';
     const multiQuestionInstruction = latestQuestionCount > 1
-        ? `\n\n## Multi-Question Coverage\nThe latest user message contains ${cappedQuestions} distinct questions.\nYou MUST answer every question explicitly in your final response.\nUse numbered sections that map one-to-one with these questions:\n${latestQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\nBefore finalizing, verify that no question was skipped.`
+        ? `\n\n## Multi-Question Coverage\nThe latest user message contains ${cappedQuestions} distinct questions.${truncationNote}\nYou MUST answer every question explicitly in your final response.\nUse numbered sections that map one-to-one with these questions:\n${latestQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\nBefore finalizing, verify that no question was skipped.`
         : '';
     const system = AGENT_SYSTEM_PROMPT
         .replaceAll('{UNIVERSITY_NAME}', universityName)
