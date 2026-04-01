@@ -225,7 +225,7 @@ const embeddings = getEmbeddings();
 
 - Uses `react-markdown` for rendering AI responses
 - Citations parsed and converted to clickable links
-- localStorage persistence for chat history (saved only on stream finish)
+- Server-side conversation persistence in MongoDB via `/api/chat` and `/api/history`
 - Client-side only rendering to avoid SSR hydration mismatches
 
 ### System Prompts
@@ -275,7 +275,7 @@ The Voice and Text interfaces represent a **single unified entity**.
 ### Security & Persistence
 - **Token Exchange & Scaling**: The `/api/voice-token` route generates **short-lived temporary credentials** using the Deepgram SDK. Token lifetime is controlled by `DEEPGRAM_TOKEN_TTL` (default 3600s in the env schema), which is separate from the rate-limiter window.
 - **Cross-Instance Rate Limiting**: Voice tokens are limited to **5 requests per 60 seconds** per user via the MongoDB-backed `voice_rate_limits` collection and a TTL index (`expireAfterSeconds: 60`). When the limit is exceeded, the route returns **HTTP 429** with `Retry-After: 60` and a response body message indicating the rate limit was exceeded.
-- **Chat History Persistence**: Chat messages are saved to `localStorage` only when a stream finishes, ensuring reliability while avoiding unnecessary writes during token-by-token generation.
+- **Chat History Persistence**: Chat messages are persisted to the `conversations` collection and surfaced via `/api/history` for authenticated users.
 - **Client-Side Rendering**: Voice components and chat history utilize `useEffect` to ensure they only initialize on the client, preventing SSR hydration mismatches.
 
 ---
@@ -315,9 +315,8 @@ const handleSubmit = useCallback(async (text: string) => {
 | `POST /api/crawl` | Trigger domain crawl (admin only) |
 | `GET /api/domains` | List crawled domains (admin only) |
 | `GET /api/faqs` | Get approved FAQs |
-| `GET /api/settings` | Get onboarding settings |
-| `POST /api/settings` | Update settings (admin only) |
-| `POST /api/onboarding/complete` | Mark onboarding complete |
+| `GET /api/settings` | Get public branding/settings |
+| `GET \| POST /api/onboarding/complete` | Read onboarding status and complete onboarding |
 | `POST /api/onboarding/crawl` | Start initial crawl |
 | `GET /api/onboarding/status` | Check onboarding status |
 | `POST /api/onboarding/detect` | Auto-detect university info from URL |
@@ -325,9 +324,18 @@ const handleSubmit = useCallback(async (text: string) => {
 | `GET /api/voice-token` | Get temporary Deepgram credentials |
 | `POST /api/voice-function` | Voice agent function calls |
 | `POST /api/upload` | File upload handling |
-| `POST /api/uploadthing` | UploadThing integration |
+| `GET \| POST /api/uploadthing` | UploadThing integration |
 | `GET /api/media/[filename]` | Serve uploaded media files |
-| `GET /api/threads` | List chat threads |
+| `GET /api/history` | List authenticated user chat threads |
+| `GET /api/history/[threadId]` | Read a single thread by path `threadId` (`200`, `404`, `401`) |
+| `POST /api/history/[threadId]` | Append a message to a single thread by path `threadId` (`200`, `400`, `401`, `403`, `404`) |
+| `DELETE /api/history/[threadId]` | Hard-delete a single thread by path `threadId` (`200`, `404`, `401`) |
+| `DELETE /api/threads` | Hard-delete a single thread via JSON body `{ threadId }` (`200`, `400`, `401`, `500`); this is not a bulk-clear endpoint |
+
+Deletion semantics:
+`/api/history/[threadId]`: canonical per-thread delete using the path parameter.
+`/api/threads`: legacy body-based single-thread clear helper requiring `threadId` in the request body.
+Both current endpoints perform hard delete behavior (no soft-delete flag, no summary/count response).
 
 ---
 
@@ -339,7 +347,7 @@ Admin routes are protected by middleware:
 2. **Header-based**: Checks `Authorization: Bearer <token>` header
 3. **Token must match** `ADMIN_SECRET` env var (min 16 characters)
 
-Protected routes: `/admin/*`, `/api/crawl/*`, `/api/domains/*`, `/api/settings` (POST)
+Protected routes: `/admin/*`, `/api/crawl/*`, `/api/domains/*`
 
 ---
 
@@ -413,6 +421,7 @@ The app has a setup wizard for first-time configuration:
 | `crawled_index` | Vector search documents with embeddings |
 | `settings` | Onboarding config (single doc, `_id: 'onboarding'`) |
 | `faqs` | Auto-generated FAQs with approval workflow |
+| `conversations` | Chat persistence for user/agent threads (`_id`, `threadId`, `userId`, `messages[]`, `createdAt`, `updatedAt`) |
 | `domains` | Crawled domain configurations |
 | `checkpoints_aio` | LangGraph checkpoint storage |
 | `checkpoint_writes_aio` | LangGraph checkpoint writes |

@@ -119,9 +119,25 @@ function isMaskedPlaceholder(value: string): boolean {
 
 function mergeApiKeys(prev: ApiKeys, next: Partial<ApiKeys>): ApiKeys {
   const merged = { ...prev, ...next };
+  if (next.mongodbUri && isMaskedPlaceholder(next.mongodbUri)) {
+    merged.mongodbUri = prev.mongodbUri;
+  }
+  if (next.chatApiKey && isMaskedPlaceholder(next.chatApiKey)) {
+    merged.chatApiKey = prev.chatApiKey;
+  }
+  if (next.embeddingApiKey && isMaskedPlaceholder(next.embeddingApiKey)) {
+    merged.embeddingApiKey = prev.embeddingApiKey;
+  }
+  if (next.tavilyApiKey && isMaskedPlaceholder(next.tavilyApiKey)) {
+    merged.tavilyApiKey = prev.tavilyApiKey;
+  }
+  if (next.uploadthingSecret && isMaskedPlaceholder(next.uploadthingSecret)) {
+    merged.uploadthingSecret = prev.uploadthingSecret;
+  }
   if (next.adminSecret && isMaskedPlaceholder(next.adminSecret)) {
     merged.adminSecret = prev.adminSecret;
   }
+
   return merged;
 }
 
@@ -478,7 +494,7 @@ CHAT_MAX_STEPS=${apiKeys.chatMaxSteps}
 CHAT_TEMPERATURE=${apiKeys.chatTemperature}
 EMBEDDING_API_KEY=${apiKeys.embeddingApiKey ? '****' + apiKeys.embeddingApiKey.slice(-4) : ''}
 TAVILY_API_KEY=${apiKeys.tavilyApiKey ? '****' + apiKeys.tavilyApiKey.slice(-4) : ''}
-ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}`;
+ADMIN_SECRET=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}`;
 
     return (
       <div className="rounded-lg border overflow-hidden">
