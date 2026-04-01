@@ -61,7 +61,7 @@ function isSearchToolPart(part: MessagePart): part is SearchToolPartWithOutput {
  * `false` otherwise)
  */
 function extractSourcesFromMessageParts(parts: MessagePart[]): { sources: Source[]; usedWebFallback: boolean } {
-  const sources: Source[] = [];
+  let sources: Source[] = [];
   let usedWebFallback = false;
 
   parts.forEach((part) => {
@@ -75,9 +75,7 @@ function extractSourcesFromMessageParts(parts: MessagePart[]): { sources: Source
     }
 
     const sourceType: Source['sourceType'] = part.type === 'tool-web_search' ? 'web' : 'vector';
-    if (sourceType === 'web') {
-      usedWebFallback = true;
-    }
+    const parsedSources: Source[] = [];
 
     outputResults.forEach((result) => {
       if (typeof result !== 'object' || result === null) {
@@ -92,7 +90,7 @@ function extractSourcesFromMessageParts(parts: MessagePart[]): { sources: Source
 
       const title = typeof candidate.title === 'string' ? candidate.title : undefined;
       const score = typeof candidate.score === 'number' && Number.isFinite(candidate.score) ? candidate.score : undefined;
-      sources.push({
+      parsedSources.push({
         url,
         title,
         content,
@@ -100,6 +98,11 @@ function extractSourcesFromMessageParts(parts: MessagePart[]): { sources: Source
         sourceType,
       });
     });
+
+    if (parsedSources.length > 0) {
+      sources = parsedSources;
+      usedWebFallback = sourceType === 'web';
+    }
   });
 
   return { sources, usedWebFallback };

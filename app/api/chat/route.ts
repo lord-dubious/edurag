@@ -110,19 +110,20 @@ function extractAssistantText(parts: UIMessagePartLike[]): string {
  * @returns An array of parsed Source objects derived from available search results; results lacking usable `content` are omitted
  */
 function extractAssistantSources(parts: UIMessagePartLike[]): Source[] {
-  const sources: Source[] = [];
+  let latestSources: Source[] = [];
 
   parts.forEach((part) => {
     if (!isSearchOutputPart(part)) {
       return;
     }
-    const sourceType: Source['sourceType'] = part.type === 'tool-web_search' ? 'web' : 'vector';
 
+    const sourceType: Source['sourceType'] = part.type === 'tool-web_search' ? 'web' : 'vector';
     const results = part.output?.results;
     if (!Array.isArray(results)) {
       return;
     }
 
+    const parsedSources: Source[] = [];
     results.forEach((result) => {
       if (typeof result !== 'object' || result === null) {
         return;
@@ -142,7 +143,7 @@ function extractAssistantSources(parts: UIMessagePartLike[]): Source[] {
         ? candidate.score
         : undefined;
 
-      sources.push({
+      parsedSources.push({
         url,
         title,
         content,
@@ -150,9 +151,13 @@ function extractAssistantSources(parts: UIMessagePartLike[]): Source[] {
         sourceType,
       });
     });
+
+    if (parsedSources.length > 0) {
+      latestSources = parsedSources;
+    }
   });
 
-  return sources;
+  return latestSources;
 }
 
 /**
