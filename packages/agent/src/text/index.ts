@@ -114,12 +114,15 @@ export async function runAgent(
     const steps = maxSteps ?? deps.maxSteps;
     const tokens = maxTokens ?? deps.maxTokens;
     const temp = temperature ?? deps.temperature;
-    const latestQuestions = extractQuestionList(getLatestUserText(messages)).slice(0, 8);
-    const adaptiveSteps = latestQuestions.length > 1
-        ? Math.max(steps, Math.min(8, latestQuestions.length + 1))
+    const extractedQuestions = extractQuestionList(getLatestUserText(messages));
+    const latestQuestionCount = extractedQuestions.length;
+    const cappedQuestions = Math.min(latestQuestionCount, 8);
+    const latestQuestions = extractedQuestions.slice(0, cappedQuestions);
+    const adaptiveSteps = latestQuestionCount > 1
+        ? Math.max(steps, Math.min(8, cappedQuestions + 1))
         : steps;
-    const multiQuestionInstruction = latestQuestions.length > 1
-        ? `\n\n## Multi-Question Coverage\nThe latest user message contains ${latestQuestions.length} distinct questions.\nYou MUST answer every question explicitly in your final response.\nUse numbered sections that map one-to-one with these questions:\n${latestQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\nBefore finalizing, verify that no question was skipped.`
+    const multiQuestionInstruction = latestQuestionCount > 1
+        ? `\n\n## Multi-Question Coverage\nThe latest user message contains ${cappedQuestions} distinct questions.\nYou MUST answer every question explicitly in your final response.\nUse numbered sections that map one-to-one with these questions:\n${latestQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}\nBefore finalizing, verify that no question was skipped.`
         : '';
     const system = AGENT_SYSTEM_PROMPT
         .replaceAll('{UNIVERSITY_NAME}', universityName)

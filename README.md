@@ -287,6 +287,51 @@ Public FAQ list (ISR cached).
 
 Admin-only domain registry CRUD.
 
+### DELETE `/api/threads`
+
+Thread clear endpoint implemented in `app/api/threads/route.ts`.
+
+**Auth:** Requires an authenticated user session.
+
+**Request:**
+```json
+{
+  "threadId": "session-123"
+}
+```
+
+**Success (`200`):**
+```json
+{
+  "success": true
+}
+```
+
+**Error Responses:**
+- `401 Unauthorized`
+```json
+{
+  "error": "Unauthorized",
+  "code": "UNAUTHORIZED"
+}
+```
+- `400 Bad Request`
+```json
+{
+  "error": "Invalid request body",
+  "code": "VALIDATION_ERROR"
+}
+```
+- `500 Internal Server Error`
+```json
+{
+  "error": "Failed to clear thread history",
+  "code": "DB_ERROR"
+}
+```
+
+In development, error responses can include an additional `details` field.
+
 ---
 
 ## Deployment

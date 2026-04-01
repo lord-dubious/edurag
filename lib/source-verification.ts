@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { env } from './env';
 import { getMongoCollection } from './vectorstore';
 
@@ -59,6 +60,8 @@ interface VectorDoc {
   threadId?: unknown;
 }
 
+const MAX_LIVE_CONTENT_BYTES = 512 * 1024;
+
 /**
  * Normalize and validate a URL string by trimming, parsing, and removing any fragment.
  *
@@ -80,6 +83,97 @@ function normalizeUrl(rawUrl: string): string | null {
     return parsed.toString();
   } catch {
     return null;
+  }
+}
+
+function isPrivateIPv4Address(hostname: string): boolean {
+  const parts = hostname.split('.').map(part => Number(part));
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return true;
+  }
+
+  const [a, b] = parts;
+  if (a === 10 || a === 127 || a === 0) {
+    return true;
+  }
+  if (a === 169 && b === 254) {
+    return true;
+  }
+  if (a === 172 && b >= 16 && b <= 31) {
+    return true;
+  }
+  if (a === 192 && b === 168) {
+    return true;
+  }
+  if (a === 100 && b >= 64 && b <= 127) {
+    return true;
+  }
+  if (a >= 224) {
+    return true;
+  }
+
+  return false;
+}
+
+function isPrivateIPv6Address(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  if (normalized === '::1' || normalized === '::') {
+    return true;
+  }
+  if (normalized.startsWith('fe80:')) {
+    return true;
+  }
+  if (normalized.startsWith('fc') || normalized.startsWith('fd')) {
+    return true;
+  }
+  if (normalized.startsWith('::ffff:')) {
+    const mappedIPv4 = normalized.slice('::ffff:'.length);
+    return isIP(mappedIPv4) !== 4 || isPrivateIPv4Address(mappedIPv4);
+  }
+
+  return false;
+}
+
+function isDisallowedHostname(hostname: string): boolean {
+  const normalized = hostname.trim().toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+
+  if (
+    normalized === 'localhost' ||
+    normalized === '0.0.0.0' ||
+    normalized === '169.254.169.254' ||
+    normalized === 'metadata.google.internal'
+  ) {
+    return true;
+  }
+
+  if (
+    normalized.endsWith('.local') ||
+    normalized.endsWith('.internal') ||
+    normalized.endsWith('.localhost')
+  ) {
+    return true;
+  }
+
+  const ipVersion = isIP(normalized);
+  if (ipVersion === 4) {
+    return isPrivateIPv4Address(normalized);
+  }
+  if (ipVersion === 6) {
+    return isPrivateIPv6Address(normalized);
+  }
+
+  return !normalized.includes('.');
+}
+
+function isFetchableUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return !isDisallowedHostname(parsed.hostname);
+  } catch {
+    return false;
   }
 }
 
@@ -193,6 +287,57 @@ async function requestWithTimeout(url: string, method: 'HEAD' | 'GET', timeoutMs
   }
 }
 
+async function readResponseTextWithLimit(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) {
+    return '';
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let text = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    if (!value) {
+      continue;
+    }
+
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      await reader.cancel();
+      throw new Error(`Response body exceeded ${maxBytes} bytes`);
+    }
+
+    text += decoder.decode(value, { stream: true });
+  }
+
+  text += decoder.decode();
+  return text;
+}
+
+function buildBlockedUrlResult(
+  source: IndexedSource,
+  finalUrl: string,
+  checkedWith: 'HEAD' | 'GET',
+): SourceVerificationResult {
+  return {
+    url: source.url,
+    finalUrl,
+    title: source.title,
+    chunkCount: source.chunkCount,
+    statusCode: null,
+    checkedWith,
+    linkStatus: 'error',
+    contentStatus: 'unknown',
+    error: 'Blocked private or non-public source URL',
+  };
+}
+
 /**
  * Verify a single indexed source's link health and, when applicable, compare its live content to the stored sample.
  *
@@ -208,12 +353,19 @@ async function verifySource(source: IndexedSource, timeoutMs: number): Promise<S
   let contentStatus: ContentStatus = 'unknown';
   let error: string | undefined;
 
+  if (!isFetchableUrl(source.url)) {
+    return buildBlockedUrlResult(source, source.url, 'HEAD');
+  }
+
   let shouldRunGet = true;
 
   try {
     const headResponse = await requestWithTimeout(source.url, 'HEAD', timeoutMs);
     statusCode = headResponse.status;
     finalUrl = headResponse.url || source.url;
+    if (!isFetchableUrl(finalUrl)) {
+      return buildBlockedUrlResult(source, finalUrl, 'HEAD');
+    }
     linkStatus = getLinkStatusFromCode(headResponse.status);
     if (headResponse.redirected && linkStatus === 'ok' && finalUrl !== source.url) {
       linkStatus = 'redirected';
@@ -236,6 +388,9 @@ async function verifySource(source: IndexedSource, timeoutMs: number): Promise<S
       const getResponse = await requestWithTimeout(source.url, 'GET', timeoutMs);
       statusCode = getResponse.status;
       finalUrl = getResponse.url || finalUrl;
+      if (!isFetchableUrl(finalUrl)) {
+        return buildBlockedUrlResult(source, finalUrl, 'GET');
+      }
       linkStatus = getLinkStatusFromCode(getResponse.status);
       if (getResponse.redirected && linkStatus === 'ok' && finalUrl !== source.url) {
         linkStatus = 'redirected';
@@ -250,9 +405,12 @@ async function verifySource(source: IndexedSource, timeoutMs: number): Promise<S
       );
 
       if (shouldCompareContent) {
-        const liveContent = await getResponse.text();
+        const liveContent = await readResponseTextWithLimit(getResponse, MAX_LIVE_CONTENT_BYTES);
         contentStatus = compareContent(source.sampleContent, liveContent);
       } else {
+        if (getResponse.body) {
+          await getResponse.body.cancel().catch(() => undefined);
+        }
         contentStatus = 'unknown';
       }
       error = undefined;
