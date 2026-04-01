@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { resolveAuthConfig } from '@/lib/auth-config';
 
-const buildProcessEnv = (overrides: NodeJS.ProcessEnv): NodeJS.ProcessEnv => ({
-  NODE_ENV: 'test',
+const buildProcessEnv = (overrides: Partial<NodeJS.ProcessEnv> = {}): NodeJS.ProcessEnv => ({
   ...overrides,
+  NODE_ENV: overrides.NODE_ENV ?? 'test',
 });
 
 describe('resolveAuthConfig', () => {

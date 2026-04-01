@@ -4,7 +4,7 @@ const ORIGINAL_ENV = { ...process.env };
 
 type SessionValue = { user?: { id?: string } } | null;
 
-const setupEnv = (overrides: NodeJS.ProcessEnv) => {
+const setupEnv = (overrides: Partial<NodeJS.ProcessEnv> = {}) => {
   for (const key of Object.keys(process.env)) {
     delete process.env[key];
   }
