@@ -10,7 +10,7 @@ describe('Crawl Pipeline', () => {
   let client: MongoClient;
 
   beforeAll(async () => {
-    client = new MongoClient(env.MONGODB_URI);
+    client = new MongoClient(env.MONGODB_URI!);
     await client.connect();
   });
 

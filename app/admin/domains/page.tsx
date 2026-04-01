@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CrawlForm } from '@/components/admin/CrawlForm';
 import { CrawlProgress } from '@/components/admin/CrawlProgress';
@@ -28,7 +30,88 @@ interface DomainApiResponse {
   status?: 'indexed' | 'crawling' | 'error';
 }
 
+interface VerificationSummary {
+  checkedSources: number;
+  dead: number;
+  errors: number;
+  contentMismatch: number;
+}
+
+interface VerificationResult {
+  url: string;
+  linkStatus: string;
+  contentStatus: string;
+}
+
+/**
+ * Determines whether a value is a non-null object.
+ *
+ * @param value - The value to check.
+ * @returns `true` if `value` is a non-null object, `false` otherwise.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * Asserts whether a value conforms to the VerificationSummary shape.
+ *
+ * @returns `true` if `value` is a record containing finite numeric `checkedSources`, `dead`, `errors`, and `contentMismatch`, `false` otherwise.
+ */
+function isVerificationSummary(value: unknown): value is VerificationSummary {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.checkedSources === 'number' &&
+    Number.isFinite(value.checkedSources) &&
+    typeof value.dead === 'number' &&
+    Number.isFinite(value.dead) &&
+    typeof value.errors === 'number' &&
+    Number.isFinite(value.errors) &&
+    typeof value.contentMismatch === 'number' &&
+    Number.isFinite(value.contentMismatch)
+  );
+}
+
+/**
+ * Determines whether a value matches the shape of a VerificationResult.
+ *
+ * @param value - The value to validate as a verification result
+ * @returns `true` if `value` is a record with string `url`, `linkStatus`, and `contentStatus`; `false` otherwise.
+ */
+function isVerificationResult(value: unknown): value is VerificationResult {
+  return (
+    isRecord(value) &&
+    typeof value.url === 'string' &&
+    typeof value.linkStatus === 'string' &&
+    typeof value.contentStatus === 'string'
+  );
+}
+
+/**
+ * Determines whether a value is an array of verification result objects.
+ *
+ * @param value - The value to test
+ * @returns `true` if `value` is an array and every element satisfies `VerificationResult`, `false` otherwise.
+ */
+function isVerificationResultArray(value: unknown): value is VerificationResult[] {
+  return Array.isArray(value) && value.every(isVerificationResult);
+}
+
+/**
+ * Render the admin "Domains" management page and manage domain lifecycle actions.
+ *
+ * This client component displays domain statistics, a form to add domains, recent crawl activity,
+ * an indexed domains table, and an active crawl progress view. It also handles fetching domains,
+ * starting crawls (including reindexing), deleting domains, and verifying source URLs; it performs
+ * client-side auth-checks and redirects to the admin login when the session token is missing or invalid.
+ *
+ * @returns The React element for the Domains admin UI (statistics, add form, recent crawls, indexed table, and crawl controls).
+ */
 export default function DomainsPage() {
+  const router = useRouter();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -44,11 +127,21 @@ export default function DomainsPage() {
     ? document.cookie.split('; ').find(c => c.startsWith('admin_token='))?.split('=')[1]
     : '';
 
+  useEffect(() => {
+    if (!token) {
+      router.replace('/admin/login');
+    }
+  }, [router, token]);
+
   const fetchDomains = useCallback(async () => {
     try {
       const res = await fetch('/api/domains', {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.status === 401) {
+        router.replace('/admin/login');
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         setDomains(data.data.map((d: DomainApiResponse) => ({
@@ -65,7 +158,7 @@ export default function DomainsPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [router, token]);
 
   useEffect(() => {
     fetchDomains();
@@ -193,11 +286,126 @@ export default function DomainsPage() {
     }
   };
 
+  const handleVerify = async (domain: Domain) => {
+    setActionLoading(`verify-${domain.threadId}`);
+    try {
+      const res = await fetch('/api/domains/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ threadId: domain.threadId }),
+      });
+
+      if (res.status === 401) {
+        router.replace('/admin/login');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+
+      const dataRecord = isRecord(data) ? data : null;
+      if (!res.ok || dataRecord?.success !== true) {
+        throw new Error((dataRecord && typeof dataRecord.error === 'string' && dataRecord.error) || 'Verification failed');
+      }
+
+      const summary = isVerificationSummary(dataRecord?.summary) ? dataRecord.summary : null;
+      const results = isVerificationResultArray(dataRecord?.results) ? dataRecord.results : [];
+      if (!summary) {
+        throw new Error('Verification failed');
+      }
+
+      const hasIssues = summary.dead > 0 || summary.errors > 0 || summary.contentMismatch > 0;
+      if (!hasIssues) {
+        toast.success(`Verification passed for ${summary.checkedSources} sources.`);
+      } else {
+        const issueParts = [
+          summary.dead > 0 ? `${summary.dead} dead` : '',
+          summary.errors > 0 ? `${summary.errors} errors` : '',
+          summary.contentMismatch > 0 ? `${summary.contentMismatch} content mismatches` : '',
+        ].filter(Boolean);
+        toast.warning(`Verification found issues: ${issueParts.join(', ')}.`);
+
+        const flagged = results
+          .filter(result => result.linkStatus === 'dead' || result.linkStatus === 'error' || result.contentStatus === 'mismatch')
+          .slice(0, 3)
+          .map((result) => {
+            try {
+              return new URL(result.url).hostname;
+            } catch {
+              return result.url;
+            }
+          })
+          .filter(Boolean);
+
+        if (flagged.length > 0) {
+          toast.info(`Check: ${flagged.join(', ')}`);
+        }
+      }
+    } catch (err) {
+      console.error('Verification failed:', err);
+      toast.error('Failed to verify sources');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const indexedCount = domains.filter(d => d.status === 'indexed').length;
+  const crawlingCount = domains.filter(d => d.status === 'crawling').length;
+  const errorCount = domains.filter(d => d.status === 'error').length;
+  const totalDocuments = domains.reduce((sum, d) => sum + (d.documentCount || 0), 0);
+  const recentDomains = [...domains]
+    .sort((a, b) => {
+      const aTime = a.lastCrawled ? new Date(a.lastCrawled).getTime() : 0;
+      const bTime = b.lastCrawled ? new Date(b.lastCrawled).getTime() : 0;
+      return bTime - aTime;
+    })
+    .slice(0, 3);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Domains</h1>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight">Domains</h1>
         <p className="text-muted-foreground">Manage crawled domains and knowledge base sources</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Domains</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{domains.length}</div>
+            <p className="text-xs text-muted-foreground">Connected sources</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Indexed Docs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalDocuments.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Search-ready content</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Crawling</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{crawlingCount}</div>
+            <p className="text-xs text-muted-foreground">Active jobs</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Errors</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{errorCount}</div>
+            <p className="text-xs text-muted-foreground">Needs attention</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -209,6 +417,32 @@ export default function DomainsPage() {
         </CardHeader>
         <CardContent>
           <CrawlForm onSubmit={handleAddDomain} isLoading={actionLoading === 'adding'} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Crawls</CardTitle>
+          <CardDescription>Latest domains and their crawl status</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {recentDomains.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No crawl activity yet.</div>
+          ) : (
+            recentDomains.map(domain => (
+              <div key={domain._id} className="flex items-center justify-between border rounded-lg px-4 py-3">
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{domain.url}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Last crawled: {domain.lastCrawled ? new Date(domain.lastCrawled).toLocaleString() : 'Not yet'}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {domain.documentCount.toLocaleString()} docs
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 
@@ -239,8 +473,9 @@ export default function DomainsPage() {
             <DomainTable
               domains={domains}
               onReindex={handleReindex}
+              onVerify={handleVerify}
               onDelete={handleDelete}
-              isLoading={!!crawlProgress?.active}
+              isLoading={!!crawlProgress?.active || Boolean(actionLoading?.startsWith('verify-'))}
             />
           )}
         </CardContent>

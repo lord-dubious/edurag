@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { headers } from 'next/headers';
+import { auth } from '@/lib/auth';
 import { clearHistory } from '@/lib/conversation';
 import { errorResponse } from '@/lib/errors';
 
@@ -7,6 +9,11 @@ const bodySchema = z.object({
 });
 
 export async function DELETE(req: Request) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user?.id) {
+    return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
+  }
+
   let body: z.infer<typeof bodySchema>;
   try {
     body = bodySchema.parse(await req.json());
@@ -14,7 +21,10 @@ export async function DELETE(req: Request) {
     return errorResponse('VALIDATION_ERROR', 'Invalid request body', 400, err);
   }
 
-  await clearHistory(body.threadId);
-
-  return Response.json({ success: true });
+  try {
+    await clearHistory(body.threadId, session.user.id);
+    return Response.json({ success: true });
+  } catch (err) {
+    return errorResponse('DB_ERROR', 'Failed to clear thread history', 500, err);
+  }
 }

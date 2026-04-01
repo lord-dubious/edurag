@@ -17,15 +17,13 @@ import {
   ConfirmationAction,
   ConfirmationRequest
 } from '@/components/ai-elements/confirmation';
-import { RefreshCcw, Trash2, ExternalLink, MoreHorizontal } from 'lucide-react';
+import { RefreshCcw, Trash2, ExternalLink, MoreHorizontal, ShieldCheck } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-
-type ConfirmationStatus = 'input-streaming' | 'input-available' | 'approval-requested' | 'approval-responded' | 'output-available' | 'output-error' | 'output-denied';
 
 export interface Domain {
   _id: string;
@@ -39,11 +37,25 @@ export interface Domain {
 interface DomainTableProps {
   domains: Domain[];
   onReindex: (domain: Domain) => void;
+  onVerify?: (domain: Domain) => void;
   onDelete: (domain: Domain) => void;
   isLoading?: boolean;
 }
 
-export function DomainTable({ domains, onReindex, onDelete, isLoading }: DomainTableProps) {
+/**
+ * Render a table of domains with per-domain actions for re-indexing, optional verification, and deletion.
+ *
+ * The component displays domain hostname, document count, last crawled date, and status; each row exposes a dropdown
+ * with Re-index, an optional Verify sources action (if `onVerify` is provided), and Delete which opens a confirmation UI.
+ *
+ * @param domains - Array of domain records to display
+ * @param onReindex - Callback invoked with a domain when the user selects "Re-index"
+ * @param onVerify - Optional callback invoked with a domain when the user selects "Verify sources"
+ * @param onDelete - Callback invoked with a domain when the user confirms deletion
+ * @param isLoading - When true, row action controls are disabled
+ * @returns The DomainTable React element
+ */
+export function DomainTable({ domains, onReindex, onVerify, onDelete, isLoading }: DomainTableProps) {
   const [deleteDomain, setDeleteDomain] = useState<Domain | null>(null);
 
   const formatDate = (date: Date | null) => {
@@ -66,7 +78,7 @@ export function DomainTable({ domains, onReindex, onDelete, isLoading }: DomainT
   };
 
   return (
-    <>
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100 fill-mode-both overflow-hidden rounded-md border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -115,7 +127,13 @@ export function DomainTable({ domains, onReindex, onDelete, isLoading }: DomainT
                         <RefreshCcw className="h-4 w-4 mr-2" />
                         Re-index
                       </DropdownMenuItem>
-                      <DropdownMenuItem 
+                      {onVerify && (
+                        <DropdownMenuItem onClick={() => onVerify(domain)}>
+                          <ShieldCheck className="h-4 w-4 mr-2" />
+                          Verify sources
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
                         onClick={() => setDeleteDomain(domain)}
                         className="text-destructive focus:text-destructive"
                       >
@@ -158,6 +176,6 @@ export function DomainTable({ domains, onReindex, onDelete, isLoading }: DomainT
           </>
         )}
       </Confirmation>
-    </>
+    </div>
   );
 }

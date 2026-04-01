@@ -1,11 +1,14 @@
-import { tavily } from '@tavily/core';
+import { Document } from '@langchain/core/documents';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
-import { Document } from '@langchain/core/documents';
+import { tavily } from '@tavily/core';
+
+import { DEFAULT_CRAWL_INSTRUCTIONS } from '@edurag/agent/text/prompts';
+
 import { env } from './env';
-import { embeddings } from './providers';
+import { getEmbeddings } from './providers';
 import { getMongoCollection } from './vectorstore';
-import { DEFAULT_CRAWL_INSTRUCTIONS } from './agent/prompts';
+import { getSettings } from './db/settings';
 
 interface CrawlOptions {
   url: string;
@@ -22,7 +25,7 @@ interface CrawlOptions {
   onProgress?: (page: number, total: number) => void;
 }
 
-function cleanContent(raw: string | null | undefined): string {
+export function cleanContent(raw: string | null | undefined): string {
   if (!raw || typeof raw !== 'string') return '';
   try {
     return raw
@@ -48,7 +51,7 @@ function cleanContent(raw: string | null | undefined): string {
   }
 }
 
-function extractTitle(rawContent: string | null | undefined, url: string): string {
+export function extractTitle(rawContent: string | null | undefined, url: string): string {
   if (!rawContent) {
     try {
       const urlObj = new URL(url);
@@ -93,8 +96,21 @@ function isQualityChunk(content: string): boolean {
   return true;
 }
 
+/**
+ * Crawls the given URL, extracts and cleans page content, splits content into quality chunks, and indexes those chunks into the configured MongoDB vector store.
+ *
+ * This function may delete existing vector records tied to the provided `threadId` (and matching `metadata.threadId` or `metadata.baseUrl` for that thread) before inserting newly created vectors when new documents are produced.
+ *
+ * @param opts - Crawl and vectorization options (includes `url`, `threadId`, optional crawl limits and filters, and an optional `onProgress` callback)
+ * @returns The number of document chunks added to the vector store
+ */
 export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
-  const client = tavily({ apiKey: env.TAVILY_API_KEY });
+  const settings = await getSettings();
+  const tavilyApiKey = settings?.tavilyApiKey || env.TAVILY_API_KEY;
+  if (!tavilyApiKey) {
+    throw new Error('TAVILY_API_KEY is required to crawl');
+  }
+  const client = tavily({ apiKey: tavilyApiKey });
 
   const selectPaths = opts.selectPaths
     ?? env.CRAWL_SELECT_PATHS?.split(',').map(p => p.trim()).filter(Boolean);
@@ -150,20 +166,52 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
   }
 
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
-  const vectorStore = new MongoDBAtlasVectorSearch(embeddings, {
+  const embeddingsInstance = getEmbeddings();
+  const vectorStore = new MongoDBAtlasVectorSearch(embeddingsInstance, {
     collection,
     indexName: env.VECTOR_INDEX_NAME,
     textKey: 'text',
     embeddingKey: 'embedding',
   });
 
+  if (documents.length > 0) {
+    await collection.deleteMany({
+      $or: [
+        { threadId: opts.threadId },
+        { 'metadata.threadId': opts.threadId },
+        {
+          $and: [
+            { 'metadata.baseUrl': opts.url },
+            {
+              $or: [
+                { threadId: opts.threadId },
+                { 'metadata.threadId': opts.threadId },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  }
+
   await vectorStore.addDocuments(documents);
 
   return documents.length;
 }
 
+/**
+ * Delete vector records associated with a crawl thread from the configured MongoDB collection.
+ *
+ * @param threadId - The crawl thread identifier to match against top-level `threadId` or nested `metadata.threadId`
+ * @returns The number of documents removed from the collection
+ */
 export async function deleteCrawlData(threadId: string): Promise<number> {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
-  const result = await collection.deleteMany({ threadId });
+  const result = await collection.deleteMany({
+    $or: [
+      { threadId },
+      { 'metadata.threadId': threadId },
+    ],
+  });
   return result.deletedCount;
 }

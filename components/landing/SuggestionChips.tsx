@@ -33,22 +33,27 @@ export function SuggestionChips({ onSuggestionClick }: SuggestionChipsProps) {
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-      <p className="text-sm text-muted-foreground mb-3 text-center">
+      <p className="text-sm text-muted-foreground mb-4 text-center animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300 fill-mode-both">
         Quick suggestions
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {suggestions.map((suggestion) => {
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {suggestions.map((suggestion, index) => {
           const Icon = suggestion.icon;
           return (
-            <Button
+            <div
               key={suggestion.label}
-              variant="outline"
-              className="h-auto py-3 px-4 justify-start text-left gap-3 hover:bg-accent"
-              onClick={() => handleClick(suggestion.query)}
+              className="animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-500 fill-mode-both"
+              style={{ animationDelay: `${400 + index * 100}ms` }}
             >
-              <Icon className="size-4 shrink-0 text-primary" />
-              <span className="truncate text-sm">{suggestion.label}</span>
-            </Button>
+              <Button
+                variant="outline"
+                className="w-full h-auto py-3 px-4 justify-start text-left gap-3 hover:bg-accent hover:border-primary/30 transition-all hover:shadow-sm"
+                onClick={() => handleClick(suggestion.query)}
+              >
+                <Icon className="size-4 shrink-0 text-primary" />
+                <span className="truncate text-sm font-medium">{suggestion.label}</span>
+              </Button>
+            </div>
           );
         })}
       </div>

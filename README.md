@@ -10,7 +10,9 @@ Administrators crawl and index institutional content via a protected backend das
 
 - **Knowledge Ingestion** — Admin crawls institutional URLs via Tavily, chunks, embeds, and stores in MongoDB Atlas Vector Search
 - **Conversational RAG** — Students query an AI agent with semantic vector search, streamed cited answers
+- **Voice Agent** — High-fidelity voice interaction powered by **Deepgram** (Nova-3 STT & Aura-2 TTS)
 - **Auto-FAQ Generation** — Frequently asked questions are tracked and auto-synthesized
+- **Automated Onboarding** — Streamlined setup for branding, API configuration, and initial indexing
 - **AI Elements UI** — Production-grade chat components with citations
 - **Admin Dashboard** — Domain management, crawl progress, FAQ approval queue
 
@@ -46,9 +48,11 @@ Edit `.env.local` with your credentials:
 
 ```bash
 # Required
+AUTH_SECRET=your-random-32-char-secret
+BETTER_AUTH_URL=http://localhost:3000
 CHAT_API_KEY=your-llm-api-key
-CHAT_BASE_URL=https://api.cerebras.ai/v1  # or https://api.openai.com/v1
-CHAT_MODEL=gpt-oss-120b                    # or gpt-4o, llama-3.3-70b, etc.
+CHAT_BASE_URL=https://api.cerebras.ai/v1
+CHAT_MODEL=gpt-oss-120b
 
 EMBEDDING_API_KEY=your-voyage-api-key
 EMBEDDING_BASE_URL=https://api.voyageai.com/v1
@@ -58,6 +62,16 @@ EMBEDDING_DIMENSIONS=2048
 MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net
 TAVILY_API_KEY=tvly-your-key
 ADMIN_SECRET=your-secure-admin-token-min-16-chars
+
+# Voice Agent (Deepgram)
+DEEPGRAM_API_KEY=your-deepgram-key
+DEEPGRAM_STT_MODEL=nova-3
+DEEPGRAM_TTS_MODEL=aura-2-thalia-en
+
+# Optional
+UNIVERSITY_URL=https://university.edu
+UPLOADTHING_SECRET=sk_live_...
+UPLOADTHING_APP_ID=...
 ```
 
 ### 4. MongoDB Atlas Vector Search Setup
@@ -136,45 +150,78 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
+## Deploying to Netlify
+
+### 1. Install the Netlify Next.js Plugin
+
+```bash
+npm install -D @netlify/plugin-nextjs
+```
+
+### 2. Set Environment Variables in Netlify Dashboard
+
+Go to **Site Settings → Environment Variables** and add:
+
+| Variable | Value | Required |
+|----------|-------|----------|
+| `AUTH_SECRET` | Random 32+ char secret (`npx auth secret`) | Yes |
+| `BETTER_AUTH_URL` | Your full deploy URL e.g. `https://your-site.netlify.app` | Yes |
+| `MONGODB_URI` | MongoDB Atlas connection string | Yes |
+| `CHAT_API_KEY` | LLM API key | Yes |
+| `CHAT_BASE_URL` | LLM base URL | Yes |
+| `CHAT_MODEL` | `gpt-oss-120b` | Yes |
+| `EMBEDDING_API_KEY` | Voyage AI key | Yes |
+| `TAVILY_API_KEY` | Tavily key | Yes |
+| `ADMIN_SECRET` | Min 16 chars | Yes |
+| `DEEPGRAM_API_KEY` | Deepgram API key | For voice |
+
+> **Important**: `BETTER_AUTH_URL` must exactly match your Netlify site URL (no trailing slash). Without it, auth redirects back to `localhost` after sign-in.
+
+### 3. Deploy
+
+```bash
+# Push to your branch, or trigger a manual deploy in Netlify dashboard
+git push origin main
+```
+
+---
+
 ## Project Structure
 
 ```
 edurag/
 ├── app/
 │   ├── (public)/
-│   │   ├── page.tsx              # Landing page (ISR)
-│   │   └── chat/page.tsx         # Student chat UI
+│   │   ├── chat/page.tsx         # Student text chat UI
+│   │   ├── voice/page.tsx        # Student voice agent UI
+│   │   └── page.tsx              # Landing page
 │   ├── admin/
 │   │   ├── layout.tsx            # Auth guard
 │   │   ├── login/page.tsx        # Token login
 │   │   ├── page.tsx              # Dashboard
 │   │   ├── domains/page.tsx      # Domain management
 │   │   └── faqs/page.tsx         # FAQ approval
+│   ├── setup/
+│   │   └── page.tsx              # Automated onboarding flow
 │   └── api/
-│       ├── chat/route.ts         # Streaming chat
+│       ├── chat/route.ts         # Streaming text chat
+│       ├── voice-token/route.ts  # Deepgram token auth
+│       ├── voice-function/route.ts # Voice agent tool calling
 │       ├── crawl/route.ts        # SSE crawl progress
 │       ├── domains/route.ts      # Domain CRUD
 │       ├── faqs/route.ts         # Public FAQs
-│       └── threads/route.ts      # Conversation management
+│       └── threads/route.ts      # Thread deletion
 ├── lib/
-│   ├── agent/
-│   │   ├── index.ts              # Agent entry point
-│   │   ├── prompts.ts            # System prompts
-│   │   ├── tools.ts              # Tool registry
-│   │   └── types.ts              # Agent types
+│   ├── voice/                    # Deepgram & Voice logic
+│   ├── agent/                    # App-specific agent wiring
 │   ├── providers.ts              # LLM + Embedding factories
 │   ├── vectorstore.ts            # MongoDB vector store
-│   ├── conversation.ts           # Chat history
 │   ├── crawl.ts                  # Tavily crawl pipeline
-│   ├── faq-manager.ts            # FAQ tracking
 │   ├── auth.ts                   # Admin auth
-│   ├── errors.ts                 # Error handling
-│   └── env.ts                    # Zod-validated env
-└── components/
-    ├── chat/                     # Chat UI components
-    ├── landing/                  # Landing page components
-    ├── admin/                    # Admin UI components
-    └── ai-elements/              # AI Elements primitives
+│   ├── env.ts                    # Zod-validated env
+│   └── errors.ts                 # Error handling
+└── packages/
+    └── agent/                    # Core Agent Orchestration logic
 ```
 
 ---
@@ -192,10 +239,10 @@ edurag/
 
 ### Student Chat
 
-1. Navigate to `/chat`
-2. Ask questions about the university
-3. View cited answers with source links
-4. Session history saved in sidebar
+1. Navigate to `/chat` for text-based interaction.
+2. Navigate to `/voice` for real-time voice interaction.
+3. Ask questions about the university and view cited answers.
+4. Session history is saved automatically in the sidebar.
 
 ---
 
@@ -240,6 +287,51 @@ Public FAQ list (ISR cached).
 
 Admin-only domain registry CRUD.
 
+### DELETE `/api/threads`
+
+Thread clear endpoint implemented in `app/api/threads/route.ts`.
+
+**Auth:** Requires an authenticated user session.
+
+**Request:**
+```json
+{
+  "threadId": "session-123"
+}
+```
+
+**Success (`200`):**
+```json
+{
+  "success": true
+}
+```
+
+**Error Responses:**
+- `401 Unauthorized`
+```json
+{
+  "error": "Unauthorized",
+  "code": "UNAUTHORIZED"
+}
+```
+- `400 Bad Request`
+```json
+{
+  "error": "Invalid request body",
+  "code": "VALIDATION_ERROR"
+}
+```
+- `500 Internal Server Error`
+```json
+{
+  "error": "Failed to clear thread history",
+  "code": "DB_ERROR"
+}
+```
+
+In development, error responses can include an additional `details` field.
+
 ---
 
 ## Deployment
@@ -277,16 +369,21 @@ CMD ["npm", "start"]
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `CHAT_API_KEY` | LLM API key | ✅ |
-| `CHAT_BASE_URL` | LLM API endpoint | ✅ |
-| `CHAT_MODEL` | Model name | ✅ |
-| `EMBEDDING_API_KEY` | Embedding API key | ✅ |
-| `EMBEDDING_BASE_URL` | Embedding endpoint | ✅ |
-| `EMBEDDING_MODEL` | Embedding model | ✅ |
-| `EMBEDDING_DIMENSIONS` | Vector dimensions (must match index) | ✅ |
-| `MONGODB_URI` | MongoDB Atlas connection string | ✅ |
-| `TAVILY_API_KEY` | Tavily crawl API key | ✅ |
-| `ADMIN_SECRET` | Admin auth token (min 16 chars) | ✅ |
+| `AUTH_SECRET` | Random 32+ character secret, e.g., generated with `npx auth secret` | Yes |
+| `BETTER_AUTH_URL` | Full deploy URL or localhost during development | Yes |
+| `CHAT_API_KEY` | LLM API key | Yes |
+| `CHAT_BASE_URL` | LLM API endpoint | Yes |
+| `CHAT_MODEL` | Model name | Yes |
+| `EMBEDDING_API_KEY` | Embedding API key | Yes |
+| `EMBEDDING_BASE_URL` | Embedding endpoint | Yes |
+| `EMBEDDING_MODEL` | Embedding model | Yes |
+| `EMBEDDING_DIMENSIONS` | Vector dimensions (must match index) | Yes |
+| `MONGODB_URI` | MongoDB Atlas connection string | Yes |
+| `TAVILY_API_KEY` | Tavily crawl API key | Yes |
+| `ADMIN_SECRET` | Admin auth token (min 16 chars) | Yes |
+| `DEEPGRAM_API_KEY` | Deepgram API key | For voice |
+| `DEEPGRAM_STT_MODEL` | Deepgram STT model | For voice |
+| `DEEPGRAM_TTS_MODEL` | Deepgram TTS model | For voice |
 | `FAQ_THRESHOLD` | Questions before FAQ synthesis | Default: 5 |
 | `CRAWL_*` | Crawl defaults | Optional |
 
@@ -298,11 +395,13 @@ CMD ["npm", "start"]
 |-------|---------|
 | Framework | Next.js 16 |
 | AI SDK | Vercel AI SDK 6 |
+| Voice | Deepgram (v4 SDK) |
+| Core Agent | @edurag/agent (Workspace) |
 | Vector Store | @langchain/mongodb |
-| Embeddings | @langchain/openai |
+| LLM Provider | Cerebras (gpt-oss-120b) |
+| Embeddings | Voyage AI (voyage-4-large) |
 | Crawling | @tavily/core |
-| Database | MongoDB 6.x |
-| Validation | Zod |
+| Database | MongoDB Atlas |
 | UI | shadcn/ui, AI Elements, Tailwind |
 
 ---

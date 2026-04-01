@@ -20,6 +20,14 @@
 # production
 /build
 
+EDURAG_ARCHITECTURE.md
+EDURAG_CONTENT_SOURCES_SPEC (1).md
+EDURAG_CRAWL_CONFIG_SPEC.md
+EDURAG_ONBOARDING_SPEC.md
+edurag-admin-kb.html
+edurag-onboarding-v2.html
+edurag-student.html
+EDURAG_VOICE_AGENT_SPEC.md
 # misc
 .DS_Store
 *.pem
@@ -43,3 +51,19 @@ next-env.d.ts
 
 # playwright mcp debug logs
 .playwright-mcp/
+
+# uploaded files
+/public/uploads/
+
+
+# keep committed env template
+!/.env.example
+
+# E2E Test Artifacts
+test-audio.wav
+test-output*.txt
+debug-voice*.png
+
+# API / Review Artifacts
+prs.json
+reviews.json

@@ -1,9 +1,12 @@
+import { ObjectId } from 'mongodb';
+
 import { generateText } from 'ai';
+
+import { FAQ_SYNTHESIS_PROMPT } from '@edurag/agent/text/prompts';
+
+import { env } from './env';
 import { chatModel } from './providers';
 import { getMongoCollection } from './vectorstore';
-import { FAQ_SYNTHESIS_PROMPT } from './agent/prompts';
-import { env } from './env';
-import { ObjectId } from 'mongodb';
 
 interface FaqDocument {
   _id: ObjectId;

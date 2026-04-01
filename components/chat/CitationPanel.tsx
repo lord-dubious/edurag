@@ -4,12 +4,60 @@ interface Source {
   url: string;
   title?: string;
   content: string;
+  sourceType?: 'vector' | 'web';
 }
 
 interface Props {
   sources: Source[];
 }
 
+/**
+ * Validate and normalize a URL, returning it only if it uses the HTTP or HTTPS scheme.
+ *
+ * @param url - The input URL string to validate and normalize
+ * @returns The normalized URL string if its protocol is `http:` or `https:`, `null` otherwise
+ */
+function getSafeHref(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extracts a display-friendly hostname from a URL.
+ *
+ * @param url - The input URL string to parse
+ * @returns The hostname with a leading `www.` removed, or `'source'` if the URL cannot be parsed or hostname is empty
+ */
+function getSourceHostname(url: string): string {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '');
+    return hostname || 'source';
+  } catch {
+    return 'source';
+  }
+}
+
+/**
+ * Produce a short, display-safe preview string from source content.
+ *
+ * The function strips HTML tags and markdown links, collapses whitespace, and trims the result.
+ * If the content is falsy or the cleaned text is too short, returns "Content preview not available".
+ * If the text appears to be navigation-heavy, attempts to extract a meaningful sentence; if none is found,
+ * returns "View page for details".
+ * If the cleaned text exceeds `maxLength`, truncates at `maxLength` then backtracks to the previous space
+ * (if any) and appends an ellipsis.
+ *
+ * @param content - The raw source content to clean and shorten
+ * @param maxLength - Maximum number of characters for the preview (defaults to 150)
+ * @returns A display-safe preview string, or one of the sentinel messages `"Content preview not available"` or `"View page for details"`
+ */
 function cleanSourcePreview(content: string, maxLength = 150): string {
   if (!content) return 'Content preview not available';
 
@@ -46,35 +94,58 @@ function cleanSourcePreview(content: string, maxLength = 150): string {
   return truncated.slice(0, lastSpace > 0 ? lastSpace : maxLength) + '...';
 }
 
+/**
+ * Render a right-side panel listing citation sources.
+ *
+ * Displays a compact, scrollable list of provided sources with a numeric badge, title (or hostname fallback), source type chip ("Web" or "KB"), a short content preview, and the source hostname. Shows a "Web fallback" badge when any source has `sourceType === 'web'`.
+ *
+ * @param sources - Array of citation sources to display. Links with non-HTTP/HTTPS URLs are rendered inert (href set to `#` and navigation prevented); valid `http`/`https` URLs open in a new tab.
+ * @returns A JSX element containing the sources panel, or `null` when `sources` is empty.
+ */
 export function CitationPanel({ sources }: Props) {
   if (sources.length === 0) return null;
+  const hasWebFallback = sources.some(source => source.sourceType === 'web');
 
   return (
     <aside className="w-[340px] border-l bg-muted/20 p-5 overflow-y-auto animate-in slide-in-from-right-8 duration-300 shrink-0">
       <div className="flex items-center justify-between mb-5">
-        <h3 className="text-sm font-semibold">Sources</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-semibold">Sources</h3>
+          {hasWebFallback && (
+            <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+              Web fallback
+            </span>
+          )}
+        </div>
         <span className="flex items-center justify-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold font-mono">
           {sources.length}
         </span>
       </div>
       <div className="space-y-3">
         {sources.map((source, i) => {
-          const domain = new URL(source.url).hostname.replace('www.', '');
+          const safeHref = getSafeHref(source.url);
+          const domain = getSourceHostname(source.url);
           return (
             <a
               key={i}
-              href={source.url}
+              href={safeHref ?? '#'}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={safeHref ? undefined : (event) => event.preventDefault()}
               className="group flex items-start gap-3 p-3.5 bg-card border rounded-xl hover:border-primary/50 hover:bg-accent/40 hover:shadow-sm transition-all cursor-pointer no-underline"
             >
               <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                 <span className="text-[10px] font-mono font-bold text-primary">{i + 1}</span>
               </div>
               <div className="min-w-0 flex-1 space-y-1.5">
-                <h4 className="text-sm font-medium line-clamp-2 text-foreground group-hover:text-primary leading-snug">
-                  {source.title ?? domain}
-                </h4>
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="text-sm font-medium line-clamp-2 text-foreground group-hover:text-primary leading-snug">
+                    {source.title ?? domain}
+                  </h4>
+                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    {source.sourceType === 'web' ? 'Web' : 'KB'}
+                  </span>
+                </div>
                 <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
                   {cleanSourcePreview(source.content, 120)}
                 </p>

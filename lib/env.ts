@@ -5,12 +5,17 @@ const envSchema = z.object({
   CHAT_BASE_URL: z.string().url().optional().or(z.literal('')),
   CHAT_MODEL: z.string().default('gpt-oss-120b'),
   CHAT_MAX_TOKENS: z.coerce.number().default(32000),
-  CHAT_CONTEXT_LENGTH: z.coerce.number().default(65536),
+  CHAT_MAX_STEPS: z.coerce.number().min(1).max(20).default(5),
+  CHAT_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.2),
 
   EMBEDDING_API_KEY: z.string().min(1).optional(),
   EMBEDDING_BASE_URL: z.string().url().optional().or(z.literal('')),
   EMBEDDING_MODEL: z.string().default('voyage-4-large'),
   EMBEDDING_DIMENSIONS: z.coerce.number().default(2048),
+
+  RERANK_MODEL: z.string().default('rerank-2.5'),
+  RERANK_TOP_K: z.coerce.number().min(1).max(20).default(6),
+  RERANK_TIMEOUT_MS: z.coerce.number().positive().default(5000),
 
   MONGODB_URI: z.string().min(1).optional(),
   DB_NAME: z.string().default('edurag'),
@@ -19,7 +24,6 @@ const envSchema = z.object({
   COLLECTION3: z.string().default('checkpoint_writes_aio'),
   VECTOR_COLLECTION: z.string().default('crawled_index'),
   VECTOR_INDEX_NAME: z.string().default('index'),
-  CONVERSATIONS_COLLECTION: z.string().default('conversations'),
   FAQ_COLLECTION: z.string().default('faqs'),
   DOMAINS_COLLECTION: z.string().default('domains'),
 
@@ -37,8 +41,32 @@ const envSchema = z.object({
   CRAWL_FORMAT: z.enum(['markdown', 'text']).default('markdown'),
 
   ADMIN_SECRET: z.string().min(16).optional(),
-  NEXT_PUBLIC_APP_NAME: z.string().default('University Knowledge Base'),
-  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+
+  // Note: AUTH_SECRET is optional globally but is required by NextAuth for session encryption (used at auth.ts) when authentication is enabled.
+  AUTH_SECRET: z.string().min(1).optional(),
+  // BETTER_AUTH_URL must be set to the deployment URL on non-Vercel hosts (e.g. https://your-site.netlify.app)
+  BETTER_AUTH_URL: z.string().url().optional(),
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  MICROSOFT_CLIENT_ID: z.string().min(1).optional(),
+  MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
+  MICROSOFT_TENANT_ID: z.string().min(1).optional(),
+
+  UNIVERSITY_URL: z.string().url().optional().or(z.literal('')),
+  AUTO_CRAWL: z.coerce.boolean().default(false),
+
+  UPLOADTHING_SECRET: z.string().min(1).optional(),
+  UPLOADTHING_APP_ID: z.string().min(1).optional(),
+
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+
+  TITLE_MODEL: z.string().optional(),
+
+  DEEPGRAM_API_KEY: z.string().min(1).optional(),
+  DEEPGRAM_TOKEN_TTL: z.coerce.number().min(30).max(3600).default(3600),
+  DEEPGRAM_STT_MODEL: z.string().default('nova-3'),
+  DEEPGRAM_TTS_MODEL: z.string().default('aura-2-thalia-en'),
+  DEEPGRAM_THINK_MODEL: z.string().default('gemini-2.5-flash'),
 });
 
 let _env: z.infer<typeof envSchema> | undefined;
@@ -57,3 +85,14 @@ export const env = new Proxy({} as z.infer<typeof envSchema>, {
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+export function hasRequiredEnvVars(): boolean {
+  return !!(
+    process.env.MONGODB_URI &&
+    process.env.CHAT_API_KEY &&
+    process.env.EMBEDDING_API_KEY &&
+    process.env.TAVILY_API_KEY &&
+    process.env.ADMIN_SECRET &&
+    process.env.ADMIN_SECRET.length >= 16
+  );
+}
