@@ -107,55 +107,57 @@ export function CitationPanel({ sources }: Props) {
   const hasWebFallback = sources.some(source => source.sourceType === 'web');
 
   return (
-    <aside className="w-[340px] border-l bg-muted/20 p-5 overflow-y-auto animate-in slide-in-from-right-8 duration-300 shrink-0">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold">Sources</h3>
-          {hasWebFallback && (
-            <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-              Web fallback
-            </span>
-          )}
+    <aside className='w-[360px] shrink-0 overflow-y-auto border-l border-white/45 bg-background/80 p-4 backdrop-blur-sm animate-in slide-in-from-right-8 duration-300 dark:border-white/10'>
+      <div className='surface-glass rounded-2xl p-4'>
+        <div className='mb-4 flex items-center justify-between'>
+          <div className='flex items-center gap-2'>
+            <h3 className='text-sm font-semibold'>Sources</h3>
+            {hasWebFallback && (
+              <span className='rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary'>
+                Web fallback
+              </span>
+            )}
+          </div>
+          <span className='flex items-center justify-center rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-bold text-primary'>
+            {sources.length}
+          </span>
         </div>
-        <span className="flex items-center justify-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold font-mono">
-          {sources.length}
-        </span>
-      </div>
-      <div className="space-y-3">
-        {sources.map((source, i) => {
-          const safeHref = getSafeHref(source.url);
-          const domain = getSourceHostname(source.url);
-          return (
-            <a
-              key={i}
-              href={safeHref ?? '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={safeHref ? undefined : (event) => event.preventDefault()}
-              className="group flex items-start gap-3 p-3.5 bg-card border rounded-xl hover:border-primary/50 hover:bg-accent/40 hover:shadow-sm transition-all cursor-pointer no-underline"
-            >
-              <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <span className="text-[10px] font-mono font-bold text-primary">{i + 1}</span>
-              </div>
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="flex items-start justify-between gap-2">
-                  <h4 className="text-sm font-medium line-clamp-2 text-foreground group-hover:text-primary leading-snug">
-                    {source.title ?? domain}
-                  </h4>
-                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+        <div className='space-y-2.5'>
+          {sources.map((source, i) => {
+            const safeHref = getSafeHref(source.url);
+            const domain = getSourceHostname(source.url);
+            return (
+              <a
+                key={i}
+                href={safeHref ?? '#'}
+                target='_blank'
+                rel='noopener noreferrer'
+                onClick={safeHref ? undefined : (event) => event.preventDefault()}
+                className='group block rounded-xl border border-white/65 bg-background/85 p-3.5 no-underline transition hover:border-primary/40 hover:bg-background'
+              >
+                <div className='mb-2 flex items-start justify-between gap-2'>
+                  <div className='flex min-w-0 items-center gap-2'>
+                    <span className='flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/12 text-[10px] font-mono font-bold text-primary'>
+                      {i + 1}
+                    </span>
+                    <h4 className='line-clamp-2 text-sm font-medium leading-snug text-foreground group-hover:text-primary'>
+                      {source.title ?? domain}
+                    </h4>
+                  </div>
+                  <span className='shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground'>
                     {source.sourceType === 'web' ? 'Web' : 'KB'}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed">
+                <p className='line-clamp-3 text-xs leading-relaxed text-muted-foreground'>
                   {cleanSourcePreview(source.content, 120)}
                 </p>
-                <span className="text-[10px] text-primary/70 font-mono mt-1 block">
+                <span className='mt-2 block font-mono text-[10px] text-primary/70'>
                   {domain}
                 </span>
-              </div>
-            </a>
-          );
-        })}
+              </a>
+            );
+          })}
+        </div>
       </div>
     </aside>
   );

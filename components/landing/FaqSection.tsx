@@ -39,14 +39,17 @@ export function FaqSection() {
 
   if (loading) {
     return (
-      <section className="w-full max-w-3xl mx-auto px-4 py-12">
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <Skeleton className="h-8 w-64" />
-        </div>
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-lg" />
-          ))}
+      <section id='faqs' className='mx-auto w-full max-w-6xl px-4 py-14'>
+        <div className='surface-glass rounded-3xl p-6 sm:p-8'>
+          <div className='mb-6 flex items-center justify-between gap-3'>
+            <Skeleton className='h-8 w-56' />
+            <Skeleton className='h-6 w-24 rounded-full' />
+          </div>
+          <div className='space-y-3'>
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className='h-16 w-full rounded-xl' />
+            ))}
+          </div>
         </div>
       </section>
     );
@@ -55,33 +58,42 @@ export function FaqSection() {
   if (faqs.length === 0) return null;
 
   return (
-    <section className="w-full max-w-3xl mx-auto px-4 py-16 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-500 fill-mode-both">
-      <div className="flex flex-col items-center justify-center gap-2 mb-10 text-center">
-        <h2 className="text-3xl font-bold tracking-tight">Frequently Asked Questions</h2>
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <p>Common questions about</p>
-          <Badge variant="secondary" className="font-normal">
-            {faqs.length} answered
+    <section id='faqs' className='mx-auto w-full max-w-6xl px-4 py-14'>
+      <div className='surface-glass rounded-3xl p-6 sm:p-8'>
+        <div className='mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between'>
+          <div className='space-y-1.5'>
+            <p className='text-xs font-semibold uppercase tracking-[0.17em] text-muted-foreground'>
+              FAQ Library
+            </p>
+            <h2 className='text-2xl font-semibold tracking-tight sm:text-3xl'>
+              The questions students ask most often
+            </h2>
+            <p className='max-w-2xl text-sm text-muted-foreground sm:text-base'>
+              These answers are curated from your knowledge base and updated as your content evolves.
+            </p>
+          </div>
+          <Badge variant='secondary' className='w-fit px-3 py-1 text-xs'>
+            {faqs.length} answers ready
           </Badge>
         </div>
-      </div>
 
-      <Accordion type="single" collapsible className="space-y-3">
-        {faqs.map((faq, index) => (
-          <AccordionItem
-            key={faq._id}
-            value={`faq-${index}`}
-            className="border rounded-xl px-5 transition-colors data-[state=open]:bg-accent/30 bg-card hover:border-primary/30 shadow-sm"
-          >
-            <AccordionTrigger className="text-left font-medium hover:no-underline py-5 text-base">
-              {faq.question}
-            </AccordionTrigger>
-            <AccordionContent className="text-muted-foreground pb-5 leading-relaxed text-sm md:text-base">
-              {faq.answer}
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+        <Accordion type='single' collapsible className='divide-y divide-white/45 rounded-2xl border border-white/60 bg-background/80 px-4 sm:px-6'>
+          {faqs.map((faq, index) => (
+            <AccordionItem
+              key={faq._id}
+              value={`faq-${index}`}
+              className='border-b-0'
+            >
+              <AccordionTrigger className='py-5 text-left text-base font-medium hover:no-underline'>
+                {faq.question}
+              </AccordionTrigger>
+              <AccordionContent className='pb-5 text-sm leading-relaxed text-muted-foreground sm:text-base'>
+                {faq.answer}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </div>
     </section>
   );
 }

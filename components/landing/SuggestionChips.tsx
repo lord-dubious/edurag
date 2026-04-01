@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { GraduationCapIcon, DollarSignIcon, ClipboardListIcon, HomeIcon, BookOpenIcon, UsersIcon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -25,39 +24,34 @@ interface SuggestionChipsProps {
 }
 
 export function SuggestionChips({ onSuggestionClick }: SuggestionChipsProps) {
-  const handleClick = (query: string) => {
-    if (onSuggestionClick) {
-      onSuggestionClick(query);
-    }
-  };
-
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <p className="text-sm text-muted-foreground mb-4 text-center animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300 fill-mode-both">
-        Quick suggestions
-      </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {suggestions.map((suggestion, index) => {
-          const Icon = suggestion.icon;
-          return (
-            <div
-              key={suggestion.label}
-              className="animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-500 fill-mode-both"
-              style={{ animationDelay: `${400 + index * 100}ms` }}
-            >
-              <Button
-                variant="outline"
-                className="w-full h-auto py-3 px-4 justify-start text-left gap-3 hover:bg-accent hover:border-primary/30 transition-all hover:shadow-sm"
-                onClick={() => handleClick(suggestion.query)}
+    <section className='mx-auto w-full max-w-6xl px-4 pb-4'>
+      <div className='surface-glass rounded-2xl px-4 py-4 sm:px-5'>
+        <div className='mb-3 flex items-center justify-between gap-2'>
+          <p className='text-xs font-semibold uppercase tracking-[0.17em] text-muted-foreground'>
+            Guided prompts
+          </p>
+          <span className='text-xs text-muted-foreground'>Tap to launch in chat</span>
+        </div>
+        <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6'>
+          {suggestions.map((suggestion, index) => {
+            const Icon = suggestion.icon;
+            return (
+              <button
+                key={suggestion.label}
+                type='button'
+                className='animate-in fade-in zoom-in-95 rounded-xl border border-white/60 bg-background/80 px-3 py-3 text-left transition hover:border-primary/35 hover:bg-background'
+                style={{ animationDelay: `${index * 70}ms` }}
+                onClick={() => onSuggestionClick?.(suggestion.query)}
               >
-                <Icon className="size-4 shrink-0 text-primary" />
-                <span className="truncate text-sm font-medium">{suggestion.label}</span>
-              </Button>
-            </div>
-          );
-        })}
+                <Icon className='mb-2 size-4 text-primary' />
+                <span className='block text-sm font-medium leading-tight'>{suggestion.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </section>
   );
 }
 

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen, Phone } from 'lucide-react';
+import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen, Phone, Plus } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { useTheme } from 'next-themes';
 
@@ -411,10 +411,9 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
   const suggestions = useMemo(() => pickSuggestions(SUGGESTION_POOL, 4, suggestionsSeed), [suggestionsSeed]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar for History */}
+    <div className='brand-aurora flex h-screen overflow-hidden'>
       {session?.user && showHistory && (
-        <div className="w-80 shrink-0 hidden md:flex flex-col border-r h-full">
+        <div className='hidden h-full w-80 shrink-0 border-r border-white/45 md:flex dark:border-white/10'>
           <HistorySidebar
             currentId={threadId}
             onSelect={handleHistorySelect}
@@ -426,13 +425,15 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
         </div>
       )}
       {session?.user && showHistory && (
-        <div className="fixed inset-0 z-50 bg-background md:hidden">
-          <div className="h-full flex flex-col">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="font-semibold">History</h2>
-              <button onClick={() => setShowHistory(false)}>Close</button>
+        <div className='fixed inset-0 z-50 bg-background/95 backdrop-blur-sm md:hidden'>
+          <div className='h-full flex-col'>
+            <div className='flex items-center justify-between border-b px-4 py-3'>
+              <h2 className='font-semibold'>History</h2>
+              <button onClick={() => setShowHistory(false)} className='rounded-md px-2 py-1 text-sm text-muted-foreground'>
+                Close
+              </button>
             </div>
-            <div className="flex-1 overflow-hidden">
+            <div className='h-[calc(100%-53px)] overflow-hidden'>
               <HistorySidebar
                 currentId={threadId}
                 onSelect={handleHistorySelect}
@@ -446,100 +447,122 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
         </div>
       )}
       {!session?.user && (
-        <div className="w-80 shrink-0 hidden md:flex flex-col border-r h-full bg-muted/20">
-          <div className="p-6 space-y-3">
-            <h2 className="text-sm font-semibold">History</h2>
-            <p className="text-sm text-muted-foreground">Sign in to save and revisit your chats.</p>
-            <p className="text-xs text-muted-foreground">Keep your admissions questions, compare answers, and pick up where you left off.</p>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/auth/signin?callbackUrl=/chat">Sign in</Link>
+        <div className='hidden h-full w-80 shrink-0 border-r border-white/45 bg-background/70 p-5 md:flex md:flex-col dark:border-white/10'>
+          <div className='surface-glass space-y-3 rounded-2xl p-4'>
+            <h2 className='text-sm font-semibold'>History</h2>
+            <p className='text-sm text-muted-foreground'>Sign in to save and revisit your chats.</p>
+            <p className='text-xs text-muted-foreground'>
+              Keep your admissions questions, compare answers, and continue where you left off.
+            </p>
+            <Button variant='outline' size='sm' asChild>
+              <Link href='/auth/signin?callbackUrl=/chat'>Sign in</Link>
             </Button>
           </div>
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center gap-3 px-4 h-14 border-b bg-background shrink-0">
+      <div className='flex min-w-0 flex-1 flex-col'>
+        <header className='flex h-16 shrink-0 items-center gap-3 border-b border-white/45 bg-background/80 px-4 backdrop-blur-md dark:border-white/10 sm:px-5'>
           {session?.user && (
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className="p-2 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-              aria-label="Toggle history"
-              title={showHistory ? "Close History" : "Open History"}
+              className='-ml-1 rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
+              aria-label='Toggle history'
+              title={showHistory ? 'Close History' : 'Open History'}
             >
-              {showHistory ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
+              {showHistory ? <PanelLeftClose className='h-5 w-5' /> : <PanelLeftOpen className='h-5 w-5' />}
             </button>
           )}
 
-          <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className='flex min-w-0 flex-1 items-center gap-2'>
             {iconType === 'logo' && logoUrl ? (
-              <img src={logoUrl} alt={appName} className="h-7 w-auto object-contain" />
+              <img src={logoUrl} alt={appName} className='h-7 w-auto object-contain' />
             ) : iconType === 'emoji' && emoji ? (
-              <span className="text-xl">{emoji}</span>
+              <span className='text-xl'>{emoji}</span>
             ) : null}
-            <h1 className="text-sm font-medium text-muted-foreground truncate">
-              {appName}
-            </h1>
+            <div className='min-w-0'>
+              <h1 className='truncate text-sm font-semibold tracking-tight text-foreground'>
+                {appName}
+              </h1>
+              <p className='truncate text-[11px] text-muted-foreground'>
+                {voiceMode ? 'Voice session active' : 'Text assistant'}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className='flex items-center gap-2'>
+            <Button
+              variant='outline'
+              size='sm'
+              className='hidden h-8 gap-1.5 rounded-lg border-white/60 bg-background/70 px-2.5 text-xs sm:inline-flex'
+              onClick={handleNewChat}
+            >
+              <Plus className='size-3.5' />
+              New chat
+            </Button>
             <button
               onClick={() => setShowSources(!showSources)}
               disabled={!hasSources}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${hasSources
+              className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${hasSources
                 ? (showSources
-                  ? 'border-primary text-primary bg-primary/10'
-                  : 'border-border hover:border-primary hover:text-primary')
-                : 'border-border text-muted-foreground bg-muted/40 cursor-not-allowed'
+                  ? 'border-primary bg-primary/12 text-primary'
+                  : 'border-white/60 bg-background/70 hover:border-primary hover:text-primary')
+                : 'cursor-not-allowed border-border bg-muted/45 text-muted-foreground'
                 }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full ${hasSources ? 'bg-primary' : 'bg-muted-foreground/50'}`} />
+              <span className={`h-1.5 w-1.5 rounded-full ${hasSources ? 'bg-primary' : 'bg-muted-foreground/50'}`} />
               Sources {lastSources.length}
               {hasWebFallbackSources && (
-                <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none">
+                <span className='rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none'>
                   Web
                 </span>
               )}
             </button>
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted transition-colors"
-              title="Toggle theme"
+              className='flex h-8 w-8 items-center justify-center rounded-md border border-white/60 bg-background/70 transition-colors hover:bg-muted dark:border-white/15'
+              title='Toggle theme'
             >
               {theme === 'dark' ? (
-                <SunIcon className="w-4 h-4" />
+                <SunIcon className='w-4 h-4' />
               ) : (
-                <MoonIcon className="w-4 h-4" />
+                <MoonIcon className='w-4 h-4' />
               )}
             </button>
             {session?.user ? <UserMenu /> : <LoginButton />}
           </div>
         </header>
 
-        <div className="flex-1 flex overflow-hidden relative">
-          <main className="flex-1 flex flex-col min-w-0 relative bg-background">
-            <div className="flex-1 overflow-y-auto">
-              <div className="max-w-3xl mx-auto p-4 md:p-6 pb-48 md:pb-56">
+        <div className='relative flex flex-1 overflow-hidden'>
+          <main className='relative flex min-w-0 flex-1 flex-col bg-transparent'>
+            <div className='flex-1 overflow-y-auto'>
+              <div className='mx-auto w-full max-w-4xl px-4 pb-56 pt-6 sm:px-6 sm:pb-64'>
                 {isEmpty && (
-                  <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-6">
-                    <div className="space-y-2">
-                      <h2 className="text-2xl font-semibold">Welcome to {appName}</h2>
-                      <p className="text-muted-foreground max-w-md">
-                        Ask me anything about admissions, programs, tuition, campus life, and more.
+                  <div className='surface-glass mx-auto flex min-h-[58vh] max-w-3xl flex-col items-center justify-center rounded-3xl px-6 py-10 text-center'>
+                    <div className='mb-7 space-y-2'>
+                      <p className='text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground'>
+                        Start a conversation
+                      </p>
+                      <h2 className='text-3xl font-semibold tracking-tight sm:text-4xl'>
+                        Welcome to {appName}
+                      </h2>
+                      <p className='mx-auto max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base'>
+                        Ask about admissions, programs, tuition, deadlines, campus life, and student support in natural language.
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                    <div className='grid w-full max-w-2xl grid-cols-1 gap-2.5 sm:grid-cols-2'>
                       {suggestions.map((suggestion) => (
                         <button
                           key={suggestion.label}
                           onClick={() => handleSuggestionClick(suggestion.query)}
-                          className="h-auto py-3 px-4 justify-start text-left gap-2 rounded-md border border-border bg-background hover:bg-accent hover:border-primary/30 transition-all text-sm font-medium"
+                          className='rounded-xl border border-white/60 bg-background/80 px-3.5 py-3 text-left text-sm font-medium transition hover:border-primary/35 hover:bg-background'
                         >
                           {suggestion.label}
                         </button>
                       ))}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Phone className="size-3.5" />
+                    <div className='mt-5 flex items-center gap-2 text-xs text-muted-foreground'>
+                      <Phone className='size-3.5' />
                       <span>
                         Prefer voice? Tap the phone icon{isAuthenticated ? ' to start a call.' : ' to sign in and start a call.'}
                       </span>
@@ -555,11 +578,11 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
                   />
                 )}
                 {error && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm mt-4">
+                  <div className='mt-4 flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive'>
                     <span>Something went wrong.</span>
                     <button
                       onClick={() => regenerate()}
-                      className="underline font-medium"
+                      className='font-medium underline'
                     >
                       Try again
                     </button>
@@ -568,9 +591,8 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
               </div>
             </div>
 
-            <div className={`absolute bottom-0 left-0 right-0 py-4 px-2 sm:px-4 bg-gradient-to-t from-background via-background/95 to-transparent z-10
-                    ${voiceMode ? "bg-background pb-6" : ""}`}>
-              <div className="max-w-3xl mx-auto">
+            <div className={`absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-background via-background/96 to-transparent px-3 py-4 sm:px-5 ${voiceMode ? 'bg-background pb-6' : ''}`}>
+              <div className='mx-auto max-w-4xl'>
                 {voiceMode ? (
                   <VoiceChat
                     messages={messages}

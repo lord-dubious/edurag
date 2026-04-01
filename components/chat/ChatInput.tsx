@@ -25,28 +25,39 @@ interface Props {
 
 export function ChatInput({ onSubmit, status, defaultInput, onVoiceMode, voiceHelperText, voiceDisabled }: Props) {
   const input = (
-    <PromptInput onSubmit={onSubmit} className="w-full max-w-3xl mx-auto bg-background rounded-xl border shadow-sm">
+    <PromptInput
+      onSubmit={onSubmit}
+      className='surface-glass mx-auto w-full max-w-4xl rounded-2xl shadow-[0_18px_34px_-24px_rgba(0,0,0,0.65)]'
+    >
       <PromptInputBody>
-        <PromptInputTextarea placeholder="Ask about admissions, programs, tuition…" />
+        <PromptInputTextarea
+          placeholder='Ask about admissions, programs, tuition, deadlines...'
+          className='min-h-[56px] bg-transparent text-base placeholder:text-muted-foreground/85'
+        />
       </PromptInputBody>
-      <PromptInputFooter>
-        <PromptInputTools />
+      <PromptInputFooter className='rounded-b-2xl border-t border-white/35 bg-transparent p-2.5 dark:border-white/10'>
+        <div className='hidden sm:block'>
+          <PromptInputTools />
+        </div>
         {voiceHelperText && (
-          <span className="text-xs text-muted-foreground">{voiceHelperText}</span>
+          <span className='text-xs text-muted-foreground'>{voiceHelperText}</span>
         )}
-        <div className="flex items-center gap-2">
+        <div className='flex items-center gap-2'>
           {onVoiceMode && (
             <PromptInputButton
               onClick={onVoiceMode}
-              title="Voice call"
-              aria-label="Start voice call"
+              title='Voice call'
+              aria-label='Start voice call'
               disabled={voiceDisabled}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md shadow-sm border-none shadow-black/5 flex items-center justify-center p-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              className='brand-glow-dot flex items-center justify-center rounded-lg bg-primary p-2 text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60'
             >
-              <Phone className="size-4" />
+              <Phone className='size-4' />
             </PromptInputButton>
           )}
-          <PromptInputSubmit status={status} className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md shadow-sm border-none shadow-black/5" />
+          <PromptInputSubmit
+            status={status}
+            className='rounded-lg bg-primary text-primary-foreground shadow-sm transition hover:bg-primary/90'
+          />
         </div>
       </PromptInputFooter>
     </PromptInput>

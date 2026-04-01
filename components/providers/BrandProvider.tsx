@@ -38,10 +38,30 @@ const DEFAULT_BRAND: BrandSettings = {
   onboarded: false,
 };
 
+function normalizeHexColor(value: string | undefined, fallback: string): string {
+  if (!value) {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return fallback;
+}
+
+function hexToRgbChannels(hex: string): string {
+  const normalized = normalizeHexColor(hex, DEFAULT_BRAND.primaryColor);
+  const r = parseInt(normalized.slice(1, 3), 16);
+  const g = parseInt(normalized.slice(3, 5), 16);
+  const b = parseInt(normalized.slice(5, 7), 16);
+  return `${r} ${g} ${b}`;
+}
+
 function hexToApproxOklch(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const normalized = normalizeHexColor(hex, DEFAULT_BRAND.primaryColor);
+  const r = parseInt(normalized.slice(1, 3), 16) / 255;
+  const g = parseInt(normalized.slice(3, 5), 16) / 255;
+  const b = parseInt(normalized.slice(5, 7), 16) / 255;
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -117,18 +137,27 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
 function applyBrandColors(brand: BrandSettings): void {
   const root = document.documentElement;
-  const primaryOkLCH = hexToApproxOklch(brand.primaryColor);
-  const secondaryOkLCH = hexToApproxOklch(brand.secondaryColor);
+  const safePrimaryHex = normalizeHexColor(brand.primaryColor, DEFAULT_BRAND.primaryColor);
+  const safeSecondaryHex = normalizeHexColor(brand.secondaryColor, DEFAULT_BRAND.secondaryColor);
+  const primaryOkLCH = hexToApproxOklch(safePrimaryHex);
+  const secondaryOkLCH = hexToApproxOklch(safeSecondaryHex);
+  const primaryRgb = hexToRgbChannels(safePrimaryHex);
+  const secondaryRgb = hexToRgbChannels(safeSecondaryHex);
 
   root.style.setProperty('--primary', primaryOkLCH);
   root.style.setProperty('--secondary', secondaryOkLCH);
   root.style.setProperty('--accent', primaryOkLCH);
   root.style.setProperty('--accent-glow', primaryOkLCH);
   root.style.setProperty('--sidebar-primary', primaryOkLCH);
+  root.style.setProperty('--brand-primary-hex', safePrimaryHex);
+  root.style.setProperty('--brand-secondary-hex', safeSecondaryHex);
+  root.style.setProperty('--brand-primary-rgb', primaryRgb);
+  root.style.setProperty('--brand-secondary-rgb', secondaryRgb);
 
   const lighterPrimary = primaryOkLCH.replace(/oklch\((\d+\.\d+)/, (_, l) => {
     const newL = Math.min(0.98, parseFloat(l) + 0.3);
     return `oklch(${newL.toFixed(3)}`;
   });
   root.style.setProperty('--accent-light', lighterPrimary);
+  root.style.setProperty('--brand-surface', `color-mix(in oklab, ${safePrimaryHex} 14%, white 86%)`);
 }

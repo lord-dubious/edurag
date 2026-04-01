@@ -23,6 +23,16 @@ interface HistorySidebarProps {
   refreshKey?: number;
 }
 
+function formatUpdatedAt(value: string): string {
+  const date = new Date(value);
+  const now = new Date();
+  const isSameDay = date.toDateString() === now.toDateString();
+  if (isSameDay) {
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 export function HistorySidebar({ currentId, onSelect, onNew, onDelete, isOpen, refreshKey }: HistorySidebarProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,54 +78,67 @@ export function HistorySidebar({ currentId, onSelect, onNew, onDelete, isOpen, r
   if (!isOpen) return null;
 
   return (
-    <div className="w-full flex flex-col h-full bg-muted/20">
-      <div className="flex items-center justify-between px-4 h-14 border-b shrink-0">
-        <h2 className="text-sm font-semibold">History</h2>
-        <Button onClick={onNew} size="sm" variant="ghost" className="h-8 w-8 p-0">
-          <Plus className="h-4 w-4" />
-        </Button>
+    <div className="flex h-full w-full flex-col bg-gradient-to-b from-primary/10 via-background to-background">
+      <div className="shrink-0 border-b border-white/40 px-4 py-3 dark:border-white/10">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold tracking-tight">Conversation History</h2>
+          <Button onClick={onNew} size="sm" variant="ghost" className="h-8 w-8 rounded-lg p-0 hover:bg-primary/10">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Your saved sessions appear here.
+        </p>
       </div>
       <ScrollArea className="flex-1">
-        <div className="p-2 space-y-1">
+        <div className="space-y-2 p-3">
           {conversations.map((conv) => (
             <div
               key={conv.threadId}
               className={cn(
-                "group relative flex items-start rounded-md w-full overflow-hidden",
-                currentId === conv.threadId && "bg-muted"
+                'group relative overflow-hidden rounded-xl border',
+                currentId === conv.threadId
+                  ? 'border-primary/30 bg-primary/10'
+                  : 'border-transparent hover:border-white/60 hover:bg-accent/55',
               )}
             >
               <button
-                className={cn(
-                  "flex items-start gap-2 text-left w-full px-3 py-3 rounded-md text-sm transition-colors",
-                  "hover:bg-accent",
-                  currentId === conv.threadId ? "bg-muted hover:bg-muted/80" : ""
-                )}
+                className='flex w-full items-start gap-2.5 px-3 py-3 text-left text-sm transition-colors'
                 onClick={() => onSelect(conv.threadId)}
               >
-                <MessageSquare className="h-4 w-4 mt-0.5 shrink-0 opacity-70" />
-                <div className="flex flex-col items-start overflow-hidden flex-1 min-w-0 pr-7">
-                  <span className="line-clamp-2 w-full font-medium whitespace-normal break-words leading-snug">
-                    {conv.title || conv.messages[0]?.content?.substring(0, 100) || "New Chat"}
+                <div className={cn(
+                  'mt-0.5 rounded-md p-1.5',
+                  currentId === conv.threadId ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground',
+                )}>
+                  <MessageSquare className='h-3.5 w-3.5' />
+                </div>
+                <div className='min-w-0 flex-1 pr-7'>
+                  <span className='line-clamp-2 block w-full whitespace-normal break-words text-sm font-medium leading-snug'>
+                    {conv.title || conv.messages[0]?.content?.substring(0, 100) || 'New Chat'}
                   </span>
-                  <span className="text-xs text-muted-foreground mt-1">
-                    {new Date(conv.updatedAt).toLocaleDateString()}
-                  </span>
+                  <div className='mt-1 flex items-center gap-2'>
+                    <span className='text-[11px] text-muted-foreground'>
+                      {formatUpdatedAt(conv.updatedAt)}
+                    </span>
+                    <span className='text-[11px] text-muted-foreground/70'>
+                      {conv.messages.length} msgs
+                    </span>
+                  </div>
                 </div>
               </button>
               <button
                 onClick={(e) => handleDelete(e, conv.threadId)}
-                className="absolute right-2 top-3 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                aria-label="Delete conversation"
-                title="Delete conversation"
+                className='absolute right-2 top-2.5 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus:opacity-100 group-hover:opacity-100'
+                aria-label='Delete conversation'
+                title='Delete conversation'
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className='h-3.5 w-3.5' />
               </button>
             </div>
           ))}
           {conversations.length === 0 && !loading && (
-            <div className="text-sm text-muted-foreground p-4 text-center">
-              No history yet.
+            <div className='rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground'>
+              No history yet. Start a chat to save your first thread.
             </div>
           )}
         </div>
