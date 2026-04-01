@@ -85,6 +85,7 @@ interface ApiKeys {
   chatModel: string;
   chatMaxTokens: number;
   chatMaxSteps: number;
+  chatTemperature: number;
   embeddingApiKey: string;
   embeddingModel: string;
   embeddingDimensions: number;
@@ -155,6 +156,15 @@ const PasswordInput = ({ id, placeholder, value, onChange, className }: Password
   );
 };
 
+/**
+ * Render the onboarding wizard for configuring and launching a university knowledge base.
+ *
+ * The component manages a multi-step setup flow (university URL, branding, crawl scope,
+ * API configuration, crawling progress, and completion), persists/fetches saved settings,
+ * streams crawl progress from the server, and posts the final configuration to the backend.
+ *
+ * @returns The JSX element for the full onboarding setup page
+ */
 export default function SetupPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -197,6 +207,7 @@ export default function SetupPage() {
     chatModel: '',
     chatMaxTokens: 32000,
     chatMaxSteps: 5,
+    chatTemperature: 0.2,
     embeddingApiKey: '',
     embeddingModel: 'voyage-4-large',
     embeddingDimensions: 2048,
@@ -462,6 +473,9 @@ MONGODB_URI=${apiKeys.mongodbUri ? apiKeys.mongodbUri.replace(/:([^@]+)@/, ':***
 CHAT_API_KEY=${apiKeys.chatApiKey ? '****' + apiKeys.chatApiKey.slice(-4) : ''}
 CHAT_BASE_URL=${apiKeys.chatBaseUrl || ''}
 CHAT_MODEL=${apiKeys.chatModel || ''}
+CHAT_MAX_TOKENS=${apiKeys.chatMaxTokens}
+CHAT_MAX_STEPS=${apiKeys.chatMaxSteps}
+CHAT_TEMPERATURE=${apiKeys.chatTemperature}
 EMBEDDING_API_KEY=${apiKeys.embeddingApiKey ? '****' + apiKeys.embeddingApiKey.slice(-4) : ''}
 TAVILY_API_KEY=${apiKeys.tavilyApiKey ? '****' + apiKeys.tavilyApiKey.slice(-4) : ''}
 ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}`;
@@ -1207,7 +1221,7 @@ ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}
                         className="font-mono text-sm"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                       <div className="space-y-2">
                         <Label htmlFor="chatMaxTokens">Max Tokens</Label>
                         <Input
@@ -1229,6 +1243,24 @@ ADMIN_TOKEN=${apiKeys.adminSecret ? '****' + apiKeys.adminSecret.slice(-4) : ''}
                           placeholder="5"
                           value={apiKeys.chatMaxSteps}
                           onChange={(e) => setApiKeys((prev) => ({ ...prev, chatMaxSteps: Math.min(20, Math.max(1, parseInt(e.target.value) || 5)) }))}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="chatTemperature">Temperature</Label>
+                        <Input
+                          id="chatTemperature"
+                          type="number"
+                          min={0}
+                          max={2}
+                          step={0.1}
+                          placeholder="0.2"
+                          value={apiKeys.chatTemperature}
+                          onChange={(e) => {
+                            const parsed = parseFloat(e.target.value);
+                            const value = Number.isFinite(parsed) ? parsed : 0.2;
+                            setApiKeys((prev) => ({ ...prev, chatTemperature: Math.min(2, Math.max(0, value)) }));
+                          }}
                           className="font-mono text-sm"
                         />
                       </div>

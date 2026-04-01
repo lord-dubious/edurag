@@ -23,25 +23,86 @@ import { ChatMessages } from './ChatMessages';
 import { CitationPanel } from './CitationPanel';
 import type { Source } from '@edurag/agent/text';
 
-interface VectorSearchResult {
-  url: string;
-  title?: string;
-  content: string;
-  score: number;
-}
-
-interface VectorSearchToolPartWithOutput {
-  type: 'tool-vector_search';
+interface SearchToolPartWithOutput {
+  type: 'tool-vector_search' | 'tool-web_search';
   toolCallId: string;
   state: 'output-available';
-  input: { query: string; topK?: number };
-  output: { found: boolean; results: VectorSearchResult[] };
+  input: { query: string; topK?: number; maxResults?: number };
+  output: { found: boolean; results?: unknown };
 }
 
 type MessagePart = { type: string; state?: string; output?: unknown };
 
-function isVectorSearchToolPart(part: MessagePart): part is VectorSearchToolPartWithOutput {
-  return part.type === 'tool-vector_search' && part.state === 'output-available' && 'output' in part;
+/**
+ * Determines whether a message part represents a completed search tool output.
+ *
+ * @param part - The message part to inspect
+ * @returns `true` if `part` is a `tool-vector_search` or `tool-web_search` with `state` equal to `'output-available'` and an `output` property, `false` otherwise.
+ */
+function isSearchToolPart(part: MessagePart): part is SearchToolPartWithOutput {
+  return (
+    (part.type === 'tool-vector_search' || part.type === 'tool-web_search') &&
+    part.state === 'output-available' &&
+    'output' in part
+  );
+}
+
+/**
+ * Extracts validated source records from message parts produced by search tools.
+ *
+ * Scans the provided message parts for outputs from `tool-vector_search` or
+ * `tool-web_search`, validates each result object, and converts valid entries
+ * into `Source` records containing `url`, `content`, optional `title` and
+ * numeric `score`, and a `sourceType` of `"vector"` or `"web"`.
+ *
+ * @param parts - Message parts to inspect for search tool outputs
+ * @returns An object with `sources` (the array of extracted `Source` records) and
+ * `usedWebFallback` (`true` if any extracted source originated from a web search,
+ * `false` otherwise)
+ */
+function extractSourcesFromMessageParts(parts: MessagePart[]): { sources: Source[]; usedWebFallback: boolean } {
+  const sources: Source[] = [];
+  let usedWebFallback = false;
+
+  parts.forEach((part) => {
+    if (!isSearchToolPart(part)) {
+      return;
+    }
+
+    const outputResults = part.output?.results;
+    if (!Array.isArray(outputResults)) {
+      return;
+    }
+
+    const sourceType: Source['sourceType'] = part.type === 'tool-web_search' ? 'web' : 'vector';
+    if (sourceType === 'web') {
+      usedWebFallback = true;
+    }
+
+    outputResults.forEach((result) => {
+      if (typeof result !== 'object' || result === null) {
+        return;
+      }
+      const candidate = result as Record<string, unknown>;
+      const url = typeof candidate.url === 'string' ? candidate.url : '';
+      const content = typeof candidate.content === 'string' ? candidate.content : '';
+      if (!url || !content) {
+        return;
+      }
+
+      const title = typeof candidate.title === 'string' ? candidate.title : undefined;
+      const score = typeof candidate.score === 'number' && Number.isFinite(candidate.score) ? candidate.score : undefined;
+      sources.push({
+        url,
+        title,
+        content,
+        score,
+        sourceType,
+      });
+    });
+  });
+
+  return { sources, usedWebFallback };
 }
 
 interface ChatInterfaceProps {
@@ -78,6 +139,15 @@ function pickSuggestions<T>(items: T[], count: number, seed: number): T[] {
   return shuffled.slice(0, count);
 }
 
+/**
+ * Renders the main chat UI including message list, input/voice controls, history sidebar, and citation panel.
+ *
+ * The component manages thread state, history loading/saving, source extraction for assistant messages, suggestion prompts, and optional voice chat handoff behavior.
+ *
+ * @param initialQuery - Optional initial query to send automatically when the chat is ready and empty
+ * @param initialVoice - If true, opens the voice chat UI and attempts auto-start on mount
+ * @returns The chat interface React element
+ */
 export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps) {
   const router = useRouter();
   const { data: session } = authClient.useSession();
@@ -131,44 +201,27 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
   const { messages, setMessages, status, error, sendMessage, regenerate } = useChat({
     id: threadId,
     transport,
-    onFinish: async ({ message }) => {
-      let newSources: Source[] = [];
-      if (message.parts) {
-        const toolParts = message.parts.filter(isVectorSearchToolPart);
-        if (toolParts.length > 0) {
-          newSources = [];
-          toolParts.forEach((part) => {
-            if (part.output?.results) {
-              part.output.results.forEach((r: VectorSearchResult) => {
-                newSources.push({
-                  url: r.url,
-                  title: r.title,
-                  content: r.content,
-                });
-              });
-            }
-          });
-          if (newSources.length > 0) {
-            setSources(prev => ({
-              ...prev,
-              [message.id]: newSources,
-            }));
+    onFinish: async ({ message, messages, isAbort, isDisconnect, isError }) => {
+      if (isAbort || isDisconnect || isError) {
+        return;
+      }
+
+      let extraction = extractSourcesFromMessageParts((message.parts ?? []) as MessagePart[]);
+      if (extraction.sources.length === 0) {
+        const responseIdx = messages.findIndex(msg => msg.id === message.id);
+        if (responseIdx > 0) {
+          const previousMessage = messages[responseIdx - 1];
+          if (previousMessage.role === 'assistant') {
+            extraction = extractSourcesFromMessageParts((previousMessage.parts ?? []) as MessagePart[]);
           }
         }
       }
 
-      const assistantText = message.parts
-        ?.filter((part): part is { type: 'text'; text: string } => part.type === 'text' && typeof (part as { text?: unknown }).text === 'string')
-        .map(part => part.text)
-        .join('') ?? '';
-
-      if (session?.user && assistantText.trim()) {
-        await persistHistoryMessage({
-          role: 'assistant',
-          id: message.id,
-          content: assistantText,
-          sources: newSources,
-        }, 'assistant message');
+      if (extraction.sources.length > 0) {
+        setSources(prev => ({
+          ...prev,
+          [message.id]: extraction.sources,
+        }));
       }
     },
   });
@@ -345,10 +398,13 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     [status, sendMessage]
   );
 
-  const lastMessage = messages.at(-1);
-  const lastSources = lastMessage ? sources[lastMessage.id] ?? [] : [];
+  const lastSourcedAssistantMessage = [...messages]
+    .reverse()
+    .find(message => message.role === 'assistant' && (sources[message.id]?.length ?? 0) > 0);
+  const lastSources = lastSourcedAssistantMessage ? sources[lastSourcedAssistantMessage.id] ?? [] : [];
   const isEmpty = messages.length === 0 && status === 'ready';
   const hasSources = lastSources.length > 0;
+  const hasWebFallbackSources = lastSources.some(source => source.sourceType === 'web');
   const suggestions = useMemo(() => pickSuggestions(SUGGESTION_POOL, 4, suggestionsSeed), [suggestionsSeed]);
 
   return (
@@ -435,6 +491,11 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
             >
               <span className={`w-1.5 h-1.5 rounded-full ${hasSources ? 'bg-primary' : 'bg-muted-foreground/50'}`} />
               Sources {lastSources.length}
+              {hasWebFallbackSources && (
+                <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold leading-none">
+                  Web
+                </span>
+              )}
             </button>
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

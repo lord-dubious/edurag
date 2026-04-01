@@ -6,6 +6,7 @@ const envSchema = z.object({
   CHAT_MODEL: z.string().default('gpt-oss-120b'),
   CHAT_MAX_TOKENS: z.coerce.number().default(32000),
   CHAT_MAX_STEPS: z.coerce.number().min(1).max(20).default(5),
+  CHAT_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.2),
 
   EMBEDDING_API_KEY: z.string().min(1).optional(),
   EMBEDDING_BASE_URL: z.string().url().optional().or(z.literal('')),

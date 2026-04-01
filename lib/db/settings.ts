@@ -26,6 +26,7 @@ export interface OnboardingSettings {
     apiKey?: string;
     maxTokens?: number;
     maxSteps?: number;
+    temperature?: number;
   };
   embeddingConfig?: {
     apiKey?: string;

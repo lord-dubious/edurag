@@ -33,14 +33,16 @@ export async function GET(req: NextRequest) {
   }
 
   const faqs = await getPublicFaqs(20);
+  const publicFaqs = faqs.map(f => ({
+    _id: f._id instanceof ObjectId ? f._id.toString() : String(f._id),
+    question: f.question,
+    answer: f.answer,
+    count: f.count ?? 0,
+  }));
 
   return Response.json({
     success: true,
-    data: faqs.map(f => ({
-      id: f._id.toString(),
-      question: f.question,
-      answer: f.answer,
-      count: f.count,
-    })),
+    faqs: publicFaqs,
+    data: publicFaqs,
   });
 }

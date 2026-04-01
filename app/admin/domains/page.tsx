@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CrawlForm } from '@/components/admin/CrawlForm';
 import { CrawlProgress } from '@/components/admin/CrawlProgress';
@@ -29,6 +30,86 @@ interface DomainApiResponse {
   status?: 'indexed' | 'crawling' | 'error';
 }
 
+interface VerificationSummary {
+  checkedSources: number;
+  dead: number;
+  errors: number;
+  contentMismatch: number;
+}
+
+interface VerificationResult {
+  url: string;
+  linkStatus: string;
+  contentStatus: string;
+}
+
+/**
+ * Determines whether a value is a non-null object.
+ *
+ * @param value - The value to check.
+ * @returns `true` if `value` is a non-null object, `false` otherwise.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * Asserts whether a value conforms to the VerificationSummary shape.
+ *
+ * @returns `true` if `value` is a record containing finite numeric `checkedSources`, `dead`, `errors`, and `contentMismatch`, `false` otherwise.
+ */
+function isVerificationSummary(value: unknown): value is VerificationSummary {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.checkedSources === 'number' &&
+    Number.isFinite(value.checkedSources) &&
+    typeof value.dead === 'number' &&
+    Number.isFinite(value.dead) &&
+    typeof value.errors === 'number' &&
+    Number.isFinite(value.errors) &&
+    typeof value.contentMismatch === 'number' &&
+    Number.isFinite(value.contentMismatch)
+  );
+}
+
+/**
+ * Determines whether a value matches the shape of a VerificationResult.
+ *
+ * @param value - The value to validate as a verification result
+ * @returns `true` if `value` is a record with string `url`, `linkStatus`, and `contentStatus`; `false` otherwise.
+ */
+function isVerificationResult(value: unknown): value is VerificationResult {
+  return (
+    isRecord(value) &&
+    typeof value.url === 'string' &&
+    typeof value.linkStatus === 'string' &&
+    typeof value.contentStatus === 'string'
+  );
+}
+
+/**
+ * Determines whether a value is an array of verification result objects.
+ *
+ * @param value - The value to test
+ * @returns `true` if `value` is an array and every element satisfies `VerificationResult`, `false` otherwise.
+ */
+function isVerificationResultArray(value: unknown): value is VerificationResult[] {
+  return Array.isArray(value) && value.every(isVerificationResult);
+}
+
+/**
+ * Render the admin "Domains" management page and manage domain lifecycle actions.
+ *
+ * This client component displays domain statistics, a form to add domains, recent crawl activity,
+ * an indexed domains table, and an active crawl progress view. It also handles fetching domains,
+ * starting crawls (including reindexing), deleting domains, and verifying source URLs; it performs
+ * client-side auth-checks and redirects to the admin login when the session token is missing or invalid.
+ *
+ * @returns The React element for the Domains admin UI (statistics, add form, recent crawls, indexed table, and crawl controls).
+ */
 export default function DomainsPage() {
   const router = useRouter();
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -205,6 +286,70 @@ export default function DomainsPage() {
     }
   };
 
+  const handleVerify = async (domain: Domain) => {
+    setActionLoading(`verify-${domain.threadId}`);
+    try {
+      const res = await fetch('/api/domains/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ threadId: domain.threadId }),
+      });
+
+      if (res.status === 401) {
+        router.replace('/admin/login');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+
+      const dataRecord = isRecord(data) ? data : null;
+      if (!res.ok || dataRecord?.success !== true) {
+        throw new Error((dataRecord && typeof dataRecord.error === 'string' && dataRecord.error) || 'Verification failed');
+      }
+
+      const summary = isVerificationSummary(dataRecord?.summary) ? dataRecord.summary : null;
+      const results = isVerificationResultArray(dataRecord?.results) ? dataRecord.results : [];
+      if (!summary) {
+        throw new Error('Verification failed');
+      }
+
+      const hasIssues = summary.dead > 0 || summary.errors > 0 || summary.contentMismatch > 0;
+      if (!hasIssues) {
+        toast.success(`Verification passed for ${summary.checkedSources} sources.`);
+      } else {
+        const issueParts = [
+          summary.dead > 0 ? `${summary.dead} dead` : '',
+          summary.errors > 0 ? `${summary.errors} errors` : '',
+          summary.contentMismatch > 0 ? `${summary.contentMismatch} content mismatches` : '',
+        ].filter(Boolean);
+        toast.warning(`Verification found issues: ${issueParts.join(', ')}.`);
+
+        const flagged = results
+          .filter(result => result.linkStatus === 'dead' || result.linkStatus === 'error' || result.contentStatus === 'mismatch')
+          .slice(0, 3)
+          .map((result) => {
+            try {
+              return new URL(result.url).hostname;
+            } catch {
+              return result.url;
+            }
+          })
+          .filter(Boolean);
+
+        if (flagged.length > 0) {
+          toast.info(`Check: ${flagged.join(', ')}`);
+        }
+      }
+    } catch (err) {
+      console.error('Verification failed:', err);
+      toast.error('Failed to verify sources');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const indexedCount = domains.filter(d => d.status === 'indexed').length;
   const crawlingCount = domains.filter(d => d.status === 'crawling').length;
   const errorCount = domains.filter(d => d.status === 'error').length;
@@ -328,8 +473,9 @@ export default function DomainsPage() {
             <DomainTable
               domains={domains}
               onReindex={handleReindex}
+              onVerify={handleVerify}
               onDelete={handleDelete}
-              isLoading={!!crawlProgress?.active}
+              isLoading={!!crawlProgress?.active || Boolean(actionLoading?.startsWith('verify-'))}
             />
           )}
         </CardContent>

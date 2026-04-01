@@ -10,6 +10,20 @@ import { revalidatePath } from 'next/cache';
 import { LogoUpload } from '@/components/admin/LogoUpload';
 import { Badge } from '@/components/ui/badge';
 
+/**
+ * Process admin settings form submission, persist the updated configuration, and revalidate the admin settings page.
+ *
+ * Reads branding, AI model, embeddings, reranking, Tavily, Deepgram (voice), and Uploadthing fields from `formData`,
+ * parsing and clamping numeric values where applicable (for example: `chatTemperature` clamped to [0, 2], `chatMaxSteps`
+ * clamped to [1, 20], `rerankTopK` clamped to [1, 20]). Blank string fields are persisted as `undefined`. Administrative
+ * access is required before making changes.
+ *
+ * @param formData - FormData from the admin settings form containing fields such as `appName`, `brandPrimary`, `brandSecondary`,
+ *   `iconType`, `chatModel`, `chatBaseUrl`, `chatApiKey`, `chatMaxTokens`, `chatMaxSteps`, `chatTemperature`,
+ *   `embeddingModel`, `embeddingDimensions`, `embeddingApiKey`, `rerankModel`, `rerankTopK`, `tavilyApiKey`,
+ *   `deepgramApiKey`, `deepgramTokenTtl`, `deepgramSttModel`, `deepgramTtsModel`, `deepgramThinkModel`,
+ *   `uploadthingSecret`, and `uploadthingAppId`.
+ */
 async function saveSettings(formData: FormData) {
   'use server';
 
@@ -25,6 +39,10 @@ async function saveSettings(formData: FormData) {
 
   const chatMaxTokens = parseInt(formData.get('chatMaxTokens') as string) || 32000;
   const chatMaxSteps = Math.min(20, Math.max(1, parseInt(formData.get('chatMaxSteps') as string) || 5));
+  const parsedChatTemperature = parseFloat(formData.get('chatTemperature') as string);
+  const chatTemperature = Number.isFinite(parsedChatTemperature)
+    ? Math.min(2, Math.max(0, parsedChatTemperature))
+    : existing?.chatConfig?.temperature ?? env.CHAT_TEMPERATURE;
   const chatModel = (formData.get('chatModel') as string).trim();
   const chatBaseUrl = (formData.get('chatBaseUrl') as string).trim();
   const chatApiKeyInput = formData.get('chatApiKey') as string;
@@ -63,6 +81,7 @@ async function saveSettings(formData: FormData) {
     chatConfig: {
       maxTokens: chatMaxTokens,
       maxSteps: chatMaxSteps,
+      temperature: chatTemperature,
       model: chatModel || undefined,
       baseUrl: chatBaseUrl || undefined,
       apiKey: chatApiKey || undefined,
@@ -91,6 +110,14 @@ async function saveSettings(formData: FormData) {
   revalidatePath('/admin/settings');
 }
 
+/**
+ * Render the admin settings page for configuring site appearance, AI models, and service credentials.
+ *
+ * Loads persisted settings (requires admin access), derives UI defaults (falling back to environment values),
+ * and returns a form that allows updating branding, chat/embedding/reranking models, Tavily, Deepgram, and Uploadthing settings.
+ *
+ * @returns A JSX element containing the admin settings form and system status overview.
+ */
 export default async function AdminSettingsPage() {
   await requireAdmin();
   const settings = await getSettings();
@@ -104,6 +131,7 @@ export default async function AdminSettingsPage() {
 
   const chatMaxTokens = settings?.chatConfig?.maxTokens || env.CHAT_MAX_TOKENS;
   const chatMaxSteps = settings?.chatConfig?.maxSteps || env.CHAT_MAX_STEPS;
+  const chatTemperature = settings?.chatConfig?.temperature ?? env.CHAT_TEMPERATURE;
   const chatModel = settings?.chatConfig?.model || env.CHAT_MODEL;
   const chatBaseUrl = settings?.chatConfig?.baseUrl || env.CHAT_BASE_URL || '';
   const hasChatKeyInSettings = Boolean(settings?.chatConfig?.apiKey);
@@ -275,7 +303,7 @@ export default async function AdminSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Chat</div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="chatMaxTokens">Max Output Tokens</Label>
                 <Input
@@ -304,6 +332,22 @@ export default async function AdminSettingsPage() {
                 />
                 <p className="text-xs text-muted-foreground">
                   Maximum tool calls per response
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="chatTemperature">Temperature</Label>
+                <Input
+                  id="chatTemperature"
+                  name="chatTemperature"
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  defaultValue={chatTemperature}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  0 is deterministic, higher values are more creative
                 </p>
               </div>
             </div>

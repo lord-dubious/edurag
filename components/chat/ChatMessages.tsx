@@ -54,6 +54,7 @@ interface Source {
   url: string;
   title?: string;
   content: string;
+  sourceType?: 'vector' | 'web';
 }
 
 interface Props {
@@ -63,15 +64,59 @@ interface Props {
   onRegenerate: () => void;
 }
 
+/**
+ * Normalize and validate a URL string and return it only for `http` or `https` schemes.
+ *
+ * @returns The normalized URL string if `url` parses and has protocol `http:` or `https:`, `null` otherwise.
+ */
+function getSafeHref(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extracts a sanitized hostname from a URL string, removing a leading `www.`.
+ *
+ * @param url - The input URL string to parse.
+ * @returns The hostname with a leading `www.` removed, or `"source"` if the URL cannot be parsed or yields an empty hostname.
+ */
+function getSourceHostname(url: string): string {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '');
+    return hostname || 'source';
+  } catch {
+    return 'source';
+  }
+}
+
+/**
+ * Renders a clickable citation "chip" that displays a numbered badge and a title and links to the source when the URL is safe.
+ *
+ * The component uses the provided `customTitle` if present, otherwise falls back to `source.title` or a hostname-derived label. If the source URL is not an http(s) URL, the chip renders a placeholder link (`'#'`) and prevents navigation; the tooltip indicates when the source URL is unavailable.
+ *
+ * @param index - Zero-based citation index (displayed as `index + 1` in the badge)
+ * @param source - Source metadata containing at least `url` and optionally `title`/`content`
+ * @param customTitle - Optional override for the displayed title
+ * @returns The JSX element representing the citation chip
+ */
 function CitationChip({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
-  const displayTitle = customTitle || source.title || new URL(source.url).hostname;
+  const safeHref = getSafeHref(source.url);
+  const displayTitle = customTitle || source.title || getSourceHostname(source.url);
   return (
     <a
-      href={source.url}
+      href={safeHref ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={safeHref ? undefined : (event) => event.preventDefault()}
       className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-[11px] font-medium text-primary hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer no-underline group"
-      title={source.url}
+      title={safeHref ?? 'Unavailable source URL'}
     >
       <span className="flex size-[16px] shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-mono text-primary-foreground group-hover:bg-primary-foreground/30 transition-colors">
         {index + 1}
@@ -81,15 +126,24 @@ function CitationChip({ index, source, customTitle }: { index: number; source: S
   );
 }
 
+/**
+ * Render a clickable source card showing a numbered badge, title, truncated snippet, and domain.
+ *
+ * @param index - Zero-based index of the source (used to render the 1-based badge).
+ * @param source - The citation source object containing at least `url` and `content`; `title` may be present.
+ * @param customTitle - Optional override for the displayed title; used instead of `source.title` or the hostname.
+ * @returns The JSX anchor element for the styled source card; links to the source URL when it is a safe http(s) href. */
 function SourceCard({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
-  const domain = new URL(source.url).hostname.replace('www.', '');
+  const safeHref = getSafeHref(source.url);
+  const domain = getSourceHostname(source.url);
   const displayTitle = customTitle || source.title || domain;
 
   return (
     <a
-      href={source.url}
+      href={safeHref ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={safeHref ? undefined : (event) => event.preventDefault()}
       className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-accent/50 transition-colors cursor-pointer no-underline"
     >
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -143,6 +197,17 @@ const RenderedMessage = memo(function RenderedMessage({ text, sources }: { text:
   );
 }, (prev, next) => prev.text === next.text && prev.sources === next.sources);
 
+/**
+ * Render the chat transcript including message bubbles, source panels, and per-assistant actions.
+ *
+ * Renders an empty-state when there are no messages. For each message it displays text parts, tool progress rows, a voice-handoff note, and — for assistant messages with attached sources — a compact sources panel with up to six source cards. When the last assistant message is ready it shows Copy and Regenerate actions.
+ *
+ * @param messages - Array of UIMessage objects representing the chat transcript
+ * @param sources - Mapping from message id to an array of Source entries used to render citation chips and source cards
+ * @param status - Current chat status; controls rendering of action buttons and certain fallbacks
+ * @param onRegenerate - Callback invoked when the user triggers the "Regenerate" action
+ * @returns The rendered chat messages React element
+ */
 export function ChatMessages({ messages, sources, status, onRegenerate }: Props) {
 
   if (messages.length === 0) {
@@ -206,13 +271,16 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
                         return <RenderedMessage key={`${message.id}-${i}`} text={text} sources={msgSources} />;
                       }
                       if (part.type.startsWith('tool-')) {
+                        const toolLabel = part.type === 'tool-web_search'
+                          ? 'Searching web fallback...'
+                          : 'Searching knowledge base...';
                         return (
                           <div key={`${message.id}-${i}`} className="flex items-center gap-2 text-sm text-muted-foreground px-4 py-2">
                             <svg className="animate-spin size-4" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                             </svg>
-                            <span>Searching knowledge base...</span>
+                            <span>{toolLabel}</span>
                           </div>
                         );
                       }
