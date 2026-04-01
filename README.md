@@ -193,7 +193,7 @@ edurag/
 ├── app/
 │   ├── (public)/
 │   │   ├── chat/page.tsx         # Student text chat UI
-│   │   ├── voice/page.tsx        # Student voice agent UI
+│   │   ├── (voice mode is integrated in chat/page.tsx via ?voice=1)
 │   │   └── page.tsx              # Landing page
 │   ├── admin/
 │   │   ├── layout.tsx            # Auth guard
@@ -210,6 +210,8 @@ edurag/
 │       ├── crawl/route.ts        # SSE crawl progress
 │       ├── domains/route.ts      # Domain CRUD
 │       ├── faqs/route.ts         # Public FAQs
+│       ├── history/route.ts      # Conversation list
+│       ├── history/[threadId]/route.ts # Conversation read/append/delete
 │       └── threads/route.ts      # Thread deletion
 ├── lib/
 │   ├── voice/                    # Deepgram & Voice logic
@@ -240,7 +242,7 @@ edurag/
 ### Student Chat
 
 1. Navigate to `/chat` for text-based interaction.
-2. Navigate to `/voice` for real-time voice interaction.
+2. Start voice by clicking the phone button in `/chat` (or open `/chat?voice=1`).
 3. Ask questions about the university and view cited answers.
 4. Session history is saved automatically in the sidebar.
 
@@ -286,6 +288,14 @@ Public FAQ list (ISR cached).
 ### GET|POST|DELETE `/api/domains`
 
 Admin-only domain registry CRUD.
+
+### GET `/api/history`
+
+Authenticated conversation list for the current user.
+
+### GET|POST|DELETE `/api/history/[threadId]`
+
+Authenticated conversation read/append/delete for a single thread.
 
 ### DELETE `/api/threads`
 

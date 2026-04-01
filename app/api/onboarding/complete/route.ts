@@ -27,6 +27,10 @@ function maskSecret(value: string | undefined): string {
   return '*'.repeat(value.length - 4) + value.slice(-4);
 }
 
+function maskedPresence(value: string | undefined): string {
+  return value ? '****' : '';
+}
+
 function sanitizeEnvValue(value: string | undefined | null): string | undefined {
   if (value === undefined || value === null) return undefined;
   return value.replace(/[\n\r]/g, '');
@@ -301,13 +305,13 @@ export async function POST(request: NextRequest): Promise<Response> {
 }
 
 /**
- * Provide onboarding status, selected saved settings, environment-variable availability, and current API key values.
+ * Provide onboarding status, selected saved settings, environment-variable availability, and masked API key presence.
  *
  * @returns A JSON HTTP `Response` whose body contains:
  * - `isOnboarded`: `true` if onboarding has been completed, `false` otherwise.
  * - `uniUrl`, `brandPrimary`, `brandSecondary`, `logoUrl`, `emoji`, `iconType`, `showTitle`, `appName`: selected stored settings (may be `undefined` if unset).
  * - `hasAllEnvVars`: `true` if all required environment variables are present, `false` otherwise.
- * - `apiKeys`: an object with the current environment values (or `''` when unset) for:
+ * - `apiKeys`: an object with non-secret config values plus masked presence indicators (`'****'` or `''`) for secrets:
  *   - `mongodbUri`, `chatApiKey`, `chatBaseUrl`, `chatModel`, `chatMaxTokens`, `chatMaxSteps`, `chatTemperature`,
  *     `embeddingApiKey`, `embeddingModel`, `embeddingDimensions`, `tavilyApiKey`.
  *   - `adminSecret`: set to `'****'` when `ADMIN_SECRET` is present, otherwise `''`.
@@ -327,18 +331,18 @@ export async function GET(): Promise<Response> {
       appName: settings?.appName,
       hasAllEnvVars: hasRequiredEnvVars(),
       apiKeys: {
-        mongodbUri: process.env.MONGODB_URI || '',
-        chatApiKey: process.env.CHAT_API_KEY || '',
+        mongodbUri: maskedPresence(process.env.MONGODB_URI),
+        chatApiKey: maskedPresence(process.env.CHAT_API_KEY),
         chatBaseUrl: process.env.CHAT_BASE_URL || '',
         chatModel: process.env.CHAT_MODEL || '',
         chatMaxTokens: process.env.CHAT_MAX_TOKENS || '',
         chatMaxSteps: process.env.CHAT_MAX_STEPS || '',
         chatTemperature: process.env.CHAT_TEMPERATURE || '',
-        embeddingApiKey: process.env.EMBEDDING_API_KEY || '',
+        embeddingApiKey: maskedPresence(process.env.EMBEDDING_API_KEY),
         embeddingModel: process.env.EMBEDDING_MODEL || '',
         embeddingDimensions: process.env.EMBEDDING_DIMENSIONS || '',
-        tavilyApiKey: process.env.TAVILY_API_KEY || '',
-        adminSecret: process.env.ADMIN_SECRET ? '****' : '',
+        tavilyApiKey: maskedPresence(process.env.TAVILY_API_KEY),
+        adminSecret: maskedPresence(process.env.ADMIN_SECRET),
       },
     });
   } catch (error) {

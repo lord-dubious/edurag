@@ -7,10 +7,14 @@ export async function GET() {
     const settings = await getSettings();
     return NextResponse.json({
       isOnboarded: settings?.onboarded ?? false,
-      settings: settings,
       uniUrl: settings?.uniUrl,
+      appName: settings?.appName,
       brandPrimary: settings?.brandPrimary,
+      brandSecondary: settings?.brandSecondary,
       logoUrl: settings?.brandLogoUrl,
+      iconType: settings?.iconType,
+      showTitle: settings?.showTitle ?? true,
+      crawlStatus: settings?.crawlStatus ?? null,
     });
   } catch (error) {
     return errorResponse('DB_ERROR', 'Failed to get onboarding status', 500, error);

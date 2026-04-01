@@ -24,6 +24,19 @@ interface FileTypeRules {
   csv: 'index' | 'skip';
 }
 
+function isMaskedPlaceholder(value: string | undefined): boolean {
+  if (!value) return false;
+  return /^\*+$/.test(value.trim());
+}
+
+function resolveApiKeyValue(value: string | undefined, envValue: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed || isMaskedPlaceholder(trimmed)) {
+    return envValue?.trim();
+  }
+  return trimmed;
+}
+
 function sendProgress(controller: ReadableStreamDefaultController, data: CrawlProgress): void {
   const encoder = new TextEncoder();
   controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
@@ -104,11 +117,11 @@ export async function POST(request: NextRequest): Promise<Response> {
     apiKeys = {},
   } = body as unknown as CrawlRequestBody;
 
-  const embeddingApiKey = apiKeys.embeddingApiKey || env.EMBEDDING_API_KEY;
+  const embeddingApiKey = resolveApiKeyValue(apiKeys.embeddingApiKey, env.EMBEDDING_API_KEY);
   const embeddingModel = apiKeys.embeddingModel || env.EMBEDDING_MODEL;
   const embeddingDimensions = apiKeys.embeddingDimensions || env.EMBEDDING_DIMENSIONS;
-  const tavilyApiKey = apiKeys.tavilyApiKey || env.TAVILY_API_KEY;
-  const mongodbUri = apiKeys.mongodbUri || env.MONGODB_URI;
+  const tavilyApiKey = resolveApiKeyValue(apiKeys.tavilyApiKey, env.TAVILY_API_KEY);
+  const mongodbUri = resolveApiKeyValue(apiKeys.mongodbUri, env.MONGODB_URI);
 
   if (!embeddingApiKey) {
     return errorResponse('VALIDATION_ERROR', 'Embedding API key is required', 400);
@@ -248,14 +261,25 @@ export async function POST(request: NextRequest): Promise<Response> {
               }
 
               for (let j = 0; j < chunks.length; j++) {
+                const chunk = chunks[j];
                 documents.push({
-                  content: chunks[j],
+                  text: chunk,
+                  content: chunk,
                   url: page.url,
                   title,
                   sourceType: isExternal ? 'external' : 'university',
                   chunkIndex: j,
                   totalChunks: chunks.length,
                   embedding: embeddingsArray[j],
+                  metadata: {
+                    url: page.url,
+                    title,
+                    sourceType: isExternal ? 'external' : 'university',
+                    chunkIndex: j,
+                    totalChunks: chunks.length,
+                    baseUrl,
+                    content: chunk,
+                  },
                   crawledAt: new Date(),
                   updatedAt: new Date(),
                 });
