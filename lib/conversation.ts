@@ -48,6 +48,17 @@ export async function getHistory(threadId: string, userId?: string): Promise<Mes
   return conversation?.messages ?? [];
 }
 
+/**
+ * Appends a message to the conversation identified by `threadId`, creating the conversation if it does not exist.
+ *
+ * If a conversation exists and has a `userId` that differs from the provided `userId`, the function throws an error.
+ * If the conversation exists without a `userId` and a `userId` is provided, the conversation's `userId` will be set.
+ *
+ * @param threadId - The identifier of the conversation thread to update or create
+ * @param message - The message to append to the conversation's messages array
+ * @param userId - Optional user identifier used for authorization and, if the conversation has no owner, to assign ownership
+ * @throws Error if the existing conversation is owned by a different user than `userId`
+ */
 export async function appendMessage(threadId: string, message: Message, userId?: string): Promise<void> {
   const collection = await getConversationsCollection();
   const existing = await collection.findOne({ threadId });

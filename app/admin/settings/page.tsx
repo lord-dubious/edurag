@@ -10,6 +10,20 @@ import { revalidatePath } from 'next/cache';
 import { LogoUpload } from '@/components/admin/LogoUpload';
 import { Badge } from '@/components/ui/badge';
 
+/**
+ * Process admin settings form submission, persist the updated configuration, and revalidate the admin settings page.
+ *
+ * Reads branding, AI model, embeddings, reranking, Tavily, Deepgram (voice), and Uploadthing fields from `formData`,
+ * parsing and clamping numeric values where applicable (for example: `chatTemperature` clamped to [0, 2], `chatMaxSteps`
+ * clamped to [1, 20], `rerankTopK` clamped to [1, 20]). Blank string fields are persisted as `undefined`. Administrative
+ * access is required before making changes.
+ *
+ * @param formData - FormData from the admin settings form containing fields such as `appName`, `brandPrimary`, `brandSecondary`,
+ *   `iconType`, `chatModel`, `chatBaseUrl`, `chatApiKey`, `chatMaxTokens`, `chatMaxSteps`, `chatTemperature`,
+ *   `embeddingModel`, `embeddingDimensions`, `embeddingApiKey`, `rerankModel`, `rerankTopK`, `tavilyApiKey`,
+ *   `deepgramApiKey`, `deepgramTokenTtl`, `deepgramSttModel`, `deepgramTtsModel`, `deepgramThinkModel`,
+ *   `uploadthingSecret`, and `uploadthingAppId`.
+ */
 async function saveSettings(formData: FormData) {
   'use server';
 
@@ -96,6 +110,14 @@ async function saveSettings(formData: FormData) {
   revalidatePath('/admin/settings');
 }
 
+/**
+ * Render the admin settings page for configuring site appearance, AI models, and service credentials.
+ *
+ * Loads persisted settings (requires admin access), derives UI defaults (falling back to environment values),
+ * and returns a form that allows updating branding, chat/embedding/reranking models, Tavily, Deepgram, and Uploadthing settings.
+ *
+ * @returns A JSX element containing the admin settings form and system status overview.
+ */
 export default async function AdminSettingsPage() {
   await requireAdmin();
   const settings = await getSettings();

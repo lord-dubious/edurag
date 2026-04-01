@@ -33,6 +33,12 @@ type SearchOutputPart = {
   };
 };
 
+/**
+ * Check whether a PartRecord represents a text part with a string payload.
+ *
+ * @param part - The part to inspect
+ * @returns `true` if `part.type` is `'text'` and `part.text` is a string, `false` otherwise.
+ */
 function isTextPart(part: PartRecord): part is { type: 'text'; text: string } {
   return part.type === 'text' && typeof part.text === 'string';
 }
@@ -41,6 +47,12 @@ function isToolPart(part: PartRecord): part is { type: `tool-${string}`; toolNam
   return typeof part.type === 'string' && part.type.startsWith('tool-');
 }
 
+/**
+ * Convert internal PartRecord entries into UI-friendly message parts.
+ *
+ * @param parts - Array of internal part records to convert
+ * @returns An array where text parts are normalized to `{ type: 'text', text }`, tool parts are preserved as `ToolUIPart`, and unrecognized parts are rendered as text parts containing their JSON representation
+ */
 function convertToUIMessageParts(parts: PartRecord[]): Array<TextUIPart | ToolUIPart> {
   return parts.map((part): TextUIPart | ToolUIPart => {
     if (isTextPart(part)) {
@@ -53,10 +65,22 @@ function convertToUIMessageParts(parts: PartRecord[]): Array<TextUIPart | ToolUI
   });
 }
 
+/**
+ * Determine whether a UI message part represents a text part.
+ *
+ * @param part - The UI message part to test
+ * @returns `true` if the part is a `TextUIPart`, `false` otherwise.
+ */
 function isResponseTextPart(part: UIMessagePartLike): part is TextUIPart {
   return part.type === 'text' && typeof (part as { text?: unknown }).text === 'string';
 }
 
+/**
+ * Determines whether a UI message part is a search tool output with results available.
+ *
+ * @param part - The message part to test
+ * @returns `true` if `part.type` is `'tool-vector_search'` or `'tool-web_search'` and `part.state` equals `'output-available'`, `false` otherwise
+ */
 function isSearchOutputPart(part: UIMessagePartLike): part is SearchOutputPart {
   return (
     (part.type === 'tool-vector_search' || part.type === 'tool-web_search') &&
@@ -64,6 +88,12 @@ function isSearchOutputPart(part: UIMessagePartLike): part is SearchOutputPart {
   );
 }
 
+/**
+ * Concatenates the text content of all response text parts into a single string.
+ *
+ * @param parts - Array of UI message parts; only parts recognized as response text parts contribute text
+ * @returns The combined text from response text parts in original order, or an empty string if none are present
+ */
 function extractAssistantText(parts: UIMessagePartLike[]): string {
   return parts
     .filter(isResponseTextPart)
@@ -71,6 +101,14 @@ function extractAssistantText(parts: UIMessagePartLike[]): string {
     .join('');
 }
 
+/**
+ * Extracts structured Source entries from assistant message parts that contain completed search tool outputs.
+ *
+ * Iterates search output parts (web or vector) and returns an array of Source objects for each result that provides non-empty trimmed `content`. Each Source includes `content`, `url` (empty string if missing), optional `title` (omitted when empty), optional finite numeric `score`, and `sourceType` inferred as `'web'` for `tool-web_search` or `'vector'` for `tool-vector_search`.
+ *
+ * @param parts - Array of UI message parts which may include search tool output parts
+ * @returns An array of parsed Source objects derived from available search results; results lacking usable `content` are omitted
+ */
 function extractAssistantSources(parts: UIMessagePartLike[]): Source[] {
   const sources: Source[] = [];
 
@@ -117,6 +155,14 @@ function extractAssistantSources(parts: UIMessagePartLike[]): Source[] {
   return sources;
 }
 
+/**
+ * Handle POST /chat requests: validate the payload, run the agent, stream the agent's UI message response, and persist conversation changes.
+ *
+ * Validates the incoming JSON body, ensures the last message is a user message, and derives the user's text. Starts background tasks (FAQ tracking and optional conversation title generation). Converts incoming messages to UI-ready messages, loads settings, runs the agent, and returns a streamed UI message response. After the stream completes, conditionally persists the assistant's final message and its sources when there is an authenticated user and the run is not aborted or a continuation; if the assistant's sources are empty, attempts to inherit sources from the immediately preceding assistant message.
+ *
+ * @param req - The incoming HTTP request containing the chat payload
+ * @returns An HTTP response that streams the agent's UI message output on success, or an error response with a standardized error code on validation or agent failure
+ */
 export async function POST(req: Request) {
   let body: z.infer<typeof bodySchema>;
   try {

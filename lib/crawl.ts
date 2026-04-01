@@ -96,6 +96,14 @@ function isQualityChunk(content: string): boolean {
   return true;
 }
 
+/**
+ * Crawls the given URL, extracts and cleans page content, splits content into quality chunks, and indexes those chunks into the configured MongoDB vector store.
+ *
+ * This function may delete existing vector records tied to the provided `threadId` (and matching `metadata.threadId` or `metadata.baseUrl` for that thread) before inserting newly created vectors when new documents are produced.
+ *
+ * @param opts - Crawl and vectorization options (includes `url`, `threadId`, optional crawl limits and filters, and an optional `onProgress` callback)
+ * @returns The number of document chunks added to the vector store
+ */
 export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
   const settings = await getSettings();
   const tavilyApiKey = settings?.tavilyApiKey || env.TAVILY_API_KEY;
@@ -191,6 +199,12 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
   return documents.length;
 }
 
+/**
+ * Delete vector records associated with a crawl thread from the configured MongoDB collection.
+ *
+ * @param threadId - The crawl thread identifier to match against top-level `threadId` or nested `metadata.threadId`
+ * @returns The number of documents removed from the collection
+ */
 export async function deleteCrawlData(threadId: string): Promise<number> {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
   const result = await collection.deleteMany({

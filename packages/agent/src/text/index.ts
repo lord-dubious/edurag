@@ -15,6 +15,12 @@ export interface AgentDependencies {
     temperature: number;
 }
 
+/**
+ * Extracts the most recent non-empty user message text from a conversation.
+ *
+ * @param messages - Conversation message list to scan (searched from newest to oldest)
+ * @returns The trimmed concatenation of the most recent user's text parts joined with `\n`, or an empty string if no user text is found
+ */
 function getLatestUserText(messages: AgentOptions['messages']): string {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
         const message = messages[i];
@@ -37,6 +43,14 @@ function getLatestUserText(messages: AgentOptions['messages']): string {
     return '';
 }
 
+/**
+ * Extracts a list of question strings from a freeform text input.
+ *
+ * Parses the input to find candidate questions in two ways: substrings ending with '?' and lines formatted as bullets or numbered list items. Deduplicates candidates case-insensitively while preserving the first occurrence's original casing. If no candidates are found, returns the normalized input as a single-item array; if the input is blank after trimming, returns an empty array.
+ *
+ * @param input - Freeform text that may contain one or more questions (question-mark sentences, bullet lines, or numbered list lines)
+ * @returns An array of extracted question strings, deduplicated and whitespace-normalized; empty array when `input` is blank
+ */
 function extractQuestionList(input: string): string[] {
     if (!input.trim()) {
         return [];
@@ -64,6 +78,24 @@ function extractQuestionList(input: string): string[] {
     return [input.replace(/\s+/g, ' ').trim()];
 }
 
+/**
+ * Configure and run the streaming AI agent using the provided dependencies and options.
+ *
+ * Builds a system prompt (including the current date and, when multiple questions are detected
+ * in the latest user message, a multi-question instruction), selects tools (including an optional
+ * `web_search` tool when provided), adapts the step limit based on detected question count, and
+ * invokes `streamText` to produce the streaming response.
+ *
+ * @param deps - Runtime dependencies required by the agent (model, search functions, etc.).
+ * @param messages - Conversation messages to seed the agent's context; the latest user message is scanned to detect questions.
+ * @param universityName - Display name to substitute into the system prompt; defaults to "University Knowledge Base".
+ * @param extraTools - Additional tool definitions to merge into the agent's toolset.
+ * @param maxSteps - Optional override for the maximum reasoning steps; adaptive logic may increase this when multiple questions are detected.
+ * @param maxTokens - Optional override for the maximum output token limit.
+ * @param temperature - Optional override for the model temperature.
+ * @param onFinish - Optional callback forwarded to the streaming runner.
+ * @returns The streaming result produced by `streamText`, configured with the constructed system prompt, tools, temperature, token limit, and adaptive stop condition.
+ */
 export async function runAgent(
     deps: AgentDependencies,
     {

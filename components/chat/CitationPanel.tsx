@@ -11,6 +11,12 @@ interface Props {
   sources: Source[];
 }
 
+/**
+ * Validate and normalize a URL, returning it only if it uses the HTTP or HTTPS scheme.
+ *
+ * @param url - The input URL string to validate and normalize
+ * @returns The normalized URL string if its protocol is `http:` or `https:`, `null` otherwise
+ */
 function getSafeHref(url: string): string | null {
   try {
     const parsed = new URL(url);
@@ -23,6 +29,12 @@ function getSafeHref(url: string): string | null {
   }
 }
 
+/**
+ * Extracts a display-friendly hostname from a URL.
+ *
+ * @param url - The input URL string to parse
+ * @returns The hostname with a leading `www.` removed, or `'source'` if the URL cannot be parsed or hostname is empty
+ */
 function getSourceHostname(url: string): string {
   try {
     const hostname = new URL(url).hostname.replace('www.', '');
@@ -32,6 +44,20 @@ function getSourceHostname(url: string): string {
   }
 }
 
+/**
+ * Produce a short, display-safe preview string from source content.
+ *
+ * The function strips HTML tags and markdown links, collapses whitespace, and trims the result.
+ * If the content is falsy or the cleaned text is too short, returns "Content preview not available".
+ * If the text appears to be navigation-heavy, attempts to extract a meaningful sentence; if none is found,
+ * returns "View page for details".
+ * If the cleaned text exceeds `maxLength`, truncates at `maxLength` then backtracks to the previous space
+ * (if any) and appends an ellipsis.
+ *
+ * @param content - The raw source content to clean and shorten
+ * @param maxLength - Maximum number of characters for the preview (defaults to 150)
+ * @returns A display-safe preview string, or one of the sentinel messages `"Content preview not available"` or `"View page for details"`
+ */
 function cleanSourcePreview(content: string, maxLength = 150): string {
   if (!content) return 'Content preview not available';
 
@@ -68,6 +94,14 @@ function cleanSourcePreview(content: string, maxLength = 150): string {
   return truncated.slice(0, lastSpace > 0 ? lastSpace : maxLength) + '...';
 }
 
+/**
+ * Render a right-side panel listing citation sources.
+ *
+ * Displays a compact, scrollable list of provided sources with a numeric badge, title (or hostname fallback), source type chip ("Web" or "KB"), a short content preview, and the source hostname. Shows a "Web fallback" badge when any source has `sourceType === 'web'`.
+ *
+ * @param sources - Array of citation sources to display. Links with non-HTTP/HTTPS URLs are rendered inert (href set to `#` and navigation prevented); valid `http`/`https` URLs open in a new tab.
+ * @returns A JSX element containing the sources panel, or `null` when `sources` is empty.
+ */
 export function CitationPanel({ sources }: Props) {
   if (sources.length === 0) return null;
   const hasWebFallback = sources.some(source => source.sourceType === 'web');

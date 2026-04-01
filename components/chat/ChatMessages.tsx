@@ -64,6 +64,11 @@ interface Props {
   onRegenerate: () => void;
 }
 
+/**
+ * Normalize and validate a URL string and return it only for `http` or `https` schemes.
+ *
+ * @returns The normalized URL string if `url` parses and has protocol `http:` or `https:`, `null` otherwise.
+ */
 function getSafeHref(url: string): string | null {
   try {
     const parsed = new URL(url);
@@ -76,6 +81,12 @@ function getSafeHref(url: string): string | null {
   }
 }
 
+/**
+ * Extracts a sanitized hostname from a URL string, removing a leading `www.`.
+ *
+ * @param url - The input URL string to parse.
+ * @returns The hostname with a leading `www.` removed, or `"source"` if the URL cannot be parsed or yields an empty hostname.
+ */
 function getSourceHostname(url: string): string {
   try {
     const hostname = new URL(url).hostname.replace('www.', '');
@@ -85,6 +96,16 @@ function getSourceHostname(url: string): string {
   }
 }
 
+/**
+ * Renders a clickable citation "chip" that displays a numbered badge and a title and links to the source when the URL is safe.
+ *
+ * The component uses the provided `customTitle` if present, otherwise falls back to `source.title` or a hostname-derived label. If the source URL is not an http(s) URL, the chip renders a placeholder link (`'#'`) and prevents navigation; the tooltip indicates when the source URL is unavailable.
+ *
+ * @param index - Zero-based citation index (displayed as `index + 1` in the badge)
+ * @param source - Source metadata containing at least `url` and optionally `title`/`content`
+ * @param customTitle - Optional override for the displayed title
+ * @returns The JSX element representing the citation chip
+ */
 function CitationChip({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
   const safeHref = getSafeHref(source.url);
   const displayTitle = customTitle || source.title || getSourceHostname(source.url);
@@ -105,6 +126,13 @@ function CitationChip({ index, source, customTitle }: { index: number; source: S
   );
 }
 
+/**
+ * Render a clickable source card showing a numbered badge, title, truncated snippet, and domain.
+ *
+ * @param index - Zero-based index of the source (used to render the 1-based badge).
+ * @param source - The citation source object containing at least `url` and `content`; `title` may be present.
+ * @param customTitle - Optional override for the displayed title; used instead of `source.title` or the hostname.
+ * @returns The JSX anchor element for the styled source card; links to the source URL when it is a safe http(s) href. */
 function SourceCard({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
   const safeHref = getSafeHref(source.url);
   const domain = getSourceHostname(source.url);
@@ -169,6 +197,17 @@ const RenderedMessage = memo(function RenderedMessage({ text, sources }: { text:
   );
 }, (prev, next) => prev.text === next.text && prev.sources === next.sources);
 
+/**
+ * Render the chat transcript including message bubbles, source panels, and per-assistant actions.
+ *
+ * Renders an empty-state when there are no messages. For each message it displays text parts, tool progress rows, a voice-handoff note, and — for assistant messages with attached sources — a compact sources panel with up to six source cards. When the last assistant message is ready it shows Copy and Regenerate actions.
+ *
+ * @param messages - Array of UIMessage objects representing the chat transcript
+ * @param sources - Mapping from message id to an array of Source entries used to render citation chips and source cards
+ * @param status - Current chat status; controls rendering of action buttons and certain fallbacks
+ * @param onRegenerate - Callback invoked when the user triggers the "Regenerate" action
+ * @returns The rendered chat messages React element
+ */
 export function ChatMessages({ messages, sources, status, onRegenerate }: Props) {
 
   if (messages.length === 0) {

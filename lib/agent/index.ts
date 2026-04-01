@@ -21,6 +21,12 @@ interface TavilySearchResponseLike {
   results?: unknown;
 }
 
+/**
+ * Normalize whitespace in a search content string.
+ *
+ * @param input - Value to normalize; non-string values are treated as empty.
+ * @returns The input with consecutive whitespace collapsed to single spaces and trimmed; an empty string if `input` is not a string.
+ */
 function normalizeSearchContent(input: unknown): string {
   if (typeof input !== 'string') {
     return '';
@@ -31,6 +37,12 @@ function normalizeSearchContent(input: unknown): string {
     .trim();
 }
 
+/**
+ * Extracts the hostname from a URL string, stripping a leading `www.` if present.
+ *
+ * @param input - The URL string to parse (may be `undefined`)
+ * @returns The hostname without a leading `www.` if `input` is a valid URL, `null` otherwise
+ */
 function getHostname(input: string | undefined): string | null {
   if (!input) {
     return null;
@@ -43,6 +55,13 @@ function getHostname(input: string | undefined): string | null {
   }
 }
 
+/**
+ * Appends the institution name to a search query when both are non-empty and the query does not already contain the institution name.
+ *
+ * @param query - The original search query
+ * @param institutionName - The institution name to append if it is not already present in `query` (case-insensitive)
+ * @returns The resulting query: if one input is empty, returns the other; if `query` already contains `institutionName` (case-insensitive), returns `query`; otherwise returns `query` and `institutionName` joined by a single space
+ */
 function buildContextualWebQuery(query: string, institutionName: string): string {
   const normalizedQuery = query.trim();
   const normalizedInstitution = institutionName.trim();
@@ -62,6 +81,12 @@ function buildContextualWebQuery(query: string, institutionName: string): string
   return `${normalizedQuery} ${normalizedInstitution}`;
 }
 
+/**
+ * Configure and execute the conversational agent using provided options and persisted settings.
+ *
+ * @param options - Agent runtime options (controls model overrides, maxSteps, maxTokens, temperature, and optional universityName used to contextualize web searches).
+ * @returns The agent execution result produced by the runner (response payload from the agent).
+ */
 export async function runAgent(options: AgentOptions) {
   const settings = await getSettings();
   const institutionName = (options.universityName || settings?.appName || '').trim();
