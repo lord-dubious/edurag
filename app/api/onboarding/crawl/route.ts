@@ -115,7 +115,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     fileTypeRules = { pdf: 'index', docx: 'index', csv: 'skip' },
     crawlerInstructions = '',
     apiKeys = {},
-  } = body as unknown as CrawlRequestBody;
+  } = body as CrawlRequestBody;
 
   const embeddingApiKey = resolveApiKeyValue(apiKeys.embeddingApiKey, env.EMBEDDING_API_KEY);
   const embeddingModel = apiKeys.embeddingModel || env.EMBEDDING_MODEL;
@@ -136,10 +136,6 @@ export async function POST(request: NextRequest): Promise<Response> {
   const maxDepth = crawlConfig.maxDepth ?? 3;
   const maxBreadth = crawlConfig.maxBreadth ?? 50;
   const limit = crawlConfig.limit ?? 300;
-
-  if (!universityUrl) {
-    return errorResponse('VALIDATION_ERROR', 'University URL is required', 400);
-  }
 
   const stream = new ReadableStream({
     async start(controller) {
