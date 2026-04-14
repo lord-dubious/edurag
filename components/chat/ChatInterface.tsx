@@ -33,12 +33,6 @@ interface SearchToolPartWithOutput {
 
 type MessagePart = { type: string; state?: string; output?: unknown };
 
-/**
- * Determines whether a message part represents a completed search tool output.
- *
- * @param part - The message part to inspect
- * @returns `true` if `part` is a `tool-vector_search` or `tool-web_search` with `state` equal to `'output-available'` and an `output` property, `false` otherwise.
- */
 function isSearchToolPart(part: MessagePart): part is SearchToolPartWithOutput {
   return (
     (part.type === 'tool-vector_search' || part.type === 'tool-web_search') &&
@@ -47,19 +41,6 @@ function isSearchToolPart(part: MessagePart): part is SearchToolPartWithOutput {
   );
 }
 
-/**
- * Extracts validated source records from message parts produced by search tools.
- *
- * Scans the provided message parts for outputs from `tool-vector_search` or
- * `tool-web_search`, validates each result object, and converts valid entries
- * into `Source` records containing `url`, `content`, optional `title` and
- * numeric `score`, and a `sourceType` of `"vector"` or `"web"`.
- *
- * @param parts - Message parts to inspect for search tool outputs
- * @returns An object with `sources` (the array of extracted `Source` records) and
- * `usedWebFallback` (`true` if any extracted source originated from a web search,
- * `false` otherwise)
- */
 function extractSourcesFromMessageParts(parts: MessagePart[]): { sources: Source[]; usedWebFallback: boolean } {
   let sources: Source[] = [];
   let usedWebFallback = false;
@@ -142,15 +123,6 @@ function pickSuggestions<T>(items: T[], count: number, seed: number): T[] {
   return shuffled.slice(0, count);
 }
 
-/**
- * Renders the main chat UI including message list, input/voice controls, history sidebar, and citation panel.
- *
- * The component manages thread state, history loading/saving, source extraction for assistant messages, suggestion prompts, and optional voice chat handoff behavior.
- *
- * @param initialQuery - Optional initial query to send automatically when the chat is ready and empty
- * @param initialVoice - If true, opens the voice chat UI and attempts auto-start on mount
- * @returns The chat interface React element
- */
 export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps) {
   const router = useRouter();
   const { data: session } = authClient.useSession();
@@ -412,7 +384,6 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar for History */}
       {session?.user && showHistory && (
         <div className="w-80 shrink-0 hidden md:flex flex-col border-r h-full">
           <HistorySidebar

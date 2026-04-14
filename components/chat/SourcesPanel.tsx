@@ -101,7 +101,6 @@ export function SourcesPanel({ sources, isOpen: externalIsOpen, onClose }: Sourc
 
   return (
     <>
-      {/* Desktop Slide-in Panel */}
       <div className="hidden lg:block">
         <div
           className={`fixed right-0 top-0 h-full w-80 border-l bg-background shadow-lg z-40 transform transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'
@@ -134,15 +133,18 @@ export function SourcesPanel({ sources, isOpen: externalIsOpen, onClose }: Sourc
         </div>
       </div>
 
-      {/* Mobile Sheet */}
       <div className="lg:hidden">
-        <Sheet open={open} onOpenChange={(v) => {
-          if (isControlled) {
-            if (!v) onClose?.();
-          } else {
+        <Sheet
+          open={open}
+          onOpenChange={(v) => {
+            if (isControlled) {
+              if (!v) onClose?.();
+              return;
+            }
+
             setInternalIsOpen(v);
-          }
-        }}>
+          }}
+        >
           <SheetContent side="bottom" className="h-[60vh]">
             <div className="flex items-center gap-2 mb-4">
               <FileTextIcon className="size-4 text-primary" />
