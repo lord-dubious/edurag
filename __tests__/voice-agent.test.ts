@@ -21,7 +21,6 @@ describe('Voice Agent Utilities', () => {
         - Minimum GPA: **3.0**
         - [Apply here](https://apply.edu)
       `;
-            // 'Requirements Minimum GPA: 3.0 Apply here'
             const output = stripMarkdownForVoice(input);
             expect(output).toContain('Requirements');
             expect(output).toContain('Minimum GPA: 3.0');

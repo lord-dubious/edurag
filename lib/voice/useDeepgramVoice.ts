@@ -59,14 +59,13 @@ export function useDeepgramVoice({
   const isPlayingRef = useRef(false);
   const audioStartedRef = useRef(false);
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const lastSearchResultsRef = useRef<string>('');
 
   const updateState = useCallback((newState: AgentState) => {
     setState(newState);
     onStateChange?.(newState);
   }, [onStateChange]);
 
-  const playAudioQueueRef = useRef<() => void>(() => { });
+  const playAudioQueueRef = useRef<() => void>(() => {});
 
   const playAudioQueue = useCallback(async () => {
     if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
@@ -216,7 +215,6 @@ export function useDeepgramVoice({
                 `${r.title ? r.title + ': ' : ''}${stripMarkdownForVoice(r.content)}`
               )
               .join('\n\n');
-            lastSearchResultsRef.current = plainTextContext;
 
             onRequestNotes?.(args.query);
 
@@ -347,14 +345,11 @@ export function useDeepgramVoice({
   const handleMessageRef = useRef(handleMessage);
   useEffect(() => { handleMessageRef.current = handleMessage; }, [handleMessage]);
 
-  const sendSettingsRef = useRef(sendSettings);
-  useEffect(() => { sendSettingsRef.current = sendSettings; }, [sendSettings]);
-
   const cleanupAudioResources = useCallback(() => {
     if (currentSourceRef.current) {
       try {
         currentSourceRef.current.stop();
-      } catch { }
+      } catch {}
       currentSourceRef.current = null;
     }
 
@@ -362,7 +357,7 @@ export function useDeepgramVoice({
       mediaStreamRef.current.getTracks().forEach(track => {
         try {
           track.stop();
-        } catch { }
+        } catch {}
       });
       mediaStreamRef.current = null;
     }
@@ -370,7 +365,7 @@ export function useDeepgramVoice({
     if (audioContextRef.current) {
       try {
         audioContextRef.current.close();
-      } catch { }
+      } catch {}
       audioContextRef.current = null;
     }
 
@@ -504,7 +499,7 @@ export function useDeepgramVoice({
     if (currentSourceRef.current) {
       try {
         currentSourceRef.current.stop();
-      } catch { }
+      } catch {}
       currentSourceRef.current = null;
     }
 

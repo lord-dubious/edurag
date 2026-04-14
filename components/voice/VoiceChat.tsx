@@ -102,8 +102,6 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
     return () => { controller.abort(); };
   }, []);
 
-
-
   const handleUserMessage = useCallback((text: string) => {
     setCurrentTranscript(text);
     if (text.trim()) {
@@ -180,20 +178,19 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   const isAuthError = lowerError.includes('logged in') || lowerError.includes('authentication required') || lowerError.includes('unauthorized');
   const isMicError = lowerError.includes('microphone') || lowerError.includes('mic') || lowerError.includes('notallowederror') || lowerError.includes('permission') || lowerError.includes('notfounderror');
   const isConnectionError = lowerError.includes('websocket') || lowerError.includes('connection closed') || lowerError.includes('network') || lowerError.includes('token');
-  const errorTitle = isAuthError
-    ? 'Sign in required'
-    : isMicError
-      ? 'Microphone access blocked'
-      : isConnectionError
-        ? 'Voice connection failed'
-        : errorMessage || 'Something went wrong';
-  const errorBody = isAuthError
-    ? 'Please sign in to use voice chat.'
-    : isMicError
-      ? 'Allow microphone access in your browser settings, then try again.'
-      : isConnectionError
-        ? 'Check your network connection and try again.'
-        : 'Please try again.';
+  let errorTitle = errorMessage || 'Something went wrong';
+  let errorBody = 'Please try again.';
+
+  if (isAuthError) {
+    errorTitle = 'Sign in required';
+    errorBody = 'Please sign in to use voice chat.';
+  } else if (isMicError) {
+    errorTitle = 'Microphone access blocked';
+    errorBody = 'Allow microphone access in your browser settings, then try again.';
+  } else if (isConnectionError) {
+    errorTitle = 'Voice connection failed';
+    errorBody = 'Check your network connection and try again.';
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex flex-col pointer-events-auto">
