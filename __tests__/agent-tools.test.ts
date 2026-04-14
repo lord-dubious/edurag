@@ -42,9 +42,7 @@ describe('Agent Tools', () => {
       embeddingKey: 'embedding',
     });
 
-    console.log('Waiting 20s for Atlas Vector Search index refresh...');
     await new Promise(r => setTimeout(r, 20000));
-    console.log('Index refresh wait complete');
   }, 90000);
 
   afterAll(async () => {
@@ -68,7 +66,6 @@ describe('Agent Tools', () => {
     it('should return empty results for irrelevant queries', async () => {
       const results = await similaritySearchWithScore('quantum physics mars rover', 5);
 
-      console.log(`Irrelevant query returned ${results.length} results`);
     });
   });
 
@@ -85,12 +82,6 @@ describe('Agent Tools', () => {
         stopWhen: stepCountIs(3),
       });
 
-      console.log('Agent response:', result.text);
-      console.log(`Steps completed: ${result.steps.length}`);
-
-      const toolCalls = result.steps.flatMap(s => s.toolCalls || []);
-      console.log(`Tool calls made: ${toolCalls.length}`);
-
       expect(result.text.length).toBeGreaterThan(0);
     }, 60000);
 
@@ -106,12 +97,6 @@ describe('Agent Tools', () => {
         stopWhen: stepCountIs(3),
       });
 
-      console.log('Response:', result.text);
-
-      const toolResults = result.steps.flatMap(s => s.toolResults || []);
-      if (toolResults.length > 0) {
-        console.log('Tool results:', JSON.stringify(toolResults, null, 2));
-      }
     }, 120000);
   });
 });
