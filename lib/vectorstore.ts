@@ -61,7 +61,7 @@ export async function similaritySearchWithScore(
   query: string,
   k: number = 5
 ): Promise<[import('@langchain/core/documents').Document, number][]> {
-  k = Math.max(1, Math.floor(k));
+  const limit = Math.max(1, Math.floor(k));
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
   const settings = await getSettings();
   const embeddingConfig = settings?.embeddingConfig;
@@ -81,7 +81,7 @@ export async function similaritySearchWithScore(
 
   const queryEmbedding = await embeddingsInstance.embedQuery(query);
 
-  const broadK = Math.max(k * 4, 25);
+  const broadK = Math.max(limit * 4, 25);
   const allResults = await vectorStore.similaritySearchVectorWithScore(
     queryEmbedding,
     broadK
@@ -92,6 +92,13 @@ export async function similaritySearchWithScore(
   }
 
   let timerId: ReturnType<typeof setTimeout> | undefined;
+  const clearRerankTimer = () => {
+    if (timerId) {
+      clearTimeout(timerId);
+      timerId = undefined;
+    }
+  };
+
   try {
     const voyageClient = getVoyageClient(embeddingConfig?.apiKey);
 
@@ -103,7 +110,7 @@ export async function similaritySearchWithScore(
     const validResults = allResults.filter(([doc]) => doc.pageContent.trim().length > 0);
 
     if (validResults.length === 0) {
-      return allResults.slice(0, k);
+      return allResults.slice(0, limit);
     }
 
     const documents = validResults.map(([doc]) => doc.pageContent);
@@ -117,28 +124,27 @@ export async function similaritySearchWithScore(
         query,
         documents,
         model: rerankConfig?.model || env.RERANK_MODEL,
-        topK: Math.min(k, rerankConfig?.topK ?? env.RERANK_TOP_K),
+        topK: Math.min(limit, rerankConfig?.topK ?? env.RERANK_TOP_K),
         truncation: true,
       }),
       timeoutPromise,
     ]);
-    clearTimeout(timerId!);
+    clearRerankTimer();
 
     if (rerankResponse.data && rerankResponse.data.length > 0) {
       const rerankedResults = rerankResponse.data
-        .filter((item) => {
-          const idx = item.index ?? -1;
-          return idx >= 0 && idx < validResults.length;
+        .filter((item): item is { index: number; relevanceScore?: number } => {
+          const idx = item.index;
+          return typeof idx === 'number' && idx >= 0 && idx < validResults.length;
         })
         .map((item) => {
-          const idx = item.index!;
-          const [doc] = validResults[idx];
+          const [doc] = validResults[item.index];
           return [doc, item.relevanceScore ?? 0] as [typeof doc, number];
         });
 
       if (rerankedResults.length === 0) {
         console.warn('[rerank] Reranking returned no valid results, falling back to original vector search results');
-        return allResults.slice(0, k);
+        return allResults.slice(0, limit);
       }
 
       console.log(
@@ -154,11 +160,11 @@ export async function similaritySearchWithScore(
     }
 
     console.warn('[rerank] Reranking failed or returned empty data, falling back to original vector search results');
-    return allResults.slice(0, k);
+    return allResults.slice(0, limit);
   } catch (err) {
-    clearTimeout(timerId);
+    clearRerankTimer();
     console.error('[rerank] failed, falling back to vector search:', err);
-    return allResults.slice(0, k);
+    return allResults.slice(0, limit);
   }
 }
 
