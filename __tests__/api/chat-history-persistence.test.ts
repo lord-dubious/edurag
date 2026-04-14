@@ -17,7 +17,6 @@ type OnFinishEvent = {
 
 async function loadRoute(onFinishEvent: OnFinishEvent) {
   const appendMessage = vi.fn().mockResolvedValue(undefined);
-  const getConversation = vi.fn().mockResolvedValue({ title: 'Existing title' });
   const runAgent = vi.fn().mockResolvedValue({
     toUIMessageStreamResponse: async ({ onFinish }: { onFinish?: (event: OnFinishEvent) => Promise<void> | void }) => {
       if (onFinish) {
@@ -56,7 +55,7 @@ async function loadRoute(onFinishEvent: OnFinishEvent) {
   }));
   vi.doMock('@/lib/conversation', () => ({
     appendMessage,
-    getConversation,
+    getConversation: vi.fn().mockResolvedValue({ title: 'Existing title' }),
   }));
 
   const { POST } = await import('@/app/api/chat/route');
