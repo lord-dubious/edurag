@@ -4,7 +4,7 @@ import { getHistory, appendMessage, clearHistory, listConversations } from '../l
 import { closeMongoClient } from '../lib/vectorstore';
 import { env } from '../lib/env';
 
-const TEST_THREAD_ID = 'test-conv-thread-' + Date.now();
+const TEST_THREAD_ID = `test-conv-thread-${Date.now()}`;
 
 describe('Conversation Management', () => {
   let client: MongoClient;

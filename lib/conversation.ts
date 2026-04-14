@@ -41,7 +41,6 @@ export async function getHistory(threadId: string, userId?: string): Promise<Mes
   const collection = await getConversationsCollection();
   const query: Filter<ConversationDocument> = { threadId };
   if (userId) {
-    // Access own threads or anonymous threads
     query.$or = [{ userId }, { userId: { $exists: false } }, { userId: null }];
   }
   const conversation = await collection.findOne(query);
@@ -64,7 +63,6 @@ export async function appendMessage(threadId: string, message: Message, userId?:
   const existing = await collection.findOne({ threadId });
 
   if (existing) {
-    // Security check: If thread belongs to another user, prevent write.
     if (existing.userId && existing.userId !== userId) {
       console.error(`[appendMessage] Unauthorized write attempt to thread ${threadId} by user ${userId}`);
       throw new Error('Unauthorized: Cannot write to another user\'s thread');
