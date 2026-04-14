@@ -27,28 +27,24 @@ interface CrawlOptions {
 
 export function cleanContent(raw: string | null | undefined): string {
   if (!raw || typeof raw !== 'string') return '';
-  try {
-    return raw
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
-      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
-      .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-      .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
-      .replace(/\b(?:Skip to content|Main menu|Navigation|Search|Login|Sign in|Sign out|Menu|Close|Back to top|Print|Share|Font Size|A A A|High Contrast)\b/gi, '')
-      .replace(/We use cookies[^.]*\./gi, '')
-      .replace(/By using our website[^.]*\./gi, '')
-      .replace(/This site uses cookies[^.]*\./gi, '')
-      .replace(/Cookie Policy/gi, '')
-      .replace(/Accept All Cookies?/gi, '')
-      .replace(/Cookie Settings/gi, '')
-      .replace(/[ \t]+/g, ' ')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-  } catch {
-    return '';
-  }
+  return raw
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+    .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
+    .replace(/\b(?:Skip to content|Main menu|Navigation|Search|Login|Sign in|Sign out|Menu|Close|Back to top|Print|Share|Font Size|A A A|High Contrast)\b/gi, '')
+    .replace(/We use cookies[^.]*\./gi, '')
+    .replace(/By using our website[^.]*\./gi, '')
+    .replace(/This site uses cookies[^.]*\./gi, '')
+    .replace(/Cookie Policy/gi, '')
+    .replace(/Accept All Cookies?/gi, '')
+    .replace(/Cookie Settings/gi, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 export function extractTitle(rawContent: string | null | undefined, url: string): string {
@@ -63,17 +59,14 @@ export function extractTitle(rawContent: string | null | undefined, url: string)
   const titleMatch = rawContent.match(/<title[^>]*>([^<]+)<\/title>/i);
   if (titleMatch?.[1]) {
     const title = titleMatch[1].trim();
-    // Remove common suffixes like " | Site Name" or " - Site Name"
     return title.split(/[|\-–—]/)[0].trim().slice(0, 100);
   }
 
-  // Try first <h1>
   const h1Match = rawContent.match(/<h1[^>]*>([^<]+)<\/h1>/i);
   if (h1Match?.[1]) {
     return h1Match[1].trim().slice(0, 100);
   }
 
-  // Fallback to URL pathname
   try {
     const urlObj = new URL(url);
     const pathParts = urlObj.pathname.split('/').filter(Boolean);
@@ -96,14 +89,6 @@ function isQualityChunk(content: string): boolean {
   return true;
 }
 
-/**
- * Crawls the given URL, extracts and cleans page content, splits content into quality chunks, and indexes those chunks into the configured MongoDB vector store.
- *
- * This function may delete existing vector records tied to the provided `threadId` (and matching `metadata.threadId` or `metadata.baseUrl` for that thread) before inserting newly created vectors when new documents are produced.
- *
- * @param opts - Crawl and vectorization options (includes `url`, `threadId`, optional crawl limits and filters, and an optional `onProgress` callback)
- * @returns The number of document chunks added to the vector store
- */
 export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
   const settings = await getSettings();
   const tavilyApiKey = settings?.tavilyApiKey || env.TAVILY_API_KEY;
@@ -199,12 +184,6 @@ export async function crawlAndVectorize(opts: CrawlOptions): Promise<number> {
   return documents.length;
 }
 
-/**
- * Delete vector records associated with a crawl thread from the configured MongoDB collection.
- *
- * @param threadId - The crawl thread identifier to match against top-level `threadId` or nested `metadata.threadId`
- * @returns The number of documents removed from the collection
- */
 export async function deleteCrawlData(threadId: string): Promise<number> {
   const collection = await getMongoCollection(env.VECTOR_COLLECTION);
   const result = await collection.deleteMany({

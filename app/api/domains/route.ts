@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
   }
 
   const collection = await getMongoCollection(env.DOMAINS_COLLECTION);
-  
+
   const existing = await collection.findOne({ url: body.url });
   if (existing) {
     return errorResponse('VALIDATION_ERROR', 'Domain already exists', 400);

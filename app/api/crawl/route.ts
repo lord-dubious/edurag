@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
           onProgress: (page, total) => send({ type: 'progress', page, total }),
         });
 
-        // Update domain with document count
         const domainsCollection = await getMongoCollection(env.DOMAINS_COLLECTION);
         await domainsCollection.updateOne(
           { threadId: body.threadId },

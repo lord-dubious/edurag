@@ -21,7 +21,7 @@ describe('Crawl Pipeline', () => {
 
   it('should crawl a URL and vectorize content', async () => {
     const progressEvents: Array<{ page: number; total: number }> = [];
-    
+
     const docCount = await crawlAndVectorize({
       url: TEST_URL,
       threadId: TEST_THREAD_ID,
@@ -33,7 +33,6 @@ describe('Crawl Pipeline', () => {
       },
     });
 
-    console.log(`Crawled and indexed ${docCount} documents`);
     expect(docCount).toBeGreaterThan(0);
     expect(progressEvents.length).toBeGreaterThan(0);
   }, 120000);
@@ -41,13 +40,13 @@ describe('Crawl Pipeline', () => {
   it('should store documents with correct metadata', async () => {
     const db = client.db(env.DB_NAME);
     const collection = db.collection(env.VECTOR_COLLECTION);
-    
+
     const docs = await collection
       .find({ threadId: TEST_THREAD_ID })
       .toArray();
 
     expect(docs.length).toBeGreaterThan(0);
-    
+
     const firstDoc = docs[0];
     expect(firstDoc).toHaveProperty('text');
     expect(firstDoc).toHaveProperty('embedding');
@@ -57,7 +56,6 @@ describe('Crawl Pipeline', () => {
 
   it('should delete crawl data by thread ID', async () => {
     const deletedCount = await deleteCrawlData(TEST_THREAD_ID);
-    console.log(`Deleted ${deletedCount} documents`);
     expect(deletedCount).toBeGreaterThan(0);
   });
 });
