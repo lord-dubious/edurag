@@ -9,10 +9,8 @@ export const uploadRouter = {
       maxFileCount: 1,
     },
   })
-    .middleware(async () => {
-      return { uploadedAt: Date.now() };
-    })
-    .onUploadComplete(async ({ metadata, file }) => {
+    .middleware(() => ({ uploadedAt: Date.now() }))
+    .onUploadComplete(({ metadata, file }) => {
       console.log('[UploadThing] Logo upload complete:', file.ufsUrl);
       return { url: file.ufsUrl, uploadedAt: metadata.uploadedAt };
     }),
