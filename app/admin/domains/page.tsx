@@ -43,21 +43,10 @@ interface VerificationResult {
   contentStatus: string;
 }
 
-/**
- * Determines whether a value is a non-null object.
- *
- * @param value - The value to check.
- * @returns `true` if `value` is a non-null object, `false` otherwise.
- */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/**
- * Asserts whether a value conforms to the VerificationSummary shape.
- *
- * @returns `true` if `value` is a record containing finite numeric `checkedSources`, `dead`, `errors`, and `contentMismatch`, `false` otherwise.
- */
 function isVerificationSummary(value: unknown): value is VerificationSummary {
   if (!isRecord(value)) {
     return false;
@@ -75,12 +64,6 @@ function isVerificationSummary(value: unknown): value is VerificationSummary {
   );
 }
 
-/**
- * Determines whether a value matches the shape of a VerificationResult.
- *
- * @param value - The value to validate as a verification result
- * @returns `true` if `value` is a record with string `url`, `linkStatus`, and `contentStatus`; `false` otherwise.
- */
 function isVerificationResult(value: unknown): value is VerificationResult {
   return (
     isRecord(value) &&
@@ -90,26 +73,10 @@ function isVerificationResult(value: unknown): value is VerificationResult {
   );
 }
 
-/**
- * Determines whether a value is an array of verification result objects.
- *
- * @param value - The value to test
- * @returns `true` if `value` is an array and every element satisfies `VerificationResult`, `false` otherwise.
- */
 function isVerificationResultArray(value: unknown): value is VerificationResult[] {
   return Array.isArray(value) && value.every(isVerificationResult);
 }
 
-/**
- * Render the admin "Domains" management page and manage domain lifecycle actions.
- *
- * This client component displays domain statistics, a form to add domains, recent crawl activity,
- * an indexed domains table, and an active crawl progress view. It also handles fetching domains,
- * starting crawls (including reindexing), deleting domains, and verifying source URLs; it performs
- * client-side auth-checks and redirects to the admin login when the session token is missing or invalid.
- *
- * @returns The React element for the Domains admin UI (statistics, add form, recent crawls, indexed table, and crawl controls).
- */
 export default function DomainsPage() {
   const router = useRouter();
   const [domains, setDomains] = useState<Domain[]>([]);
@@ -253,7 +220,7 @@ export default function DomainsPage() {
                 ));
               }
             } catch {
-              // Skip malformed JSON
+              continue;
             }
           }
         }
