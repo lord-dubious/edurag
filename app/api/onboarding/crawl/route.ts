@@ -88,6 +88,52 @@ interface CrawlRequestBody {
   };
 }
 
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : undefined;
+}
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeCrawlRequestBody(body: Record<string, unknown>): CrawlRequestBody | null {
+  if (typeof body.universityUrl !== 'string' || body.universityUrl.trim().length === 0) {
+    return null;
+  }
+
+  const crawlConfigRecord = asRecord(body.crawlConfig);
+  const fileTypeRulesRecord = asRecord(body.fileTypeRules);
+  const apiKeysRecord = asRecord(body.apiKeys);
+
+  return {
+    universityUrl: body.universityUrl,
+    externalUrls: asStringArray(body.externalUrls),
+    excludePaths: asStringArray(body.excludePaths),
+    crawlConfig: crawlConfigRecord ? {
+      maxDepth: asNumber(crawlConfigRecord.maxDepth),
+      maxBreadth: asNumber(crawlConfigRecord.maxBreadth),
+      limit: asNumber(crawlConfigRecord.limit),
+    } : undefined,
+    fileTypeRules: fileTypeRulesRecord ? {
+      pdf: fileTypeRulesRecord.pdf === 'skip' ? 'skip' : 'index',
+      docx: fileTypeRulesRecord.docx === 'skip' ? 'skip' : 'index',
+      csv: fileTypeRulesRecord.csv === 'index' ? 'index' : 'skip',
+    } : undefined,
+    crawlerInstructions: typeof body.crawlerInstructions === 'string' ? body.crawlerInstructions : undefined,
+    apiKeys: apiKeysRecord ? {
+      embeddingApiKey: typeof apiKeysRecord.embeddingApiKey === 'string' ? apiKeysRecord.embeddingApiKey : undefined,
+      embeddingModel: typeof apiKeysRecord.embeddingModel === 'string' ? apiKeysRecord.embeddingModel : undefined,
+      embeddingDimensions: asNumber(apiKeysRecord.embeddingDimensions),
+      tavilyApiKey: typeof apiKeysRecord.tavilyApiKey === 'string' ? apiKeysRecord.tavilyApiKey : undefined,
+      mongodbUri: typeof apiKeysRecord.mongodbUri === 'string' ? apiKeysRecord.mongodbUri : undefined,
+    } : undefined,
+  };
+}
+
 export async function POST(request: NextRequest): Promise<Response> {
   let rawBody: unknown;
   try {
@@ -103,7 +149,8 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   const body = rawBody as Record<string, unknown>;
 
-  if (!body.universityUrl || typeof body.universityUrl !== 'string') {
+  const normalizedBody = normalizeCrawlRequestBody(body);
+  if (!normalizedBody) {
     return errorResponse('VALIDATION_ERROR', 'universityUrl is required', 400);
   }
 
@@ -115,7 +162,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     fileTypeRules = { pdf: 'index', docx: 'index', csv: 'skip' },
     crawlerInstructions = '',
     apiKeys = {},
-  } = body as CrawlRequestBody;
+  } = normalizedBody;
 
   const embeddingApiKey = resolveApiKeyValue(apiKeys.embeddingApiKey, env.EMBEDDING_API_KEY);
   const embeddingModel = apiKeys.embeddingModel || env.EMBEDDING_MODEL;

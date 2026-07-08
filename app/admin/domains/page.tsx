@@ -317,7 +317,6 @@ export default function DomainsPage() {
     }
   };
 
-  const indexedCount = domains.filter(d => d.status === 'indexed').length;
   const crawlingCount = domains.filter(d => d.status === 'crawling').length;
   const errorCount = domains.filter(d => d.status === 'error').length;
   const totalDocuments = domains.reduce((sum, d) => sum + (d.documentCount || 0), 0);

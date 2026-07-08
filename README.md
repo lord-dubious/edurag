@@ -52,7 +52,7 @@ AUTH_SECRET=your-random-32-char-secret
 BETTER_AUTH_URL=http://localhost:3000
 CHAT_API_KEY=your-llm-api-key
 CHAT_BASE_URL=https://api.cerebras.ai/v1
-CHAT_MODEL=gpt-oss-120b
+CHAT_MODEL=gemma-4-31b
 
 EMBEDDING_API_KEY=your-voyage-api-key
 EMBEDDING_BASE_URL=https://api.voyageai.com/v1
@@ -169,7 +169,7 @@ Go to **Site Settings → Environment Variables** and add:
 | `MONGODB_URI` | MongoDB Atlas connection string | Yes |
 | `CHAT_API_KEY` | LLM API key | Yes |
 | `CHAT_BASE_URL` | LLM base URL | Yes |
-| `CHAT_MODEL` | `gpt-oss-120b` | Yes |
+| `CHAT_MODEL` | `gemma-4-31b` | Yes |
 | `EMBEDDING_API_KEY` | Voyage AI key | Yes |
 | `TAVILY_API_KEY` | Tavily key | Yes |
 | `ADMIN_SECRET` | Min 16 chars | Yes |
@@ -408,7 +408,7 @@ CMD ["npm", "start"]
 | Voice | Deepgram (v4 SDK) |
 | Core Agent | @edurag/agent (Workspace) |
 | Vector Store | @langchain/mongodb |
-| LLM Provider | Cerebras (gpt-oss-120b) |
+| LLM Provider | Cerebras (gemma-4-31b) |
 | Embeddings | Voyage AI (voyage-4-large) |
 | Crawling | @tavily/core |
 | Database | MongoDB Atlas |

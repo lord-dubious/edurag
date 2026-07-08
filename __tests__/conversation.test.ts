@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { MongoClient } from 'mongodb';
-import { getHistory, appendMessage, clearHistory, listConversations } from '../lib/conversation';
+import { getHistory, appendMessage, clearHistory, listConversations, saveMessage } from '../lib/conversation';
 import { closeMongoClient } from '../lib/vectorstore';
 import { env } from '../lib/env';
 
@@ -82,5 +82,31 @@ describe('Conversation Management', () => {
     
     expect(testConv).toBeDefined();
     expect(testConv?.messages.length).toBe(1);
+  });
+
+  it('should update an existing message when saving by id', async () => {
+    await clearHistory(TEST_THREAD_ID);
+
+    await saveMessage(TEST_THREAD_ID, {
+      id: 'assistant-1',
+      role: 'assistant',
+      content: 'Partial answer',
+      timestamp: new Date(),
+    });
+
+    await saveMessage(TEST_THREAD_ID, {
+      id: 'assistant-1',
+      role: 'assistant',
+      content: 'Final answer',
+      timestamp: new Date(),
+    });
+
+    const history = await getHistory(TEST_THREAD_ID);
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      id: 'assistant-1',
+      role: 'assistant',
+      content: 'Final answer',
+    });
   });
 });

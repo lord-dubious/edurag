@@ -8,6 +8,71 @@ declare global {
   var mongoClient: MongoClient | undefined;
 }
 
+type VectorRuntime = {
+  vectorStore: MongoDBAtlasVectorSearch;
+  embeddingsInstance: ReturnType<typeof getEmbeddings>;
+  rerankModel: string;
+  rerankTopK: number;
+  voyageApiKey?: string;
+};
+
+let defaultCollectionPromise: Promise<Collection<MongoDocument>> | undefined;
+const vectorStoreCache = new Map<string, MongoDBAtlasVectorSearch>();
+
+function getVectorConfigKey(apiKey?: string, model?: string, dimensions?: number): string {
+  return [
+    apiKey || env.EMBEDDING_API_KEY || '',
+    model || env.EMBEDDING_MODEL,
+    dimensions || env.EMBEDDING_DIMENSIONS,
+    env.VECTOR_COLLECTION,
+    env.VECTOR_INDEX_NAME,
+  ].join('::');
+}
+
+async function getDefaultVectorCollection(): Promise<Collection<MongoDocument>> {
+  if (!defaultCollectionPromise) {
+    defaultCollectionPromise = getMongoCollection(env.VECTOR_COLLECTION);
+  }
+
+  return defaultCollectionPromise;
+}
+
+async function getVectorRuntime(): Promise<VectorRuntime> {
+  const settings = await getSettings();
+  const embeddingConfig = settings?.embeddingConfig;
+  const rerankConfig = settings?.rerankConfig;
+  const collection = await getDefaultVectorCollection();
+  const embeddingsInstance = getEmbeddings(
+    embeddingConfig?.apiKey,
+    embeddingConfig?.model,
+    embeddingConfig?.dimensions,
+  );
+  const vectorConfigKey = getVectorConfigKey(
+    embeddingConfig?.apiKey,
+    embeddingConfig?.model,
+    embeddingConfig?.dimensions,
+  );
+
+  let vectorStore = vectorStoreCache.get(vectorConfigKey);
+  if (!vectorStore) {
+    vectorStore = new MongoDBAtlasVectorSearch(embeddingsInstance, {
+      collection,
+      indexName: env.VECTOR_INDEX_NAME,
+      textKey: 'text',
+      embeddingKey: 'embedding',
+    });
+    vectorStoreCache.set(vectorConfigKey, vectorStore);
+  }
+
+  return {
+    vectorStore,
+    embeddingsInstance,
+    rerankModel: rerankConfig?.model || env.RERANK_MODEL,
+    rerankTopK: rerankConfig?.topK ?? env.RERANK_TOP_K,
+    voyageApiKey: embeddingConfig?.apiKey,
+  };
+}
+
 export async function getMongoClient(customUri?: string): Promise<MongoClient> {
   if (!customUri && globalThis.mongoClient) {
     return globalThis.mongoClient;
@@ -38,22 +103,7 @@ export async function getMongoCollection<TSchema extends MongoDocument = MongoDo
 export type { MongoDocument, WithId, OptionalId };
 
 export async function getVectorStore() {
-  const collection = await getMongoCollection(env.VECTOR_COLLECTION);
-  const settings = await getSettings();
-  const embeddingConfig = settings?.embeddingConfig;
-  const embeddingsInstance = getEmbeddings(
-    embeddingConfig?.apiKey,
-    embeddingConfig?.model,
-    embeddingConfig?.dimensions,
-  );
-
-  const vectorStore = new MongoDBAtlasVectorSearch(embeddingsInstance, {
-    collection,
-    indexName: env.VECTOR_INDEX_NAME,
-    textKey: 'text',
-    embeddingKey: 'embedding',
-  });
-
+  const { vectorStore } = await getVectorRuntime();
   return vectorStore;
 }
 
@@ -62,22 +112,13 @@ export async function similaritySearchWithScore(
   k: number = 5
 ): Promise<[import('@langchain/core/documents').Document, number][]> {
   const limit = Math.max(1, Math.floor(k));
-  const collection = await getMongoCollection(env.VECTOR_COLLECTION);
-  const settings = await getSettings();
-  const embeddingConfig = settings?.embeddingConfig;
-  const rerankConfig = settings?.rerankConfig;
-  const embeddingsInstance = getEmbeddings(
-    embeddingConfig?.apiKey,
-    embeddingConfig?.model,
-    embeddingConfig?.dimensions,
-  );
-
-  const vectorStore = new MongoDBAtlasVectorSearch(embeddingsInstance, {
-    collection,
-    indexName: env.VECTOR_INDEX_NAME,
-    textKey: 'text',
-    embeddingKey: 'embedding',
-  });
+  const {
+    vectorStore,
+    embeddingsInstance,
+    rerankModel,
+    rerankTopK,
+    voyageApiKey,
+  } = await getVectorRuntime();
 
   const queryEmbedding = await embeddingsInstance.embedQuery(query);
 
@@ -100,7 +141,7 @@ export async function similaritySearchWithScore(
   };
 
   try {
-    const voyageClient = getVoyageClient(embeddingConfig?.apiKey);
+    const voyageClient = getVoyageClient(voyageApiKey);
 
     // Fix LangChain textKey mapping issue by explicitly populating pageContent
     allResults.forEach(([doc]) => {
@@ -123,8 +164,8 @@ export async function similaritySearchWithScore(
       voyageClient.rerank({
         query,
         documents,
-        model: rerankConfig?.model || env.RERANK_MODEL,
-        topK: Math.min(limit, rerankConfig?.topK ?? env.RERANK_TOP_K),
+        model: rerankModel,
+        topK: Math.min(limit, rerankTopK),
         truncation: true,
       }),
       timeoutPromise,

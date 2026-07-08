@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createClient } from '@deepgram/sdk';
+import type { Collection } from 'mongodb';
 import { auth } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { errorResponse } from '@/lib/errors';
@@ -12,6 +13,27 @@ interface VoiceRateLimit {
   _id: string;
   count: number;
   createdAt: Date;
+}
+
+let rateLimitIndexPromise: Promise<void> | undefined;
+
+function ensureRateLimitIndex(rateLimits: Collection<VoiceRateLimit>): Promise<void> {
+  if (!rateLimitIndexPromise) {
+    rateLimitIndexPromise = rateLimits.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
+      .then(() => undefined)
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        const code = typeof err === 'object' && err !== null && 'code' in err
+          ? (err as { code?: number }).code
+          : undefined;
+        const isDuplicate = code === 85 || code === 86 || /already exists|IndexOptionsConflict|IndexKeySpecsConflict/i.test(message);
+        if (isDuplicate) return;
+
+        console.error('[voice-token] Failed to create rate limit index:', err);
+      });
+  }
+
+  return rateLimitIndexPromise;
 }
 
 export async function GET() {
@@ -26,16 +48,7 @@ export async function GET() {
     const db = client.db(env.DB_NAME);
     const rateLimits = db.collection<VoiceRateLimit>('voice_rate_limits');
 
-    await rateLimits.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      const code = typeof err === 'object' && err !== null && 'code' in err
-        ? (err as { code?: number }).code
-        : undefined;
-      const isDuplicate = code === 85 || code === 86 || /already exists|IndexOptionsConflict|IndexKeySpecsConflict/i.test(message);
-      if (isDuplicate) return;
-
-      console.error('[voice-token] Failed to create rate limit index:', err);
-    });
+    await ensureRateLimitIndex(rateLimits);
 
     const rateLimitResult = await rateLimits.findOneAndUpdate(
       { _id: userId },

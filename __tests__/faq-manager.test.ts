@@ -1,8 +1,16 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { MongoClient } from 'mongodb';
 import { trackAndMaybeGenerateFaq, getPublicFaqs } from '../lib/faq-manager';
 import { getMongoCollection, closeMongoClient } from '../lib/vectorstore';
 import { env } from '../lib/env';
+
+vi.mock('ai', async () => {
+  const actual = await vi.importActual<typeof import('ai')>('ai');
+  return {
+    ...actual,
+    generateText: vi.fn().mockResolvedValue({ text: 'Mock FAQ answer' }),
+  };
+});
 
 describe('FAQ Manager', () => {
   let client: MongoClient;
@@ -71,7 +79,7 @@ describe('FAQ Manager', () => {
   it('should return empty array when no public FAQs', async () => {
     const faqs = await getPublicFaqs(10);
 
-    const testFaqs = faqs.filter((f) => testQuestions.includes(f.question));
+    const testFaqs = faqs.filter((f: { question: string }) => testQuestions.includes(f.question));
     expect(testFaqs.length).toBe(0);
   });
 });

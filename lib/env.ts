@@ -3,7 +3,7 @@ import { z } from 'zod';
 const envSchema = z.object({
   CHAT_API_KEY: z.string().min(1).optional(),
   CHAT_BASE_URL: z.string().url().optional().or(z.literal('')),
-  CHAT_MODEL: z.string().default('gpt-oss-120b'),
+  CHAT_MODEL: z.string().default('gemma-4-31b'),
   CHAT_MAX_TOKENS: z.coerce.number().default(32000),
   CHAT_MAX_STEPS: z.coerce.number().min(1).max(20).default(5),
   CHAT_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.2),

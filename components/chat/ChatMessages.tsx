@@ -14,6 +14,7 @@ import { math } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
 import { CopyIcon, RefreshCcwIcon, ExternalLinkIcon, MessageCircleQuestionIcon, FileTextIcon } from 'lucide-react';
 import { Fragment, useMemo, memo } from 'react';
+import { cleanSourcePreview, getSafeHref, getSourceHostname } from '@/lib/chat/sources';
 
 const CITATION_REGEX = /(?:\[([^\]]+)\]\(cite:(\d+)\))|(?:【(\d+)(?:†[^】]+)?】|\[(\d+)\])/g;
 
@@ -37,15 +38,6 @@ function preprocessCitations(text: string, sources: Source[]): string {
   });
 }
 
-function cleanSourceContent(content: string, maxLength = 150): string {
-  if (!content) return '';
-  return content
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, maxLength)
-    .replace(/\s+\S*$/, '');
-}
-
 interface Source {
   url: string;
   title?: string;
@@ -58,40 +50,34 @@ interface Props {
   sources: Record<string, Source[]>;
   status: ChatStatus;
   onRegenerate: () => void;
-}
-
-function getSafeHref(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      return parsed.toString();
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function getSourceHostname(url: string): string {
-  try {
-    const hostname = new URL(url).hostname.replace('www.', '');
-    return hostname || 'source';
-  } catch {
-    return 'source';
-  }
+  latestSourcesMessageId?: string;
+  onOpenSources?: (messageId: string) => void;
 }
 
 function CitationChip({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
   const safeHref = getSafeHref(source.url);
   const displayTitle = customTitle || source.title || getSourceHostname(source.url);
+  if (!safeHref) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-muted border rounded-full text-[11px] font-medium text-muted-foreground"
+        title="Unavailable source URL"
+      >
+        <span className="flex size-[16px] shrink-0 items-center justify-center rounded-full bg-muted-foreground/15 text-[9px] font-mono text-muted-foreground">
+          {index + 1}
+        </span>
+        {displayTitle}
+      </span>
+    );
+  }
+
   return (
     <a
-      href={safeHref ?? '#'}
+      href={safeHref}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={safeHref ? undefined : (event) => event.preventDefault()}
       className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-[11px] font-medium text-primary hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer no-underline group"
-      title={safeHref ?? 'Unavailable source URL'}
+      title={safeHref}
     >
       <span className="flex size-[16px] shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-mono text-primary-foreground group-hover:bg-primary-foreground/30 transition-colors">
         {index + 1}
@@ -106,14 +92,8 @@ function SourceCard({ index, source, customTitle }: { index: number; source: Sou
   const domain = getSourceHostname(source.url);
   const displayTitle = customTitle || source.title || domain;
 
-  return (
-    <a
-      href={safeHref ?? '#'}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={safeHref ? undefined : (event) => event.preventDefault()}
-      className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-accent/50 transition-colors cursor-pointer no-underline"
-    >
+  const content = (
+    <>
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
         <span className="text-xs font-mono font-bold text-primary">{index + 1}</span>
       </div>
@@ -122,13 +102,32 @@ function SourceCard({ index, source, customTitle }: { index: number; source: Sou
           <span className="truncate text-sm font-medium text-foreground group-hover:text-primary">
             {displayTitle}
           </span>
-          <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          {safeHref && <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
         </div>
         <p className="text-xs text-muted-foreground line-clamp-2">
-          {cleanSourceContent(source.content)}
+          {cleanSourcePreview(source.content, 150)}
         </p>
         <span className="text-[10px] text-muted-foreground/70">{domain}</span>
       </div>
+    </>
+  );
+
+  if (!safeHref) {
+    return (
+      <div className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-card text-left">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={safeHref}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-accent/50 transition-colors cursor-pointer no-underline"
+    >
+      {content}
     </a>
   );
 }
@@ -164,7 +163,7 @@ const RenderedMessage = memo(function RenderedMessage({ text, sources }: { text:
   );
 }, (prev, next) => prev.text === next.text && prev.sources === next.sources);
 
-export function ChatMessages({ messages, sources, status, onRegenerate }: Props) {
+export function ChatMessages({ messages, sources, status, onRegenerate, latestSourcesMessageId, onOpenSources }: Props) {
   if (messages.length === 0) {
     return (
       <div className="flex size-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -188,6 +187,7 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
         const msgSources = sources[message.id] ?? [];
 
         const extractedTitles: Record<number, string> = {};
+        const isLatestSourcesMessage = message.id === latestSourcesMessageId;
         message.parts.forEach(part => {
           if (part.type === 'text') {
             const matches = Array.from((part as TextUIPart).text.matchAll(CITATION_REGEX));
@@ -243,7 +243,7 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
               </Message>
             )}
 
-            {message.role === 'assistant' && isLast && status === 'ready' && (
+            {message.role === 'assistant' && status === 'ready' && (
               <MessageActions>
                 <MessageAction
                   label="Copy"
@@ -257,23 +257,41 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
                 >
                   <CopyIcon className="size-3" />
                 </MessageAction>
-                <MessageAction label="Regenerate" onClick={onRegenerate}>
-                  <RefreshCcwIcon className="size-3" />
-                </MessageAction>
+                {isLast && (
+                  <MessageAction label="Regenerate" onClick={onRegenerate}>
+                    <RefreshCcwIcon className="size-3" />
+                  </MessageAction>
+                )}
               </MessageActions>
             )}
 
             {msgSources.length > 0 && message.role === 'assistant' && (
               <div className="px-4 pb-2 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <FileTextIcon className="size-4" />
-                  <span>Sources ({msgSources.length})</span>
+                <div className="flex items-center justify-between gap-3 text-sm font-medium text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <FileTextIcon className="size-4" />
+                    <span>Sources ({msgSources.length})</span>
+                  </div>
+                  {onOpenSources && (
+                    <button
+                      onClick={() => onOpenSources(message.id)}
+                      className="text-xs font-medium text-primary transition-opacity hover:opacity-80"
+                    >
+                      {isLatestSourcesMessage ? 'View all' : 'Open'}
+                    </button>
+                  )}
                 </div>
-                <div className="grid gap-2">
-                  {msgSources.slice(0, 6).map((source, i) => (
-                    <SourceCard key={`${source.url}-${i}`} index={i} source={source} customTitle={extractedTitles[i]} />
-                  ))}
-                </div>
+                {isLatestSourcesMessage ? (
+                  <div className="grid gap-2">
+                    {msgSources.slice(0, 3).map((source, i) => (
+                      <SourceCard key={`${source.url}-${i}`} index={i} source={source} customTitle={extractedTitles[i]} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Sources are available for this answer.
+                  </p>
+                )}
               </div>
             )}
           </Fragment>

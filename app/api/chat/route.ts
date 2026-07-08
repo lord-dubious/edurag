@@ -8,7 +8,8 @@ import { errorResponse } from '@/lib/errors';
 import { nanoid } from 'nanoid';
 import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
-import { appendMessage, getConversation } from '@/lib/conversation';
+import { appendMessage, getConversation, saveMessage } from '@/lib/conversation';
+import { extractSourcesFromSearchParts } from '@/lib/chat/sources';
 import type { Source } from '@edurag/agent/text';
 
 const bodySchema = z.object({
@@ -38,30 +39,28 @@ function isTextPart(part: PartRecord): part is { type: 'text'; text: string } {
 }
 
 function isToolPart(part: PartRecord): part is { type: `tool-${string}`; toolName: string; toolCallId: string; input: unknown; state: string; output?: unknown } {
-  return typeof part.type === 'string' && part.type.startsWith('tool-');
+  return (
+    typeof part.type === 'string' &&
+    part.type.startsWith('tool-') &&
+    typeof part.toolCallId === 'string' &&
+    typeof part.state === 'string'
+  );
 }
 
 function convertToUIMessageParts(parts: PartRecord[]): Array<TextUIPart | ToolUIPart> {
-  return parts.map((part): TextUIPart | ToolUIPart => {
+  return parts.flatMap((part): Array<TextUIPart | ToolUIPart> => {
     if (isTextPart(part)) {
-      return { type: 'text', text: part.text };
+      return [{ type: 'text', text: part.text }];
     }
     if (isToolPart(part)) {
-      return part as ToolUIPart;
+      return [part as ToolUIPart];
     }
-    return { type: 'text', text: JSON.stringify(part) };
+    return [];
   });
 }
 
 function isResponseTextPart(part: UIMessagePartLike): part is TextUIPart {
   return part.type === 'text' && typeof (part as { text?: unknown }).text === 'string';
-}
-
-function isSearchOutputPart(part: UIMessagePartLike): part is SearchOutputPart {
-  return (
-    (part.type === 'tool-vector_search' || part.type === 'tool-web_search') &&
-    (part as { state?: unknown }).state === 'output-available'
-  );
 }
 
 function extractAssistantText(parts: UIMessagePartLike[]): string {
@@ -72,54 +71,7 @@ function extractAssistantText(parts: UIMessagePartLike[]): string {
 }
 
 function extractAssistantSources(parts: UIMessagePartLike[]): Source[] {
-  let latestSources: Source[] = [];
-
-  parts.forEach((part) => {
-    if (!isSearchOutputPart(part)) {
-      return;
-    }
-
-    const sourceType: Source['sourceType'] = part.type === 'tool-web_search' ? 'web' : 'vector';
-    const results = part.output?.results;
-    if (!Array.isArray(results)) {
-      return;
-    }
-
-    const parsedSources: Source[] = [];
-    results.forEach((result) => {
-      if (typeof result !== 'object' || result === null) {
-        return;
-      }
-
-      const candidate = result as Record<string, unknown>;
-      const content = typeof candidate.content === 'string' ? candidate.content.trim() : '';
-      if (!content) {
-        return;
-      }
-
-      const url = typeof candidate.url === 'string' ? candidate.url.trim() : '';
-      const title = typeof candidate.title === 'string' && candidate.title.trim().length > 0
-        ? candidate.title.trim()
-        : undefined;
-      const score = typeof candidate.score === 'number' && Number.isFinite(candidate.score)
-        ? candidate.score
-        : undefined;
-
-      parsedSources.push({
-        url,
-        title,
-        content,
-        score,
-        sourceType,
-      });
-    });
-
-    if (parsedSources.length > 0) {
-      latestSources = parsedSources;
-    }
-  });
-
-  return latestSources;
+  return extractSourcesFromSearchParts(parts as SearchOutputPart[]).sources;
 }
 
 export async function POST(req: Request) {
@@ -174,7 +126,15 @@ export async function POST(req: Request) {
     const uiMessages: UIMessage[] = messages.map((m): UIMessage => ({
       id: m.id,
       role: m.role as 'user' | 'assistant',
-      parts: convertToUIMessageParts(m.parts),
+      parts: (() => {
+        const convertedParts = convertToUIMessageParts(m.parts);
+        if (convertedParts.length > 0) {
+          return convertedParts;
+        }
+
+        const fallbackText = typeof m.content === 'string' ? m.content.trim() : '';
+        return fallbackText ? [{ type: 'text', text: fallbackText }] : [];
+      })(),
     }));
 
     const lastAssistantIdx = uiMessages.findLastIndex(m => m.role === 'assistant');
@@ -188,10 +148,11 @@ export async function POST(req: Request) {
     }
 
     const settings = await getSettings();
+    const chatConfig = settings?.chatConfig;
     const universityName = settings?.appName || 'University Knowledge Base';
-    const maxSteps = settings?.chatConfig?.maxSteps;
-    const maxTokens = settings?.chatConfig?.maxTokens;
-    const temperature = settings?.chatConfig?.temperature;
+    const maxSteps = chatConfig?.maxSteps;
+    const maxTokens = chatConfig?.maxTokens;
+    const temperature = chatConfig?.temperature;
 
     const streamResult = await runAgent({
       messages: uiMessages,
@@ -203,8 +164,8 @@ export async function POST(req: Request) {
     });
     return streamResult.toUIMessageStreamResponse({
       originalMessages: uiMessages,
-      onFinish: async ({ responseMessage, messages, isAborted, isContinuation }) => {
-        if (!userId || responseMessage.role !== 'assistant' || isAborted || isContinuation) {
+      onFinish: async ({ responseMessage, isContinuation }) => {
+        if (!userId || responseMessage.role !== 'assistant' || isContinuation) {
           return;
         }
 
@@ -213,22 +174,13 @@ export async function POST(req: Request) {
           return;
         }
 
-        let assistantSources = extractAssistantSources(responseMessage.parts as UIMessagePartLike[]);
-        if (assistantSources.length === 0) {
-          const responseIdx = messages.findIndex(message => message.id === responseMessage.id);
-          if (responseIdx > 0) {
-            const previousMessage = messages[responseIdx - 1];
-            if (previousMessage.role === 'assistant') {
-              assistantSources = extractAssistantSources(previousMessage.parts as UIMessagePartLike[]);
-            }
-          }
-        }
+        const assistantSources = extractAssistantSources(responseMessage.parts as UIMessagePartLike[]);
         const messageId = typeof responseMessage.id === 'string' && responseMessage.id.length > 0
           ? responseMessage.id
           : nanoid();
 
         try {
-          await appendMessage(currentThreadId, {
+          await saveMessage(currentThreadId, {
             id: messageId,
             role: 'assistant',
             content: assistantText,

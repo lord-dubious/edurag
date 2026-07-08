@@ -9,7 +9,7 @@ export function ThemeToggle() {
 
   if (!resolvedTheme) {
     return (
-      <Button variant="ghost" size="icon" disabled>
+      <Button variant="ghost" size="icon" disabled title="Toggle theme">
         <SunIcon className="size-4" />
       </Button>
     );
