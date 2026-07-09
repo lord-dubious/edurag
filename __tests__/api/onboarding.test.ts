@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
+const mockTavilyCrawl = vi.hoisted(() => vi.fn());
+
+vi.mock('@tavily/core', () => ({
+  tavily: vi.fn(() => ({
+    crawl: mockTavilyCrawl,
+  })),
+}));
+
 vi.mock('@/lib/db/settings', () => ({
   updateSettings: vi.fn(),
   getSettings: vi.fn(),
@@ -36,6 +44,7 @@ function createRequest(body: Record<string, unknown>): NextRequest {
 describe('POST /api/onboarding/detect', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTavilyCrawl.mockResolvedValue({ results: [] });
   });
 
   it('validates and normalizes URL', async () => {
@@ -74,6 +83,36 @@ describe('POST /api/onboarding/detect', () => {
 
     expect(response.status).toBe(200);
     expect(data.url).toBe('https://example.edu');
+  });
+});
+
+describe('POST /api/onboarding/crawl', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockTavilyCrawl.mockResolvedValue({ results: [] });
+  });
+
+  it('trims university URL before crawling', async () => {
+    const { POST } = await import('@/app/api/onboarding/crawl/route');
+    const req = createRequest({
+      universityUrl: '  https://example.edu  ',
+      apiKeys: {
+        embeddingApiKey: 'test-embedding-key',
+        tavilyApiKey: 'test-tavily-key',
+        mongodbUri: 'mongodb+srv://test',
+      },
+    });
+
+    const response = await POST(req);
+    await response.text();
+
+    expect(response.status).toBe(200);
+    expect(mockTavilyCrawl).toHaveBeenCalledWith(
+      'https://example.edu',
+      expect.objectContaining({
+        extractDepth: 'basic',
+      }),
+    );
   });
 });
 

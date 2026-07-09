@@ -85,7 +85,7 @@ export function getSafeHref(url: string): string | null {
 
 export function getSourceHostname(url: string): string {
   try {
-    const hostname = new URL(url).hostname.replace('www.', '');
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
     return hostname || 'source';
   } catch {
     return 'source';

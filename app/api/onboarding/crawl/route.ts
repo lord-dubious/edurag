@@ -110,7 +110,7 @@ function normalizeCrawlRequestBody(body: Record<string, unknown>): CrawlRequestB
   const apiKeysRecord = asRecord(body.apiKeys);
 
   return {
-    universityUrl: body.universityUrl,
+    universityUrl: body.universityUrl.trim(),
     externalUrls: asStringArray(body.externalUrls),
     excludePaths: asStringArray(body.excludePaths),
     crawlConfig: crawlConfigRecord ? {
