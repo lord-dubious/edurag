@@ -42,19 +42,6 @@ interface DomainTableProps {
   isLoading?: boolean;
 }
 
-/**
- * Render a table of domains with per-domain actions for re-indexing, optional verification, and deletion.
- *
- * The component displays domain hostname, document count, last crawled date, and status; each row exposes a dropdown
- * with Re-index, an optional Verify sources action (if `onVerify` is provided), and Delete which opens a confirmation UI.
- *
- * @param domains - Array of domain records to display
- * @param onReindex - Callback invoked with a domain when the user selects "Re-index"
- * @param onVerify - Optional callback invoked with a domain when the user selects "Verify sources"
- * @param onDelete - Callback invoked with a domain when the user confirms deletion
- * @param isLoading - When true, row action controls are disabled
- * @returns The DomainTable React element
- */
 export function DomainTable({ domains, onReindex, onVerify, onDelete, isLoading }: DomainTableProps) {
   const [deleteDomain, setDeleteDomain] = useState<Domain | null>(null);
 

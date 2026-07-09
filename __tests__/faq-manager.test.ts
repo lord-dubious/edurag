@@ -1,8 +1,16 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { MongoClient } from 'mongodb';
 import { trackAndMaybeGenerateFaq, getPublicFaqs } from '../lib/faq-manager';
 import { getMongoCollection, closeMongoClient } from '../lib/vectorstore';
 import { env } from '../lib/env';
+
+vi.mock('ai', async () => {
+  const actual = await vi.importActual<typeof import('ai')>('ai');
+  return {
+    ...actual,
+    generateText: vi.fn().mockResolvedValue({ text: 'Mock FAQ answer' }),
+  };
+});
 
 describe('FAQ Manager', () => {
   let client: MongoClient;

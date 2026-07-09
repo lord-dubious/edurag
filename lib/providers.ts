@@ -5,17 +5,23 @@ import { env } from './env';
 
 let _chatProvider: ReturnType<typeof createOpenAI> | undefined;
 let _chatModel: ReturnType<ReturnType<typeof createOpenAI>['chat']> | undefined;
-let _embeddings: VoyageEmbeddings | undefined;
-let _voyageClient: VoyageAIClient | undefined;
+const _embeddingsCache = new Map<string, VoyageEmbeddings>();
+const _voyageClientCache = new Map<string, VoyageAIClient>();
 
 export function getVoyageClient(apiKey?: string): VoyageAIClient {
-  if (apiKey) {
-    return new VoyageAIClient({ apiKey });
+  const key = apiKey || env.EMBEDDING_API_KEY;
+  if (!key) {
+    throw new Error('Embedding API key is required');
   }
-  if (!_voyageClient) {
-    _voyageClient = new VoyageAIClient({ apiKey: env.EMBEDDING_API_KEY });
+
+  const cached = _voyageClientCache.get(key);
+  if (cached) {
+    return cached;
   }
-  return _voyageClient;
+
+  const client = new VoyageAIClient({ apiKey: key });
+  _voyageClientCache.set(key, client);
+  return client;
 }
 
 export function getChatProvider() {
@@ -44,13 +50,14 @@ export function getEmbeddings(
   const modelName = model || env.EMBEDDING_MODEL;
   const outputDimension = dimensions || env.EMBEDDING_DIMENSIONS;
 
-  const hasOverrides = Boolean(model || dimensions);
-  if (!apiKey && !hasOverrides && _embeddings) {
-    return _embeddings;
-  }
-
   if (!key) {
     throw new Error('Embedding API key is required');
+  }
+
+  const cacheKey = `${key}:${modelName}:${outputDimension}`;
+  const cached = _embeddingsCache.get(cacheKey);
+  if (cached) {
+    return cached;
   }
 
   const instance = new VoyageEmbeddings({
@@ -61,10 +68,7 @@ export function getEmbeddings(
     truncation: true,
   });
 
-  if (!apiKey && !hasOverrides) {
-    _embeddings = instance;
-  }
-
+  _embeddingsCache.set(cacheKey, instance);
   return instance;
 }
 

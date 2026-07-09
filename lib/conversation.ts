@@ -41,11 +41,18 @@ export async function getHistory(threadId: string, userId?: string): Promise<Mes
   const collection = await getConversationsCollection();
   const query: Filter<ConversationDocument> = { threadId };
   if (userId) {
-    // Access own threads or anonymous threads
     query.$or = [{ userId }, { userId: { $exists: false } }, { userId: null }];
   }
   const conversation = await collection.findOne(query);
   return conversation?.messages ?? [];
+}
+
+function isAuthorizedConversationOwner(existingUserId: string | null | undefined, userId?: string): boolean {
+  if (!existingUserId) {
+    return true;
+  }
+
+  return existingUserId === userId;
 }
 
 /**
@@ -64,8 +71,7 @@ export async function appendMessage(threadId: string, message: Message, userId?:
   const existing = await collection.findOne({ threadId });
 
   if (existing) {
-    // Security check: If thread belongs to another user, prevent write.
-    if (existing.userId && existing.userId !== userId) {
+    if (!isAuthorizedConversationOwner(existing.userId, userId)) {
       console.error(`[appendMessage] Unauthorized write attempt to thread ${threadId} by user ${userId}`);
       throw new Error('Unauthorized: Cannot write to another user\'s thread');
     }
@@ -93,6 +99,57 @@ export async function appendMessage(threadId: string, message: Message, userId?:
       updatedAt: new Date(),
     });
   }
+}
+
+export async function saveMessage(threadId: string, message: Message, userId?: string): Promise<void> {
+  const collection = await getConversationsCollection();
+  const existing = await collection.findOne({ threadId });
+
+  if (existing) {
+    if (!isAuthorizedConversationOwner(existing.userId, userId)) {
+      console.error(`[saveMessage] Unauthorized write attempt to thread ${threadId} by user ${userId}`);
+      throw new Error('Unauthorized: Cannot write to another user\'s thread');
+    }
+
+    const nextUpdatedAt = new Date();
+    const nextUserId = !existing.userId && userId ? userId : existing.userId;
+    const existingMessageIndex = message.id
+      ? existing.messages.findIndex(existingMessage => existingMessage.id === message.id)
+      : -1;
+
+    if (existingMessageIndex >= 0) {
+      await collection.updateOne(
+        { _id: existing._id },
+        {
+          $set: {
+            [`messages.${existingMessageIndex}`]: message,
+            updatedAt: nextUpdatedAt,
+            userId: nextUserId ?? null,
+          },
+        },
+      );
+      return;
+    }
+
+    const update: UpdateFilter<ConversationDocument> = {
+      $push: { messages: message },
+      $set: {
+        updatedAt: nextUpdatedAt,
+        userId: nextUserId ?? null,
+      },
+    };
+
+    await collection.updateOne({ _id: existing._id }, update);
+    return;
+  }
+
+  await collection.insertOne({
+    threadId,
+    userId: userId || null,
+    messages: [message],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
 }
 
 export async function updateConversationTitle(threadId: string, title: string, userId?: string): Promise<boolean> {

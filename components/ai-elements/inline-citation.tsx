@@ -92,11 +92,6 @@ export const InlineCitationCardBody = ({
 
 const CarouselApiContext = createContext<CarouselApi | undefined>(undefined);
 
-const useCarouselApi = () => {
-  const context = useContext(CarouselApiContext);
-  return context;
-};
-
 export type InlineCitationCarouselProps = ComponentProps<typeof Carousel>;
 
 export const InlineCitationCarousel = ({
@@ -155,7 +150,7 @@ export const InlineCitationCarouselIndex = ({
   className,
   ...props
 }: InlineCitationCarouselIndexProps) => {
-  const api = useCarouselApi();
+  const api = useContext(CarouselApiContext);
   const [current, setCurrent] = useState(1);
 
   useEffect(() => {
@@ -195,7 +190,7 @@ export const InlineCitationCarouselPrev = ({
   className,
   ...props
 }: InlineCitationCarouselPrevProps) => {
-  const api = useCarouselApi();
+  const api = useContext(CarouselApiContext);
 
   const handleClick = useCallback(() => {
     if (api) {
@@ -222,7 +217,7 @@ export const InlineCitationCarouselNext = ({
   className,
   ...props
 }: InlineCitationCarouselNextProps) => {
-  const api = useCarouselApi();
+  const api = useContext(CarouselApiContext);
 
   const handleClick = useCallback(() => {
     if (api) {

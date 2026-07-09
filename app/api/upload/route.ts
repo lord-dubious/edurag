@@ -10,6 +10,7 @@ const ALLOWED_TYPES: Record<string, string[]> = {
   'image/jpeg': ['.jpg', '.jpeg'],
   'image/webp': ['.webp'],
 };
+const ALLOWED_EXTENSIONS = Object.values(ALLOWED_TYPES).flat();
 const MAX_SIZE = 5 * 1024 * 1024;
 
 const FILE_SIGNATURES: Record<string, Buffer> = {
@@ -54,23 +55,20 @@ export async function POST(request: NextRequest): Promise<Response> {
       return errorResponse('VALIDATION_ERROR', 'Invalid file type', 400);
     }
 
-    const file = rawFile;
-
-    const ext = path.extname(file.name).toLowerCase();
-    const allowedExtensions = Object.values(ALLOWED_TYPES).flat();
-    if (!allowedExtensions.includes(ext)) {
+    const ext = path.extname(rawFile.name).toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
       return errorResponse('VALIDATION_ERROR', 'Invalid file extension. Allowed: PNG, JPEG, WebP', 400);
     }
 
-    if (!ALLOWED_TYPES[file.type]) {
+    if (!ALLOWED_TYPES[rawFile.type]) {
       return errorResponse('VALIDATION_ERROR', 'Invalid file type. Allowed: PNG, JPEG, WebP', 400);
     }
 
-    if (file.size > MAX_SIZE) {
+    if (rawFile.size > MAX_SIZE) {
       return errorResponse('VALIDATION_ERROR', 'File too large. Max size: 5MB', 400);
     }
 
-    const bytes = await file.arrayBuffer();
+    const bytes = await rawFile.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
     const detectedType = detectMimeType(buffer);
@@ -92,8 +90,8 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     return NextResponse.json({
       url: publicUrl,
-      fileName: file.name,
-      size: file.size,
+      fileName: rawFile.name,
+      size: rawFile.size,
       mimeType: detectedType,
     });
   } catch (error) {

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mic, PhoneOff, X } from 'lucide-react';
+import { Loader2, Mic, PhoneOff, RotateCcw, X } from 'lucide-react';
 import type { UIMessage } from '@ai-sdk/react';
 import { useDeepgramVoice } from '@/lib/voice/useDeepgramVoice';
 import type { AgentState, Source } from '@/lib/voice/useDeepgramVoice';
@@ -52,57 +52,74 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [voiceConfig, setVoiceConfig] = useState<VoiceConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isFetchingSession, setIsFetchingSession] = useState(false);
+  const [retryStartRequested, setRetryStartRequested] = useState(false);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [agentResponse, setAgentResponse] = useState('');
   const currentSourcesRef = useRef<Source[]>([]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch('/api/voice-token', { signal: controller.signal })
-      .then(async res => {
-        const data = await res.json().catch(() => null);
-        if (!res.ok) {
-          if (res.status === 401) {
-            setError('You must be logged in to use voice chat.');
-            return null;
-          }
-          const message = data && typeof data === 'object' && 'error' in data
-            ? String((data as { error?: string }).error)
-            : `Voice token request failed (${res.status})`;
-          setError(message);
-          return null;
+  const loadVoiceSession = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
+    setIsFetchingSession(true);
+    try {
+      const res = await fetch('/api/voice-token', { signal });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setApiKey(null);
+        if (res.status === 401) {
+          setError('You must be logged in to use voice chat.');
+          return false;
         }
-        return data;
-      })
-      .then(data => {
-        if (!data || typeof data !== 'object') {
-          setError('Voice token response was empty.');
-          return;
-        }
-        if ('error' in data && (data as { error?: string }).error) {
-          setError(String((data as { error?: string }).error));
-          return;
-        }
-        const token = (data as { token?: unknown }).token;
-        if (typeof token !== 'string' || token.trim().length === 0) {
-          setError('Voice token response missing token.');
-          return;
-        }
-        setApiKey(token);
-        const config = (data as { config?: unknown }).config;
-        if (config && typeof config === 'object') {
-          setVoiceConfig(config as VoiceConfig);
-        }
-      })
-      .catch(err => {
-        if (err.name === 'AbortError') return;
-        setError(prev => prev ?? 'Failed to get API key');
-        console.error(err);
-      });
-    return () => { controller.abort(); };
+        const message = data && typeof data === 'object' && 'error' in data
+          ? String((data as { error?: string }).error)
+          : `Voice token request failed (${res.status})`;
+        setError(message);
+        return false;
+      }
+
+      if (!data || typeof data !== 'object') {
+        setApiKey(null);
+        setError('Voice token response was empty.');
+        return false;
+      }
+
+      if ('error' in data && (data as { error?: string }).error) {
+        setApiKey(null);
+        setError(String((data as { error?: string }).error));
+        return false;
+      }
+
+      const token = (data as { token?: unknown }).token;
+      if (typeof token !== 'string' || token.trim().length === 0) {
+        setApiKey(null);
+        setError('Voice token response missing token.');
+        return false;
+      }
+
+      setApiKey(token);
+      const config = (data as { config?: unknown }).config;
+      if (config && typeof config === 'object') {
+        setVoiceConfig(config as VoiceConfig);
+      }
+      setError(null);
+      return true;
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return false;
+      }
+      setApiKey(null);
+      setError('Failed to get API key');
+      console.error(err);
+      return false;
+    } finally {
+      setIsFetchingSession(false);
+    }
   }, []);
 
-
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadVoiceSession(controller.signal);
+    return () => { controller.abort(); };
+  }, [loadVoiceSession]);
 
   const handleUserMessage = useCallback((text: string) => {
     setCurrentTranscript(text);
@@ -120,6 +137,9 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   }, [onMessageAdded]);
 
   const handleStateChange = useCallback((newState: AgentState) => {
+    if (newState !== 'idle') {
+      setError(null);
+    }
     if (newState === 'listening') {
       setCurrentTranscript('');
     }
@@ -143,7 +163,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
     router.push(`/auth/signin?callbackUrl=${encodeURIComponent('/chat?voice=1')}`);
   }, [router]);
 
-  const { state, start, stop } = useDeepgramVoice({
+  const { state, start, stop, interrupt } = useDeepgramVoice({
     apiKey,
     history: messages,
     onUserMessage: handleUserMessage,
@@ -159,9 +179,19 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
   });
 
   const handleEnd = useCallback(() => {
+    setRetryStartRequested(false);
     stop();
     onClose?.();
   }, [stop, onClose]);
+
+  const handleRetry = useCallback(async () => {
+    setError(null);
+    setRetryStartRequested(true);
+
+    if (!apiKey || isFetchingSession) {
+      await loadVoiceSession();
+    }
+  }, [apiKey, isFetchingSession, loadVoiceSession]);
 
   const autoStartedRef = useRef(false);
   useEffect(() => {
@@ -172,28 +202,36 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
     }
   }, [apiKey, autoStart, state, start]);
 
+  useEffect(() => {
+    if (!retryStartRequested) return;
+    if (!apiKey || state !== 'idle' || isFetchingSession || error) return;
+
+    setRetryStartRequested(false);
+    void start();
+  }, [apiKey, state, isFetchingSession, error, retryStartRequested, start]);
+
   const isInCall = state !== 'idle';
   const showTapToSpeak = Boolean(apiKey) && state === 'idle' && !error && !autoStart;
   const showAutoStarting = Boolean(apiKey) && state === 'idle' && !error && autoStart;
+  const showInterrupt = state === 'speaking' || state === 'thinking';
   const errorMessage = error ?? '';
   const lowerError = errorMessage.toLowerCase();
   const isAuthError = lowerError.includes('logged in') || lowerError.includes('authentication required') || lowerError.includes('unauthorized');
   const isMicError = lowerError.includes('microphone') || lowerError.includes('mic') || lowerError.includes('notallowederror') || lowerError.includes('permission') || lowerError.includes('notfounderror');
   const isConnectionError = lowerError.includes('websocket') || lowerError.includes('connection closed') || lowerError.includes('network') || lowerError.includes('token');
-  const errorTitle = isAuthError
-    ? 'Sign in required'
-    : isMicError
-      ? 'Microphone access blocked'
-      : isConnectionError
-        ? 'Voice connection failed'
-        : errorMessage || 'Something went wrong';
-  const errorBody = isAuthError
-    ? 'Please sign in to use voice chat.'
-    : isMicError
-      ? 'Allow microphone access in your browser settings, then try again.'
-      : isConnectionError
-        ? 'Check your network connection and try again.'
-        : 'Please try again.';
+  let errorTitle = errorMessage || 'Something went wrong';
+  let errorBody = 'Please try again.';
+
+  if (isAuthError) {
+    errorTitle = 'Sign in required';
+    errorBody = 'Please sign in to use voice chat.';
+  } else if (isMicError) {
+    errorTitle = 'Microphone access blocked';
+    errorBody = 'Allow microphone access in your browser settings, then try again.';
+  } else if (isConnectionError) {
+    errorTitle = 'Voice connection failed';
+    errorBody = 'Check your network connection and try again.';
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex flex-col pointer-events-auto">
@@ -223,21 +261,30 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
             </div>
             <p className="text-sm font-medium text-destructive">{errorTitle}</p>
             <p className="text-xs text-muted-foreground">{errorBody}</p>
-            {errorMessage && !isAuthError && (
+            {errorMessage && !isAuthError && !isMicError && !isConnectionError && errorMessage !== errorTitle && (
               <p className="text-[10px] text-muted-foreground/70">{errorMessage}</p>
             )}
             {isAuthError ? (
               <div className="flex items-center gap-2">
                 <Button onClick={handleLogin}>Log in</Button>
-                <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
+                <Button variant="outline" onClick={() => void loadVoiceSession()} disabled={isFetchingSession}>
+                  {isFetchingSession ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+                  Retry
+                </Button>
               </div>
             ) : (
-              <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
+              <Button variant="outline" onClick={() => void handleRetry()} disabled={isFetchingSession}>
+                {isFetchingSession ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+                  Retry
+                </Button>
             )}
           </div>
-        ) : !apiKey ? (
+        ) : isFetchingSession && !apiKey ? (
           <div className="flex flex-col items-center justify-center space-y-4 text-muted-foreground">
-            <div className="animate-pulse">Connecting...</div>
+            <div className="flex items-center gap-2 animate-pulse">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Connecting...
+            </div>
           </div>
         ) : (
           <>
@@ -256,9 +303,9 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
                     <span className="inline-flex h-2 w-2 rounded-full bg-primary animate-pulse" />
                     Starting voice…
                   </div>
-                  <Button variant="outline" size="sm" onClick={start} className="rounded-full">
-                    Tap to retry
-                  </Button>
+                    <Button variant="outline" size="sm" onClick={start} className="rounded-full">
+                     Retry start
+                    </Button>
                 </div>
               )}
               {showTapToSpeak && (
@@ -269,9 +316,8 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
                     className="rounded-full shadow-lg h-14 px-8 text-base gap-2"
                   >
                     <Mic className="h-5 w-5" />
-                    Tap to speak
+                    Start voice
                   </Button>
-                  <p className="text-xs text-muted-foreground">You can switch back to text anytime.</p>
                 </div>
               )}
             </div>
@@ -300,6 +346,13 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
                   <span className="font-medium tracking-wide">Searching knowledge base...</span>
                 </div>
               )}
+              {showInterrupt && (
+                <div className="pointer-events-auto mt-4">
+                  <Button variant="outline" size="sm" onClick={interrupt} className="rounded-full">
+                    Stop reply
+                  </Button>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -313,7 +366,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
             onClick={handleEnd}
             className="rounded-full w-full max-w-sm sm:max-w-none sm:w-auto text-muted-foreground"
           >
-            Switch to text chat
+            Back to text
           </Button>
         ) : (
           <>
@@ -324,7 +377,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
               className="rounded-full shadow-lg h-14 w-full max-w-sm sm:max-w-none sm:w-auto text-base gap-2"
             >
               <PhoneOff className="h-5 w-5" />
-              End Call
+              End voice
             </Button>
             <Button
               variant="ghost"
@@ -332,7 +385,7 @@ export function VoiceChat({ messages, onClose, onMessageAdded, onShowNotes, inst
               onClick={handleEnd}
               className="rounded-full w-full max-w-sm sm:max-w-none sm:w-auto text-muted-foreground"
             >
-              Switch to text chat
+              Back to text
             </Button>
           </>
         )}

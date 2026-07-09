@@ -1,12 +1,40 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createClient } from '@deepgram/sdk';
+import type { Collection } from 'mongodb';
 import { auth } from '@/lib/auth';
 import { env } from '@/lib/env';
 import { errorResponse } from '@/lib/errors';
 import { getSettings } from '@/lib/db/settings';
 
 import clientPromise from '@/lib/auth-client';
+
+interface VoiceRateLimit {
+  _id: string;
+  count: number;
+  createdAt: Date;
+}
+
+let rateLimitIndexPromise: Promise<void> | undefined;
+
+function ensureRateLimitIndex(rateLimits: Collection<VoiceRateLimit>): Promise<void> {
+  if (!rateLimitIndexPromise) {
+    rateLimitIndexPromise = rateLimits.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 })
+      .then(() => undefined)
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        const code = typeof err === 'object' && err !== null && 'code' in err
+          ? (err as { code?: number }).code
+          : undefined;
+        const isDuplicate = code === 85 || code === 86 || /already exists|IndexOptionsConflict|IndexKeySpecsConflict/i.test(message);
+        if (isDuplicate) return;
+
+        console.error('[voice-token] Failed to create rate limit index:', err);
+      });
+  }
+
+  return rateLimitIndexPromise;
+}
 
 export async function GET() {
   try {
@@ -18,23 +46,9 @@ export async function GET() {
     const userId = session.user.id;
     const client = await clientPromise;
     const db = client.db(env.DB_NAME);
-    interface VoiceRateLimit {
-      _id: string;
-      count: number;
-      createdAt: Date;
-    }
     const rateLimits = db.collection<VoiceRateLimit>('voice_rate_limits');
 
-    await rateLimits.createIndex({ createdAt: 1 }, { expireAfterSeconds: 60 }).catch(err => {
-      const message = err instanceof Error ? err.message : String(err);
-      const code = typeof err === 'object' && err && 'code' in err
-        ? (err as { code?: number }).code
-        : undefined;
-      const isDuplicate = code === 85 || code === 86 || /already exists|IndexOptionsConflict|IndexKeySpecsConflict/i.test(message);
-      if (!isDuplicate) {
-        console.error('[voice-token] Failed to create rate limit index:', err);
-      }
-    });
+    await ensureRateLimitIndex(rateLimits);
 
     const rateLimitResult = await rateLimits.findOneAndUpdate(
       { _id: userId },
@@ -45,7 +59,7 @@ export async function GET() {
       { upsert: true, returnDocument: 'after' }
     );
 
-    const doc = (rateLimitResult && typeof rateLimitResult === 'object' && 'value' in rateLimitResult
+    const doc = (rateLimitResult && 'value' in rateLimitResult
       ? rateLimitResult.value
       : rateLimitResult) as VoiceRateLimit | null | undefined;
 

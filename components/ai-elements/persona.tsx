@@ -197,7 +197,7 @@ export const Persona: FC<PersonaProps> = memo(
     const asleepInput = useStateMachineInput(rive, stateMachine, 'asleep');
 
     const setInputValue = useCallback((input: StateMachineInput | null, isActive: boolean) => {
-      if (!input || typeof input !== 'object') {
+      if (!input) {
         return;
       }
       Reflect.set(input, 'value', isActive);

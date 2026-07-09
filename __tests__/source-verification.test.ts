@@ -88,7 +88,6 @@ describe('source verification', () => {
     expect(admissions?.contentStatus).toBe('match');
     expect(tuition?.linkStatus).toBe('dead');
     expect(tuition?.contentStatus).toBe('unknown');
-
   });
 
   it('marks restricted links from HEAD without GET fallback', async () => {
@@ -123,6 +122,5 @@ describe('source verification', () => {
     expect(result.summary.restricted).toBe(1);
     expect(result.results[0].linkStatus).toBe('restricted');
     expect(fetchMock).toHaveBeenCalledTimes(1);
-
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircleIcon, SearchIcon } from 'lucide-react';
 import { FaqApprovalCard } from '@/components/admin/FaqApprovalCard';
@@ -23,6 +23,7 @@ export default function FAQsPage() {
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const normalizedSearchQuery = searchQuery.toLowerCase();
 
   const token = typeof document !== 'undefined'
     ? document.cookie.split('; ').find(c => c.startsWith('admin_token='))?.split('=')[1]
@@ -57,8 +58,7 @@ export default function FAQsPage() {
 
   const handleApprove = async (id: string, editedAnswer?: string) => {
     try {
-      const body: { answer?: string } = {};
-      if (editedAnswer) body.answer = editedAnswer;
+      const body = editedAnswer ? { answer: editedAnswer } : {};
 
       const res = await fetch(`/api/faqs/${id}/approve`, {
         method: 'POST',
@@ -96,16 +96,16 @@ export default function FAQsPage() {
   const totalFaqs = faqs.length;
 
   const filteredPending = pendingFaqs.filter(f =>
-    f.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    f.answer.toLowerCase().includes(searchQuery.toLowerCase())
+    f.question.toLowerCase().includes(normalizedSearchQuery) ||
+    f.answer.toLowerCase().includes(normalizedSearchQuery)
   );
 
   const filteredApproved = approvedFaqs.filter(f =>
-    f.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    f.answer.toLowerCase().includes(searchQuery.toLowerCase())
+    f.question.toLowerCase().includes(normalizedSearchQuery) ||
+    f.answer.toLowerCase().includes(normalizedSearchQuery)
   );
   const filteredTracking = trackingFaqs.filter(f =>
-    f.question.toLowerCase().includes(searchQuery.toLowerCase())
+    f.question.toLowerCase().includes(normalizedSearchQuery)
   );
 
   if (loading) {

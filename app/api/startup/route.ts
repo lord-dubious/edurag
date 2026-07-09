@@ -7,7 +7,7 @@ import { errorResponse } from '@/lib/errors';
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.replace(/^Bearer\s+/i, '');
-  
+
   if (token !== process.env.ADMIN_SECRET && token !== process.env.ADMIN_TOKEN) {
     return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   try {
     await ensureUserEmailIndex();
     const settings = await getSettings();
-    
+
     if (settings?.onboarded) {
       return NextResponse.json({
         success: true,
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const universityUrl = env.UNIVERSITY_URL || settings?.uniUrl;
-    
+
     if (!universityUrl) {
       return NextResponse.json({
         success: true,
@@ -34,6 +34,12 @@ export async function POST(request: NextRequest) {
         autoCrawl: false,
       });
     }
+
+    const crawlConfig = {
+      maxDepth: env.CRAWL_MAX_DEPTH,
+      maxBreadth: env.CRAWL_MAX_BREADTH,
+      limit: env.CRAWL_LIMIT,
+    };
 
     if (!env.AUTO_CRAWL) {
       return NextResponse.json({
@@ -76,11 +82,7 @@ export async function POST(request: NextRequest) {
       emoji: settings?.emoji || '🎓',
       iconType: settings?.iconType || 'emoji',
       showTitle: settings?.showTitle ?? true,
-      crawlConfig: settings?.crawlConfig || {
-        maxDepth: env.CRAWL_MAX_DEPTH,
-        maxBreadth: env.CRAWL_MAX_BREADTH,
-        limit: env.CRAWL_LIMIT,
-      },
+      crawlConfig: settings?.crawlConfig || crawlConfig,
       crawlStatus: 'pending',
     });
 
@@ -92,11 +94,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         universityUrl,
-        crawlConfig: {
-          maxDepth: env.CRAWL_MAX_DEPTH,
-          maxBreadth: env.CRAWL_MAX_BREADTH,
-          limit: env.CRAWL_LIMIT,
-        },
+        crawlConfig,
         crawlerInstructions: env.CRAWL_INSTRUCTIONS,
         fileTypeRules: { pdf: 'index', docx: 'index', csv: 'skip' },
         apiKeys: {
@@ -136,7 +134,7 @@ export async function GET() {
   try {
     await ensureUserEmailIndex();
     const settings = await getSettings();
-    
+
     return NextResponse.json({
       onboarded: settings?.onboarded ?? false,
       autoCrawl: env.AUTO_CRAWL,

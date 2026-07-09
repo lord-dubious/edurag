@@ -17,7 +17,7 @@ type OnFinishEvent = {
 
 async function loadRoute(onFinishEvent: OnFinishEvent) {
   const appendMessage = vi.fn().mockResolvedValue(undefined);
-  const getConversation = vi.fn().mockResolvedValue({ title: 'Existing title' });
+  const saveMessage = vi.fn().mockResolvedValue(undefined);
   const runAgent = vi.fn().mockResolvedValue({
     toUIMessageStreamResponse: async ({ onFinish }: { onFinish?: (event: OnFinishEvent) => Promise<void> | void }) => {
       if (onFinish) {
@@ -56,11 +56,12 @@ async function loadRoute(onFinishEvent: OnFinishEvent) {
   }));
   vi.doMock('@/lib/conversation', () => ({
     appendMessage,
-    getConversation,
+    saveMessage,
+    getConversation: vi.fn().mockResolvedValue({ title: 'Existing title' }),
   }));
 
   const { POST } = await import('@/app/api/chat/route');
-  return { POST, appendMessage, runAgent };
+  return { POST, appendMessage, saveMessage, runAgent };
 }
 
 function buildRequestBody(threadId = 'thread-1') {
@@ -105,7 +106,7 @@ describe('POST /api/chat history persistence', () => {
       ],
     };
 
-    const { POST, appendMessage, runAgent } = await loadRoute({
+    const { POST, appendMessage, saveMessage, runAgent } = await loadRoute({
       responseMessage: assistantWithTool,
       messages: [
         {
@@ -133,9 +134,10 @@ describe('POST /api/chat history persistence', () => {
       maxTokens: 4096,
       temperature: 0.4,
     }));
-    expect(appendMessage).toHaveBeenCalledTimes(2);
+    expect(appendMessage).toHaveBeenCalledTimes(1);
+    expect(saveMessage).toHaveBeenCalledTimes(1);
 
-    const assistantCall = appendMessage.mock.calls[1];
+    const assistantCall = saveMessage.mock.calls[0];
     expect(assistantCall[0]).toBe('thread-1');
     expect(assistantCall[2]).toBe('user-1');
     expect(assistantCall[1]).toMatchObject({
@@ -176,7 +178,7 @@ describe('POST /api/chat history persistence', () => {
       ],
     };
 
-    const { POST, appendMessage } = await loadRoute({
+    const { POST, appendMessage, saveMessage } = await loadRoute({
       responseMessage: assistantWithWebTool,
       messages: [
         {
@@ -198,9 +200,10 @@ describe('POST /api/chat history persistence', () => {
 
     const res = await POST(req);
     expect(res.status).toBe(200);
-    expect(appendMessage).toHaveBeenCalledTimes(2);
+    expect(appendMessage).toHaveBeenCalledTimes(1);
+    expect(saveMessage).toHaveBeenCalledTimes(1);
 
-    const assistantCall = appendMessage.mock.calls[1];
+    const assistantCall = saveMessage.mock.calls[0];
     expect(assistantCall[0]).toBe('thread-web-1');
     expect(assistantCall[1]).toMatchObject({
       id: 'assistant-web-1',
@@ -217,7 +220,7 @@ describe('POST /api/chat history persistence', () => {
     });
   });
 
-  it('persists sources from the latest non-empty search tool output when multiple outputs exist', async () => {
+  it('persists aggregated sources when multiple search tool outputs exist', async () => {
     const assistantWithMultipleSearchOutputs = {
       id: 'assistant-multi-1',
       role: 'assistant' as const,
@@ -254,7 +257,7 @@ describe('POST /api/chat history persistence', () => {
       ],
     };
 
-    const { POST, appendMessage } = await loadRoute({
+    const { POST, appendMessage, saveMessage } = await loadRoute({
       responseMessage: assistantWithMultipleSearchOutputs,
       messages: [
         {
@@ -276,15 +279,23 @@ describe('POST /api/chat history persistence', () => {
 
     const res = await POST(req);
     expect(res.status).toBe(200);
-    expect(appendMessage).toHaveBeenCalledTimes(2);
+    expect(appendMessage).toHaveBeenCalledTimes(1);
+    expect(saveMessage).toHaveBeenCalledTimes(1);
 
-    const assistantCall = appendMessage.mock.calls[1];
+    const assistantCall = saveMessage.mock.calls[0];
     expect(assistantCall[0]).toBe('thread-multi-source');
     expect(assistantCall[1]).toMatchObject({
       id: 'assistant-multi-1',
       role: 'assistant',
       content: 'Here are the latest admissions details.',
       sources: [
+        {
+          url: 'https://example.edu/old-admissions',
+          title: 'Older Admissions Page',
+          content: 'Older admissions content',
+          score: 0.75,
+          sourceType: 'vector',
+        },
         {
           url: 'https://example.edu/current-admissions',
           title: 'Current Admissions',
@@ -296,7 +307,85 @@ describe('POST /api/chat history persistence', () => {
     });
   });
 
-  it('falls back to prior assistant tool outputs when response message has none', async () => {
+  it('does not borrow sources from a previous assistant message', async () => {
+    const previousAssistantWithTool = {
+      id: 'assistant-previous',
+      role: 'assistant' as const,
+      parts: [
+        { type: 'text', text: 'Earlier answer with sources.' },
+        {
+          type: 'tool-vector_search',
+          state: 'output-available',
+          output: {
+            results: [
+              {
+                url: 'https://example.edu/earlier',
+                title: 'Earlier Source',
+                content: 'Earlier source content',
+                score: 0.91,
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const currentAssistantWithoutSources = {
+      id: 'assistant-current',
+      role: 'assistant' as const,
+      parts: [
+        { type: 'text', text: 'New answer without any search tool output.' },
+      ],
+    };
+
+    const { POST, saveMessage } = await loadRoute({
+      responseMessage: currentAssistantWithoutSources,
+      messages: [
+        {
+          id: 'user-1-msg',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Tell me something new.' }],
+        },
+        previousAssistantWithTool,
+        {
+          id: 'user-2-msg',
+          role: 'user',
+          parts: [{ type: 'text', text: 'And what about this other thing?' }],
+        },
+        currentAssistantWithoutSources,
+      ],
+      isContinuation: false,
+      isAborted: false,
+    });
+
+    const req = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        threadId: 'thread-no-borrow',
+        messages: [
+          {
+            id: 'user-2-msg',
+            role: 'user' as const,
+            parts: [{ type: 'text', text: 'And what about this other thing?' }],
+          },
+        ],
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    const assistantCall = saveMessage.mock.calls[0];
+    expect(assistantCall[1]).toMatchObject({
+      id: 'assistant-current',
+      role: 'assistant',
+      content: 'New answer without any search tool output.',
+      sources: [],
+    });
+  });
+
+  it('does not backfill from the prior assistant when the response message has no sources', async () => {
     const priorAssistantWithTool = {
       id: 'assistant-mid',
       role: 'assistant' as const,
@@ -327,7 +416,7 @@ describe('POST /api/chat history persistence', () => {
       ],
     };
 
-    const { POST, appendMessage } = await loadRoute({
+    const { POST, appendMessage, saveMessage } = await loadRoute({
       responseMessage: responseAssistant,
       messages: [
         {
@@ -359,22 +448,16 @@ describe('POST /api/chat history persistence', () => {
 
     const res = await POST(req);
     expect(res.status).toBe(200);
-    expect(appendMessage).toHaveBeenCalledTimes(2);
+    expect(appendMessage).toHaveBeenCalledTimes(1);
+    expect(saveMessage).toHaveBeenCalledTimes(1);
 
-    const assistantCall = appendMessage.mock.calls[1];
+    const assistantCall = saveMessage.mock.calls[0];
     expect(assistantCall[0]).toBe('thread-2');
     expect(assistantCall[1]).toMatchObject({
       id: 'assistant-final',
       role: 'assistant',
       content: 'Admissions open in September.',
-      sources: [
-        {
-          url: 'https://example.edu/admissions',
-          title: 'Admissions',
-          content: 'Admissions requirements and deadlines',
-          score: 0.81,
-        },
-      ],
+      sources: [],
     });
   });
 
@@ -417,7 +500,7 @@ describe('POST /api/chat history persistence', () => {
       ],
     };
 
-    const { POST, appendMessage } = await loadRoute({
+    const { POST, appendMessage, saveMessage } = await loadRoute({
       responseMessage: responseAssistant,
       messages: [
         {
@@ -450,9 +533,10 @@ describe('POST /api/chat history persistence', () => {
 
     const res = await POST(req);
     expect(res.status).toBe(200);
-    expect(appendMessage).toHaveBeenCalledTimes(2);
+    expect(appendMessage).toHaveBeenCalledTimes(1);
+    expect(saveMessage).toHaveBeenCalledTimes(1);
 
-    const assistantCall = appendMessage.mock.calls[1];
+    const assistantCall = saveMessage.mock.calls[0];
     expect(assistantCall[0]).toBe('thread-3');
     expect(assistantCall[1]).toMatchObject({
       id: 'assistant-final-no-sources',
@@ -462,7 +546,7 @@ describe('POST /api/chat history persistence', () => {
     });
   });
 
-  it('does not persist assistant message when stream finish is aborted', async () => {
+  it('persists the latest partial assistant message when stream finish is aborted', async () => {
     const responseAssistant = {
       id: 'assistant-aborted',
       role: 'assistant' as const,
@@ -471,7 +555,7 @@ describe('POST /api/chat history persistence', () => {
       ],
     };
 
-    const { POST, appendMessage } = await loadRoute({
+    const { POST, appendMessage, saveMessage } = await loadRoute({
       responseMessage: responseAssistant,
       messages: [
         {
@@ -494,10 +578,76 @@ describe('POST /api/chat history persistence', () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
     expect(appendMessage).toHaveBeenCalledTimes(1);
+    expect(saveMessage).toHaveBeenCalledTimes(1);
     expect(appendMessage.mock.calls[0][1]).toMatchObject({
       role: 'user',
       content: 'What is tuition?',
     });
+    expect(saveMessage.mock.calls[0][1]).toMatchObject({
+      id: 'assistant-aborted',
+      role: 'assistant',
+      content: 'Partial answer that should not be stored.',
+      sources: [],
+    });
+  });
+
+  it('drops unknown message parts instead of stringifying them into prompt text', async () => {
+    const responseAssistant = {
+      id: 'assistant-sanitized',
+      role: 'assistant' as const,
+      parts: [
+        { type: 'text', text: 'Here is a clean answer.' },
+      ],
+    };
+
+    const { POST, runAgent } = await loadRoute({
+      responseMessage: responseAssistant,
+      messages: [
+        {
+          id: 'user-1-msg',
+          role: 'user',
+          parts: [
+            { type: 'text', text: 'Tell me about tuition' },
+            { type: 'metadata', nested: { noisy: true } },
+          ],
+        },
+        responseAssistant,
+      ],
+      isContinuation: false,
+      isAborted: false,
+    });
+
+    const req = new Request('http://localhost/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        threadId: 'thread-sanitized',
+        messages: [
+          {
+            id: 'user-1-msg',
+            role: 'user',
+            content: 'Tell me about tuition',
+            parts: [
+              { type: 'text', text: 'Tell me about tuition' },
+              { type: 'metadata', nested: { noisy: true } },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(runAgent).toHaveBeenCalledWith(expect.objectContaining({
+      messages: [
+        expect.objectContaining({
+          id: 'user-1-msg',
+          parts: [
+            { type: 'text', text: 'Tell me about tuition' },
+          ],
+        }),
+      ],
+    }));
   });
 
   it('does not persist assistant message for continuation segment finishes', async () => {

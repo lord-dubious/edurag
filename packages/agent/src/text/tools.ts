@@ -77,7 +77,7 @@ export const createPopularFaqsTool = (getFaqsFn: GetPublicFaqsFn) =>
         inputSchema: z.object({ limit: z.number().optional().default(3) }),
         execute: async ({ limit }) => {
             const faqs = await getFaqsFn(limit);
-            return faqs.map(f => ({ question: f.question, answer: f.answer }));
+            return faqs.map((faq) => ({ question: faq.question, answer: faq.answer }));
         },
     });
 

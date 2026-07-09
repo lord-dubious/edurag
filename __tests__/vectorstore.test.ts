@@ -45,9 +45,7 @@ describe('Vector Store', () => {
       embeddingKey: 'embedding',
     });
 
-    console.log('Waiting 15s for Atlas Vector Search index refresh...');
     await new Promise(r => setTimeout(r, 15000));
-    console.log('Index refresh wait complete');
   }, 90000);
 
   afterAll(async () => {
@@ -58,14 +56,9 @@ describe('Vector Store', () => {
   });
 
   it('should perform similarity search with scores and rerank top K', async () => {
-    // broadK is at least 25, but we request 3. The reranker should return exactly 3 (if enough matches exist).
     const requestedK = 3;
     const results = await similaritySearchWithScore('computer science programs', requestedK);
 
-    console.log(`Found ${results.length} similar documents`);
-    if (results.length > 0) {
-      console.log('First result:', JSON.stringify(results[0], null, 2));
-    }
     expect(results.length).toBeGreaterThan(0);
     expect(results.length).toBeLessThanOrEqual(requestedK);
     expect(results[0][0].pageContent.length).toBeGreaterThan(0);
@@ -74,11 +67,6 @@ describe('Vector Store', () => {
   it('should return relevant results', async () => {
     const results = await similaritySearchWithScore('tuition costs', 3);
 
-    console.log('Search results with scores:');
-    results.forEach(([doc, score]) => {
-      console.log(`  Score: ${score.toFixed(4)} - ${doc.pageContent.slice(0, 50)}...`);
-    });
-
     expect(results.length).toBeGreaterThan(0);
     expect(results[0][1]).toBeGreaterThanOrEqual(0);
   });
@@ -86,21 +74,10 @@ describe('Vector Store', () => {
   it('should return documents matching the query', async () => {
     const results = await similaritySearchWithScore('application deadlines', 5);
 
-    const validResults = results.filter(([doc]) => doc.pageContent && doc.pageContent.length > 0);
-
-    if (validResults.length > 0) {
-      expect(validResults.length).toBeGreaterThan(0);
-      validResults.forEach(([doc]) => {
-        expect(doc.pageContent.length).toBeGreaterThan(0);
-        expect(doc.metadata.url).toBeDefined();
-      });
-    } else if (results.length > 0) {
-      expect(results.length).toBeGreaterThan(0);
-      results.forEach(([doc]) => {
-        expect(doc.metadata?.url).toBeDefined();
-      });
-    } else {
-      expect(true).toBe(true);
-    }
+    expect(results.length).toBeGreaterThan(0);
+    results.forEach(([doc]) => {
+      expect(doc.pageContent.length).toBeGreaterThan(0);
+      expect(doc.metadata?.url).toBeDefined();
+    });
   }, 30000);
 });

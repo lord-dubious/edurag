@@ -51,18 +51,6 @@ function resolveApiKeyValue(value: string | undefined, envValue: string | undefi
 
 type EnvEntry = { type: 'comment'; text: string } | { type: 'kv'; key: string; value: string } | { type: 'blank' };
 
-/**
- * Update the project's .env.local file with provided onboarding API keys and related settings while preserving existing file comments and ordering.
- *
- * If running in production, test, Vercel, or Netlify environments, the operation is skipped.
- *
- * @param apiKeys - Onboarding-provided API keys and numeric parameters to write into the environment file (e.g., database, chat, embedding, Tavily, Uploadthing, admin secret, and chat tuning values).
- * @param settings - Onboarding settings; `uniUrl` is written to `UNIVERSITY_URL` when present.
- * @returns An object describing the result:
- *  - `success`: `true` if the file was written successfully, `false` otherwise.
- *  - `skipped`: `true` if the write was intentionally skipped due to environment, `false` otherwise.
- *  - `error` (optional): stringified error message when `success` is `false` and the operation failed due to a filesystem error.
- */
 async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>): Promise<{ success: boolean; skipped: boolean; error?: string }> {
   const isProduction = process.env.NODE_ENV === 'production';
   const isTest = process.env.NODE_ENV === 'test';
@@ -80,7 +68,6 @@ async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>)
     await access(envPath);
     existingEnv = await readFile(envPath, 'utf-8');
   } catch {
-    // File doesn't exist, that's fine
   }
 
   const lines = existingEnv.split('\n');
@@ -163,18 +150,6 @@ async function writeEnvFile(apiKeys: ApiKeys, settings: Record<string, unknown>)
   }
 }
 
-/**
- * Complete onboarding by validating input, saving settings, optionally persisting environment variables, and returning a masked preview of resulting env values.
- *
- * Expects the request body to contain onboarding fields (e.g., `universityUrl`, `brandPrimary`, branding and UI options, `apiKeys`, `crawlConfig`, etc.). If required environment values are missing, `apiKeys` must include the necessary secrets and configuration values (MongoDB URI, chat/embedding/tavily API keys, admin secret, embedding model and dimensions).
- *
- * @param request - The incoming NextRequest whose JSON body contains onboarding configuration and optional `apiKeys`.
- * @returns A Response with JSON { success, envPreview, isProduction, envWritten } where:
- *  - `envPreview` is a newline-separated, masked preview of effective env key/value pairs,
- *  - `isProduction` reflects NODE_ENV === 'production',
- *  - `envWritten` is true when the handler wrote a new .env.local (i.e., required env vars were not already present).
- * The response also sets an `edurag_onboarded=true` cookie on success.
- */
 export async function POST(request: NextRequest): Promise<Response> {
   try {
     const existingSettings = await getSettings();
@@ -247,7 +222,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       onboarded: true,
       uniUrl: universityUrl,
       appName: universityName || 'University Knowledge Base',
-      brandPrimary: brandPrimary,
+      brandPrimary,
       brandSecondary: brandSecondary || brandPrimary,
       brandLogoUrl: (iconType === 'logo' || iconType === 'upload') ? logoUrl : '',
       emoji: iconType === 'emoji' ? emoji : '',
@@ -304,18 +279,6 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 }
 
-/**
- * Provide onboarding status, selected saved settings, environment-variable availability, and masked API key presence.
- *
- * @returns A JSON HTTP `Response` whose body contains:
- * - `isOnboarded`: `true` if onboarding has been completed, `false` otherwise.
- * - `uniUrl`, `brandPrimary`, `brandSecondary`, `logoUrl`, `emoji`, `iconType`, `showTitle`, `appName`: selected stored settings (may be `undefined` if unset).
- * - `hasAllEnvVars`: `true` if all required environment variables are present, `false` otherwise.
- * - `apiKeys`: an object with non-secret config values plus masked presence indicators (`'****'` or `''`) for secrets:
- *   - `mongodbUri`, `chatApiKey`, `chatBaseUrl`, `chatModel`, `chatMaxTokens`, `chatMaxSteps`, `chatTemperature`,
- *     `embeddingApiKey`, `embeddingModel`, `embeddingDimensions`, `tavilyApiKey`.
- *   - `adminSecret`: set to `'****'` when `ADMIN_SECRET` is present, otherwise `''`.
- */
 export async function GET(): Promise<Response> {
   try {
     const settings = await getSettings();

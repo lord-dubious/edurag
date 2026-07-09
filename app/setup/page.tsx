@@ -172,15 +172,6 @@ const PasswordInput = ({ id, placeholder, value, onChange, className }: Password
   );
 };
 
-/**
- * Render the onboarding wizard for configuring and launching a university knowledge base.
- *
- * The component manages a multi-step setup flow (university URL, branding, crawl scope,
- * API configuration, crawling progress, and completion), persists/fetches saved settings,
- * streams crawl progress from the server, and posts the final configuration to the backend.
- *
- * @returns The JSX element for the full onboarding setup page
- */
 export default function SetupPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);

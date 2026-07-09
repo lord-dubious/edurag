@@ -17,13 +17,14 @@ import type { ChatStatus } from 'ai';
 interface Props {
   onSubmit: (message: PromptInputMessage) => void;
   status: ChatStatus;
+  onStop?: () => void;
   defaultInput?: string;
   onVoiceMode?: () => void;
   voiceHelperText?: string;
   voiceDisabled?: boolean;
 }
 
-export function ChatInput({ onSubmit, status, defaultInput, onVoiceMode, voiceHelperText, voiceDisabled }: Props) {
+export function ChatInput({ onSubmit, status, onStop, defaultInput, onVoiceMode, voiceHelperText, voiceDisabled }: Props) {
   const input = (
     <PromptInput onSubmit={onSubmit} className="w-full max-w-3xl mx-auto bg-background rounded-xl border shadow-sm">
       <PromptInputBody>
@@ -38,15 +39,15 @@ export function ChatInput({ onSubmit, status, defaultInput, onVoiceMode, voiceHe
           {onVoiceMode && (
             <PromptInputButton
               onClick={onVoiceMode}
-              title="Voice call"
-              aria-label="Start voice call"
+              title="Voice chat"
+              aria-label="Start voice chat"
               disabled={voiceDisabled}
               className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md shadow-sm border-none shadow-black/5 flex items-center justify-center p-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Phone className="size-4" />
             </PromptInputButton>
           )}
-          <PromptInputSubmit status={status} className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md shadow-sm border-none shadow-black/5" />
+          <PromptInputSubmit status={status} onStop={onStop} className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-md shadow-sm border-none shadow-black/5" />
         </div>
       </PromptInputFooter>
     </PromptInput>

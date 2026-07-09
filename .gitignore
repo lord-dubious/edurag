@@ -51,6 +51,7 @@ next-env.d.ts
 
 # playwright mcp debug logs
 .playwright-mcp/
+.sisyphus/
 
 # uploaded files
 /public/uploads/

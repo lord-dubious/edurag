@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
-import { deleteConversation, getConversation, appendMessage } from '@/lib/conversation';
+import { deleteConversation, getConversation, saveMessage } from '@/lib/conversation';
 import { z } from 'zod';
 
 import { errorResponse } from '@/lib/errors';
@@ -11,6 +11,7 @@ const sourceSchema = z.object({
   title: z.string().optional(),
   content: z.string(),
   score: z.number().optional(),
+  sourceType: z.enum(['vector', 'web']).optional(),
 });
 
 const messageSchema = z.object({
@@ -23,12 +24,12 @@ const messageSchema = z.object({
 export async function GET(req: Request, { params }: { params: Promise<{ threadId: string }> }) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
   const { threadId } = await params;
   const conversation = await getConversation(threadId, session.user.id);
   if (!conversation) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return errorResponse('NOT_FOUND', 'Not Found', 404);
   }
   return NextResponse.json(conversation);
 }
@@ -53,7 +54,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ threadI
 
   const { threadId } = await params;
   try {
-    await appendMessage(threadId, {
+    await saveMessage(threadId, {
       id: parsed.data.id,
       role: parsed.data.role,
       content: parsed.data.content,
@@ -78,12 +79,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ threadI
 export async function DELETE(req: Request, { params }: { params: Promise<{ threadId: string }> }) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('UNAUTHORIZED', 'Unauthorized', 401);
   }
   const { threadId } = await params;
   const deleted = await deleteConversation(threadId, session.user.id);
   if (!deleted) {
-    return NextResponse.json({ error: "Not found or not authorized" }, { status: 404 });
+    return errorResponse('NOT_FOUND', 'Not found or not authorized', 404);
   }
   return NextResponse.json({ success: true });
 }

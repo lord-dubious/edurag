@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
 import { MoonIcon, SunIcon, PanelLeftClose, PanelLeftOpen, Phone } from 'lucide-react';
 import { nanoid } from 'nanoid';
@@ -12,100 +11,22 @@ import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, type TextUIPart, type UIMessage } from 'ai';
 
 import { authClient } from '@/lib/auth-client-better';
-import { Button } from '@/components/ui/button';
 import { LoginButton } from "@/components/auth/LoginButton";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { HistorySidebar } from "@/components/chat/HistorySidebar";
+import { useConversationHistory } from '@/components/chat/useConversationHistory';
 import { useBrand } from '@/components/providers/BrandProvider';
 import { VoiceChat, VoiceMessagePayload } from '@/components/voice/VoiceChat';
+import { extractSourcesFromSearchParts } from '@/lib/chat/sources';
 import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
-import { CitationPanel } from './CitationPanel';
+import { SourcesPanel } from './SourcesPanel';
 import type { Source } from '@edurag/agent/text';
-
-interface SearchToolPartWithOutput {
-  type: 'tool-vector_search' | 'tool-web_search';
-  toolCallId: string;
-  state: 'output-available';
-  input: { query: string; topK?: number; maxResults?: number };
-  output: { found: boolean; results?: unknown };
-}
 
 type MessagePart = { type: string; state?: string; output?: unknown };
 
-/**
- * Determines whether a message part represents a completed search tool output.
- *
- * @param part - The message part to inspect
- * @returns `true` if `part` is a `tool-vector_search` or `tool-web_search` with `state` equal to `'output-available'` and an `output` property, `false` otherwise.
- */
-function isSearchToolPart(part: MessagePart): part is SearchToolPartWithOutput {
-  return (
-    (part.type === 'tool-vector_search' || part.type === 'tool-web_search') &&
-    part.state === 'output-available' &&
-    'output' in part
-  );
-}
-
-/**
- * Extracts validated source records from message parts produced by search tools.
- *
- * Scans the provided message parts for outputs from `tool-vector_search` or
- * `tool-web_search`, validates each result object, and converts valid entries
- * into `Source` records containing `url`, `content`, optional `title` and
- * numeric `score`, and a `sourceType` of `"vector"` or `"web"`.
- *
- * @param parts - Message parts to inspect for search tool outputs
- * @returns An object with `sources` (the array of extracted `Source` records) and
- * `usedWebFallback` (`true` if any extracted source originated from a web search,
- * `false` otherwise)
- */
 function extractSourcesFromMessageParts(parts: MessagePart[]): { sources: Source[]; usedWebFallback: boolean } {
-  let sources: Source[] = [];
-  let usedWebFallback = false;
-
-  parts.forEach((part) => {
-    if (!isSearchToolPart(part)) {
-      return;
-    }
-
-    const outputResults = part.output?.results;
-    if (!Array.isArray(outputResults)) {
-      return;
-    }
-
-    const sourceType: Source['sourceType'] = part.type === 'tool-web_search' ? 'web' : 'vector';
-    const parsedSources: Source[] = [];
-
-    outputResults.forEach((result) => {
-      if (typeof result !== 'object' || result === null) {
-        return;
-      }
-      const candidate = result as Record<string, unknown>;
-      const url = typeof candidate.url === 'string' ? candidate.url : '';
-      const content = typeof candidate.content === 'string' ? candidate.content : '';
-      if (!url || !content) {
-        return;
-      }
-
-      const title = typeof candidate.title === 'string' ? candidate.title : undefined;
-      const score = typeof candidate.score === 'number' && Number.isFinite(candidate.score) ? candidate.score : undefined;
-      parsedSources.push({
-        url,
-        title,
-        content,
-        score,
-        sourceType,
-      });
-    });
-
-    if (parsedSources.length > 0) {
-      sources = parsedSources;
-      usedWebFallback = sourceType === 'web';
-    }
-  });
-
-  return { sources, usedWebFallback };
+  return extractSourcesFromSearchParts(parts);
 }
 
 interface ChatInterfaceProps {
@@ -128,6 +49,41 @@ const SUGGESTION_POOL = [
   { label: 'Outcomes', query: 'What are graduate outcomes or career support like?' },
 ];
 
+function describeChatError(error: Error | undefined): { title: string; body: string } {
+  const message = error?.message?.trim();
+  if (!message) {
+    return {
+      title: 'Something went wrong',
+      body: 'Try again or start a fresh chat.',
+    };
+  }
+
+  const lower = message.toLowerCase();
+  if (lower.includes('abort')) {
+    return {
+      title: 'Response stopped early',
+      body: 'You can regenerate the last answer or continue with a follow-up question.',
+    };
+  }
+  if (lower.includes('network') || lower.includes('fetch') || lower.includes('connection')) {
+    return {
+      title: 'Connection issue',
+      body: 'Check your connection and retry the last answer when you are ready.',
+    };
+  }
+  if (lower.includes('rate') || lower.includes('too many')) {
+    return {
+      title: 'Temporarily rate limited',
+      body: 'Wait a moment, then retry the last answer.',
+    };
+  }
+
+  return {
+    title: 'Something went wrong',
+    body: message,
+  };
+}
+
 function pickSuggestions<T>(items: T[], count: number, seed: number): T[] {
   let state = Math.floor(seed * 1000000) || 1;
   const rand = () => {
@@ -142,29 +98,20 @@ function pickSuggestions<T>(items: T[], count: number, seed: number): T[] {
   return shuffled.slice(0, count);
 }
 
-/**
- * Renders the main chat UI including message list, input/voice controls, history sidebar, and citation panel.
- *
- * The component manages thread state, history loading/saving, source extraction for assistant messages, suggestion prompts, and optional voice chat handoff behavior.
- *
- * @param initialQuery - Optional initial query to send automatically when the chat is ready and empty
- * @param initialVoice - If true, opens the voice chat UI and attempts auto-start on mount
- * @returns The chat interface React element
- */
 export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps) {
   const router = useRouter();
   const { data: session } = authClient.useSession();
   const [threadId, setThreadId] = useState(() => nanoid());
-  const [showHistory, setShowHistory] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const [sources, setSources] = useState<Record<string, Source[]>>({});
-  const [showSources, setShowSources] = useState(true);
+  const [showSources, setShowSources] = useState(false);
+  const [selectedSourcesMessageId, setSelectedSourcesMessageId] = useState<string | null>(null);
   const [voiceMode, setVoiceMode] = useState(Boolean(initialVoice));
   const [voiceAutoStart, setVoiceAutoStart] = useState(Boolean(initialVoice));
-  const [suggestionsSeed, setSuggestionsSeed] = useState(() => Math.random());
+  const [suggestionsSeed, setSuggestionsSeed] = useState(1);
   const initialQuerySentRef = useRef(false);
-  const historyLoadIdRef = useRef(0);
   const { theme, setTheme } = useTheme();
   const { brand } = useBrand();
   const isAuthenticated = Boolean(session?.user);
@@ -179,46 +126,15 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     body: () => ({ threadId }),
   }), [threadId]);
 
-  const persistHistoryMessage = useCallback(async (
-    payload: { role: 'user' | 'assistant'; id?: string; content: string; sources?: Source[] },
-    context: string,
-  ) => {
-    try {
-      const res = await fetch(`/api/history/${threadId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        console.error(`[History] ${context} failed`, {
-          status: res.status,
-          body,
-        });
-      }
-    } catch (err) {
-      console.error(`[History] ${context} failed`, err);
-    }
-  }, [threadId]);
-
-  const { messages, setMessages, status, error, sendMessage, regenerate } = useChat({
+  const { messages, setMessages, status, error, sendMessage, regenerate, stop } = useChat({
     id: threadId,
     transport,
-    onFinish: async ({ message, messages, isAbort, isDisconnect, isError }) => {
+    onFinish: async ({ message, isAbort, isDisconnect, isError }) => {
       if (isAbort || isDisconnect || isError) {
         return;
       }
 
-      let extraction = extractSourcesFromMessageParts((message.parts ?? []) as MessagePart[]);
-      if (extraction.sources.length === 0) {
-        const responseIdx = messages.findIndex(msg => msg.id === message.id);
-        if (responseIdx > 0) {
-          const previousMessage = messages[responseIdx - 1];
-          if (previousMessage.role === 'assistant') {
-            extraction = extractSourcesFromMessageParts((previousMessage.parts ?? []) as MessagePart[]);
-          }
-        }
-      }
+      const extraction = extractSourcesFromMessageParts((message.parts ?? []) as MessagePart[]);
 
       if (extraction.sources.length > 0) {
         setSources(prev => ({
@@ -229,70 +145,24 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
     },
   });
 
-  const handleHistorySelect = async (newThreadId: string) => {
-    if (newThreadId === threadId) return;
-    const loadId = ++historyLoadIdRef.current;
-    setThreadId(newThreadId);
-    setMessages([]);
-    setSources({});
+  const {
+    persistHistoryMessage,
+    handleHistorySelect,
+    handleNewChat,
+    handleDeleteConversation,
+  } = useConversationHistory({
+    threadId,
+    setThreadId,
+    setHistoryRefreshKey,
+    setMessages,
+    setSources,
+    onCompactNavigate: () => setShowHistory(false),
+  });
 
-    try {
-      const res = await fetch(`/api/history/${newThreadId}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.messages) {
-          const sourcesMap: Record<string, Source[]> = {};
-          const uiMessages = data.messages.map((m: { role: string; content: string; timestamp: string; id?: string; sources?: Source[] }) => {
-            const id = m.id ?? nanoid();
-            if (m.role === 'assistant' && Array.isArray(m.sources) && m.sources.length > 0) {
-              sourcesMap[id] = m.sources;
-            }
-            return {
-              id,
-              role: m.role as 'user' | 'assistant',
-              content: m.content,
-              parts: [{ type: 'text', text: m.content }],
-              createdAt: new Date(m.timestamp)
-            };
-          });
-          if (historyLoadIdRef.current === loadId) {
-            setMessages(uiMessages);
-            setSources(sourcesMap);
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Failed to load history", e);
-    }
-    if (window.innerWidth < 768) {
-      setShowHistory(false);
-    }
-  };
-
-  const handleNewChat = useCallback(() => {
-    setThreadId(nanoid());
-    setMessages([]);
-    setSources({});
-    setHistoryRefreshKey(k => k + 1);
-    setSuggestionsSeed(Math.random());
-    if (window.innerWidth < 768) {
-      setShowHistory(false);
-    }
-  }, [setThreadId, setMessages, setSources, setShowHistory]);
-
-  const handleDeleteConversation = useCallback(async (deleteThreadId: string) => {
-    try {
-      const res = await fetch(`/api/history/${deleteThreadId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('API delete failed');
-    } catch (e) {
-      console.error("Failed to delete conversation", e);
-      throw e;
-    }
-    setHistoryRefreshKey(k => k + 1);
-    if (deleteThreadId === threadId) {
-      handleNewChat();
-    }
-  }, [threadId, handleNewChat]);
+  const handleStartNewChat = useCallback(() => {
+    handleNewChat();
+    setSuggestionsSeed((current) => current + 1);
+  }, [handleNewChat]);
 
   useEffect(() => {
     if (!initialQuery) return;
@@ -404,21 +274,40 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
   const lastSourcedAssistantMessage = [...messages]
     .reverse()
     .find(message => message.role === 'assistant' && (sources[message.id]?.length ?? 0) > 0);
-  const lastSources = lastSourcedAssistantMessage ? sources[lastSourcedAssistantMessage.id] ?? [] : [];
+  const lastAssistantMessage = [...messages].reverse().find(message => message.role === 'assistant');
+  const selectedSourcesAvailable = selectedSourcesMessageId
+    ? (sources[selectedSourcesMessageId]?.length ?? 0) > 0
+    : false;
+  const activeSourcesMessageId = selectedSourcesAvailable
+    ? selectedSourcesMessageId
+    : lastSourcedAssistantMessage?.id ?? null;
+  const lastSources = activeSourcesMessageId ? sources[activeSourcesMessageId] ?? [] : [];
   const isEmpty = messages.length === 0 && status === 'ready';
   const hasSources = lastSources.length > 0;
   const hasWebFallbackSources = lastSources.some(source => source.sourceType === 'web');
   const suggestions = useMemo(() => pickSuggestions(SUGGESTION_POOL, 4, suggestionsSeed), [suggestionsSeed]);
+  const followUpSuggestions = useMemo(() => pickSuggestions(SUGGESTION_POOL, 3, suggestionsSeed + 1), [suggestionsSeed]);
+  const chatErrorCopy = useMemo(() => describeChatError(error), [error]);
+  const showFollowUpSuggestions = messages.length > 0 && status === 'ready';
+
+  const handleOpenSources = useCallback((messageId?: string) => {
+    const nextMessageId = messageId ?? lastSourcedAssistantMessage?.id;
+    if (!nextMessageId || (sources[nextMessageId]?.length ?? 0) === 0) {
+      return;
+    }
+
+    setSelectedSourcesMessageId(nextMessageId);
+    setShowSources(true);
+  }, [lastSourcedAssistantMessage, sources]);
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar for History */}
       {session?.user && showHistory && (
         <div className="w-80 shrink-0 hidden md:flex flex-col border-r h-full">
           <HistorySidebar
             currentId={threadId}
             onSelect={handleHistorySelect}
-            onNew={handleNewChat}
+            onNew={handleStartNewChat}
             onDelete={handleDeleteConversation}
             isOpen={true}
             refreshKey={historyRefreshKey}
@@ -436,7 +325,7 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
               <HistorySidebar
                 currentId={threadId}
                 onSelect={handleHistorySelect}
-                onNew={handleNewChat}
+                onNew={handleStartNewChat}
                 onDelete={handleDeleteConversation}
                 isOpen={true}
                 refreshKey={historyRefreshKey}
@@ -445,19 +334,6 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
           </div>
         </div>
       )}
-      {!session?.user && (
-        <div className="w-80 shrink-0 hidden md:flex flex-col border-r h-full bg-muted/20">
-          <div className="p-6 space-y-3">
-            <h2 className="text-sm font-semibold">History</h2>
-            <p className="text-sm text-muted-foreground">Sign in to save and revisit your chats.</p>
-            <p className="text-xs text-muted-foreground">Keep your admissions questions, compare answers, and pick up where you left off.</p>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/auth/signin?callbackUrl=/chat">Sign in</Link>
-            </Button>
-          </div>
-        </div>
-      )}
-
       <div className="flex-1 flex flex-col min-w-0">
         <header className="flex items-center gap-3 px-4 h-14 border-b bg-background shrink-0">
           {session?.user && (
@@ -482,11 +358,17 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowSources(!showSources)}
-              disabled={!hasSources}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${hasSources
-                ? (showSources
+              <button
+                onClick={() => {
+                  if (showSources) {
+                    setShowSources(false);
+                    return;
+                  }
+                  handleOpenSources();
+                }}
+                disabled={!hasSources}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${hasSources
+                  ? (showSources
                   ? 'border-primary text-primary bg-primary/10'
                   : 'border-border hover:border-primary hover:text-primary')
                 : 'border-border text-muted-foreground bg-muted/40 cursor-not-allowed'
@@ -541,7 +423,7 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Phone className="size-3.5" />
                       <span>
-                        Prefer voice? Tap the phone icon{isAuthenticated ? ' to start a call.' : ' to sign in and start a call.'}
+                        {isAuthenticated ? 'Prefer voice? Tap the phone icon.' : 'Prefer voice? Sign in and tap the phone icon.'}
                       </span>
                     </div>
                   </div>
@@ -552,17 +434,46 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
                     sources={sources}
                     status={status}
                     onRegenerate={regenerate}
+                    latestSourcesMessageId={lastSourcedAssistantMessage?.id}
+                    onOpenSources={handleOpenSources}
                   />
                 )}
+                {showFollowUpSuggestions && !error && (
+                  <div className="mt-6 flex flex-wrap items-center gap-2 px-1">
+                    <span className="text-xs text-muted-foreground">Try next:</span>
+                    {followUpSuggestions.map((suggestion) => (
+                      <button
+                        key={`follow-up-${suggestion.label}`}
+                        onClick={() => handleSuggestionClick(suggestion.query)}
+                        className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                      >
+                        {suggestion.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {error && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm mt-4">
-                    <span>Something went wrong.</span>
-                    <button
-                      onClick={() => regenerate()}
-                      className="underline font-medium"
-                    >
-                      Try again
-                    </button>
+                  <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm">
+                    <div className="space-y-1">
+                      <p className="font-medium text-destructive">{chatErrorCopy.title}</p>
+                      <p className="text-muted-foreground">{chatErrorCopy.body}</p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {lastAssistantMessage && (
+                        <button
+                          onClick={() => regenerate()}
+                          className="rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90"
+                        >
+                          Retry last answer
+                        </button>
+                      )}
+                      <button
+                        onClick={handleStartNewChat}
+                        className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        Start fresh chat
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -584,8 +495,9 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
                   <ChatInput
                     onSubmit={handleSubmit}
                     status={status}
+                    onStop={stop}
                     onVoiceMode={handleVoiceStart}
-                    voiceHelperText={isAuthenticated ? undefined : 'Voice requires login'}
+                    voiceHelperText={isAuthenticated ? undefined : 'Sign in for voice'}
                   />
                 )}
               </div>
@@ -593,7 +505,12 @@ export function ChatInterface({ initialQuery, initialVoice }: ChatInterfaceProps
           </main>
 
           {showSources && lastSources.length > 0 && (
-            <CitationPanel sources={lastSources} />
+            <SourcesPanel
+              sources={lastSources}
+              title={activeSourcesMessageId === lastSourcedAssistantMessage?.id ? 'Sources for latest answer' : 'Sources for selected answer'}
+              isOpen={showSources}
+              onClose={() => setShowSources(false)}
+            />
           )}
         </div>
       </div>

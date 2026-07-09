@@ -14,6 +14,7 @@ import { math } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
 import { CopyIcon, RefreshCcwIcon, ExternalLinkIcon, MessageCircleQuestionIcon, FileTextIcon } from 'lucide-react';
 import { Fragment, useMemo, memo } from 'react';
+import { cleanSourcePreview, getSafeHref, getSourceHostname } from '@/lib/chat/sources';
 
 const CITATION_REGEX = /(?:\[([^\]]+)\]\(cite:(\d+)\))|(?:【(\d+)(?:†[^】]+)?】|\[(\d+)\])/g;
 
@@ -23,10 +24,6 @@ const CITATION_ALLOWED_TAGS: AllowedTags = {
   'cite-ref': ['data-index', 'data-url', 'data-title'],
 };
 
-/**
- * Preprocess text to extract LLM-chosen source titles and convert to html.
- * [Clean Title](cite:1) → <cite-ref data-index="0" data-title="Clean Title" ... />
- */
 function preprocessCitations(text: string, sources: Source[]): string {
   return text.replace(CITATION_REGEX, (_match, customTitle, g2, g3, g4) => {
     const citationIndex = parseInt(g2 ?? g3 ?? g4, 10) - 1;
@@ -41,15 +38,6 @@ function preprocessCitations(text: string, sources: Source[]): string {
   });
 }
 
-function cleanSourceContent(content: string, maxLength = 150): string {
-  if (!content) return '';
-  return content
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, maxLength)
-    .replace(/\s+\S*$/, '');
-}
-
 interface Source {
   url: string;
   title?: string;
@@ -62,61 +50,34 @@ interface Props {
   sources: Record<string, Source[]>;
   status: ChatStatus;
   onRegenerate: () => void;
+  latestSourcesMessageId?: string;
+  onOpenSources?: (messageId: string) => void;
 }
 
-/**
- * Normalize and validate a URL string and return it only for `http` or `https` schemes.
- *
- * @returns The normalized URL string if `url` parses and has protocol `http:` or `https:`, `null` otherwise.
- */
-function getSafeHref(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      return parsed.toString();
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Extracts a sanitized hostname from a URL string, removing a leading `www.`.
- *
- * @param url - The input URL string to parse.
- * @returns The hostname with a leading `www.` removed, or `"source"` if the URL cannot be parsed or yields an empty hostname.
- */
-function getSourceHostname(url: string): string {
-  try {
-    const hostname = new URL(url).hostname.replace('www.', '');
-    return hostname || 'source';
-  } catch {
-    return 'source';
-  }
-}
-
-/**
- * Renders a clickable citation "chip" that displays a numbered badge and a title and links to the source when the URL is safe.
- *
- * The component uses the provided `customTitle` if present, otherwise falls back to `source.title` or a hostname-derived label. If the source URL is not an http(s) URL, the chip renders a placeholder link (`'#'`) and prevents navigation; the tooltip indicates when the source URL is unavailable.
- *
- * @param index - Zero-based citation index (displayed as `index + 1` in the badge)
- * @param source - Source metadata containing at least `url` and optionally `title`/`content`
- * @param customTitle - Optional override for the displayed title
- * @returns The JSX element representing the citation chip
- */
 function CitationChip({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
   const safeHref = getSafeHref(source.url);
   const displayTitle = customTitle || source.title || getSourceHostname(source.url);
+  if (!safeHref) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-muted border rounded-full text-[11px] font-medium text-muted-foreground"
+        title="Unavailable source URL"
+      >
+        <span className="flex size-[16px] shrink-0 items-center justify-center rounded-full bg-muted-foreground/15 text-[9px] font-mono text-muted-foreground">
+          {index + 1}
+        </span>
+        {displayTitle}
+      </span>
+    );
+  }
+
   return (
     <a
-      href={safeHref ?? '#'}
+      href={safeHref}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={safeHref ? undefined : (event) => event.preventDefault()}
       className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-[11px] font-medium text-primary hover:bg-primary hover:text-primary-foreground transition-all cursor-pointer no-underline group"
-      title={safeHref ?? 'Unavailable source URL'}
+      title={safeHref}
     >
       <span className="flex size-[16px] shrink-0 items-center justify-center rounded-full bg-primary text-[9px] font-mono text-primary-foreground group-hover:bg-primary-foreground/30 transition-colors">
         {index + 1}
@@ -126,26 +87,13 @@ function CitationChip({ index, source, customTitle }: { index: number; source: S
   );
 }
 
-/**
- * Render a clickable source card showing a numbered badge, title, truncated snippet, and domain.
- *
- * @param index - Zero-based index of the source (used to render the 1-based badge).
- * @param source - The citation source object containing at least `url` and `content`; `title` may be present.
- * @param customTitle - Optional override for the displayed title; used instead of `source.title` or the hostname.
- * @returns The JSX anchor element for the styled source card; links to the source URL when it is a safe http(s) href. */
 function SourceCard({ index, source, customTitle }: { index: number; source: Source; customTitle?: string }) {
   const safeHref = getSafeHref(source.url);
   const domain = getSourceHostname(source.url);
   const displayTitle = customTitle || source.title || domain;
 
-  return (
-    <a
-      href={safeHref ?? '#'}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={safeHref ? undefined : (event) => event.preventDefault()}
-      className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-accent/50 transition-colors cursor-pointer no-underline"
-    >
+  const content = (
+    <>
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
         <span className="text-xs font-mono font-bold text-primary">{index + 1}</span>
       </div>
@@ -154,18 +102,36 @@ function SourceCard({ index, source, customTitle }: { index: number; source: Sou
           <span className="truncate text-sm font-medium text-foreground group-hover:text-primary">
             {displayTitle}
           </span>
-          <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          {safeHref && <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
         </div>
         <p className="text-xs text-muted-foreground line-clamp-2">
-          {cleanSourceContent(source.content)}
+          {cleanSourcePreview(source.content, 150)}
         </p>
         <span className="text-[10px] text-muted-foreground/70">{domain}</span>
       </div>
+    </>
+  );
+
+  if (!safeHref) {
+    return (
+      <div className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-card text-left">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={safeHref}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-start gap-3 p-3 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-accent/50 transition-colors cursor-pointer no-underline"
+    >
+      {content}
     </a>
   );
 }
 
-/** Streamdown-powered markdown renderer with citation support */
 const RenderedMessage = memo(function RenderedMessage({ text, sources }: { text: string; sources: Source[] }) {
   const processed = useMemo(() => preprocessCitations(text, sources), [text, sources]);
 
@@ -197,19 +163,7 @@ const RenderedMessage = memo(function RenderedMessage({ text, sources }: { text:
   );
 }, (prev, next) => prev.text === next.text && prev.sources === next.sources);
 
-/**
- * Render the chat transcript including message bubbles, source panels, and per-assistant actions.
- *
- * Renders an empty-state when there are no messages. For each message it displays text parts, tool progress rows, a voice-handoff note, and — for assistant messages with attached sources — a compact sources panel with up to six source cards. When the last assistant message is ready it shows Copy and Regenerate actions.
- *
- * @param messages - Array of UIMessage objects representing the chat transcript
- * @param sources - Mapping from message id to an array of Source entries used to render citation chips and source cards
- * @param status - Current chat status; controls rendering of action buttons and certain fallbacks
- * @param onRegenerate - Callback invoked when the user triggers the "Regenerate" action
- * @returns The rendered chat messages React element
- */
-export function ChatMessages({ messages, sources, status, onRegenerate }: Props) {
-
+export function ChatMessages({ messages, sources, status, onRegenerate, latestSourcesMessageId, onOpenSources }: Props) {
   if (messages.length === 0) {
     return (
       <div className="flex size-full flex-col items-center justify-center gap-3 p-8 text-center">
@@ -232,8 +186,8 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
         const isLast = idx === messages.length - 1;
         const msgSources = sources[message.id] ?? [];
 
-        // Pre-parse text parts to find custom source titles generated by LLM
         const extractedTitles: Record<number, string> = {};
+        const isLatestSourcesMessage = message.id === latestSourcesMessageId;
         message.parts.forEach(part => {
           if (part.type === 'text') {
             const matches = Array.from((part as TextUIPart).text.matchAll(CITATION_REGEX));
@@ -247,56 +201,49 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
           }
         });
 
+        const firstTextPart = message.parts.find(p => p.type === 'text') as TextUIPart | undefined;
+        const isVoiceHandoff = message.role === 'user' && firstTextPart?.text?.startsWith('[VOICE_HANDOFF]');
+
         return (
           <Fragment key={message.id}>
-            {(() => {
-              const firstTextPart = message.parts.find(p => p.type === 'text') as TextUIPart | undefined;
-              const isVoiceHandoff = message.role === 'user' && firstTextPart?.text?.startsWith('[VOICE_HANDOFF]');
+            {isVoiceHandoff ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground px-4 py-2 animate-in fade-in duration-300">
+                <FileTextIcon className="size-3.5" />
+                <span className="italic">Generating detailed notes from voice request...</span>
+              </div>
+            ) : (
+              <Message from={message.role} className="animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-300">
+                <MessageContent>
+                  {message.parts.map((part, i) => {
+                    if (part.type === 'text') {
+                      return <RenderedMessage key={`${message.id}-${i}`} text={part.text} sources={msgSources} />;
+                    }
+                    if (part.type.startsWith('tool-')) {
+                      const toolLabel = part.type === 'tool-web_search'
+                        ? 'Searching web fallback...'
+                        : 'Searching knowledge base...';
+                      return (
+                        <div key={`${message.id}-${i}`} className="flex items-center gap-2 text-sm text-muted-foreground px-4 py-2">
+                          <svg className="animate-spin size-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          <span>{toolLabel}</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                  {!message.parts.some(p => p.type === 'text') && message.role === 'assistant' && status === 'ready' && (
+                    <Streamdown className="size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0" plugins={streamdownPlugins}>
+                      I found relevant information but couldn&apos;t generate a proper response. Please try rephrasing your question.
+                    </Streamdown>
+                  )}
+                </MessageContent>
+              </Message>
+            )}
 
-              if (isVoiceHandoff) {
-                return (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground px-4 py-2 animate-in fade-in duration-300">
-                    <FileTextIcon className="size-3.5" />
-                    <span className="italic">Generating detailed notes from voice request...</span>
-                  </div>
-                );
-              }
-
-              return (
-                <Message from={message.role} className="animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-300">
-                  <MessageContent>
-                    {message.parts.map((part, i) => {
-                      if (part.type === 'text') {
-                        const text = (part as TextUIPart).text;
-                        return <RenderedMessage key={`${message.id}-${i}`} text={text} sources={msgSources} />;
-                      }
-                      if (part.type.startsWith('tool-')) {
-                        const toolLabel = part.type === 'tool-web_search'
-                          ? 'Searching web fallback...'
-                          : 'Searching knowledge base...';
-                        return (
-                          <div key={`${message.id}-${i}`} className="flex items-center gap-2 text-sm text-muted-foreground px-4 py-2">
-                            <svg className="animate-spin size-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            <span>{toolLabel}</span>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })}
-                    {!message.parts.some(p => p.type === 'text') && message.role === 'assistant' && status === 'ready' && (
-                      <Streamdown className="size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0" plugins={streamdownPlugins}>
-                        I found relevant information but couldn&apos;t generate a proper response. Please try rephrasing your question.
-                      </Streamdown>
-                    )}
-                  </MessageContent>
-                </Message>
-              );
-            })()}
-
-            {message.role === 'assistant' && isLast && status === 'ready' && (
+            {message.role === 'assistant' && status === 'ready' && (
               <MessageActions>
                 <MessageAction
                   label="Copy"
@@ -310,23 +257,41 @@ export function ChatMessages({ messages, sources, status, onRegenerate }: Props)
                 >
                   <CopyIcon className="size-3" />
                 </MessageAction>
-                <MessageAction label="Regenerate" onClick={onRegenerate}>
-                  <RefreshCcwIcon className="size-3" />
-                </MessageAction>
+                {isLast && (
+                  <MessageAction label="Regenerate" onClick={onRegenerate}>
+                    <RefreshCcwIcon className="size-3" />
+                  </MessageAction>
+                )}
               </MessageActions>
             )}
 
             {msgSources.length > 0 && message.role === 'assistant' && (
               <div className="px-4 pb-2 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <FileTextIcon className="size-4" />
-                  <span>Sources ({msgSources.length})</span>
+                <div className="flex items-center justify-between gap-3 text-sm font-medium text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <FileTextIcon className="size-4" />
+                    <span>Sources ({msgSources.length})</span>
+                  </div>
+                  {onOpenSources && (
+                    <button
+                      onClick={() => onOpenSources(message.id)}
+                      className="text-xs font-medium text-primary transition-opacity hover:opacity-80"
+                    >
+                      {isLatestSourcesMessage ? 'View all' : 'Open'}
+                    </button>
+                  )}
                 </div>
-                <div className="grid gap-2">
-                  {msgSources.slice(0, 6).map((source, i) => (
-                    <SourceCard key={`${source.url}-${i}`} index={i} source={source} customTitle={extractedTitles[i]} />
-                  ))}
-                </div>
+                {isLatestSourcesMessage ? (
+                  <div className="grid gap-2">
+                    {msgSources.slice(0, 3).map((source, i) => (
+                      <SourceCard key={`${source.url}-${i}`} index={i} source={source} customTitle={extractedTitles[i]} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Sources are available for this answer.
+                  </p>
+                )}
               </div>
             )}
           </Fragment>
